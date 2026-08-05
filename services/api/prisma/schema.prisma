@@ -63,13 +63,13 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens RefreshToken[]
-  profile       Profile?
-  preference    Preference?
-  equipment     Equipment[]
+  refreshTokens   RefreshToken[]
+  profile         Profile?
+  preference      Preference?
+  equipment       Equipment[]
   workoutSchedule WorkoutSchedule?
-  devices       DeviceConnection[]
-  auditEvents   AuditEvent[]
+  devices         DeviceConnection[]
+  auditEvents     AuditEvent[]
 
   @@index([status])
   @@map("users")
@@ -78,6 +78,11 @@ model User {
 model RefreshToken {
   id         String    @id @default(uuid())
   userId     String
+  // Shared by every token descended from the same login/register — i.e. the
+  // original token and every token it was rotated into. Lets us revoke an
+  // entire session lineage at once when reuse of an already-rotated token
+  // indicates possible theft (see AuthService.handleRefreshTokenReuse).
+  familyId   String
   tokenHash  String
   expiresAt  DateTime
   revokedAt  DateTime?
@@ -88,27 +93,28 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([familyId])
   @@map("refresh_tokens")
 }
 
 model Profile {
-  id                  String              @id @default(uuid())
-  userId              String              @unique
+  id                  String             @id @default(uuid())
+  userId              String             @unique
   firstName           String
   dateOfBirth         DateTime?
   countryCode         String?
-  languageCode        String              @default("en")
-  timezone            String              @default("UTC")
-  unitSystem          UnitSystem          @default(METRIC)
-  sexForCalculations  SexForCalculations  @default(UNSPECIFIED)
+  languageCode        String             @default("en")
+  timezone            String             @default("UTC")
+  unitSystem          UnitSystem         @default(METRIC)
+  sexForCalculations  SexForCalculations @default(UNSPECIFIED)
   heightCm            Float?
   weightKg            Float?
   primaryGoal         String?
   experienceLevel     String?
-  onboardingCompleted Boolean             @default(false)
-  onboardingStep      Int                 @default(0)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  onboardingCompleted Boolean            @default(false)
+  onboardingStep      Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -116,16 +122,16 @@ model Profile {
 }
 
 model Preference {
-  id                  String        @id @default(uuid())
-  userId              String        @unique
-  companion           Companion     @default(ATLAS)
-  companionMode       CompanionMode @default(STANDARD)
-  themeMode           ThemeMode     @default(SYSTEM)
-  reducedMotion       Boolean       @default(false)
-  notificationsEnabled Boolean      @default(true)
-  aiMemoryEnabled     Boolean       @default(true)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  id                   String        @id @default(uuid())
+  userId               String        @unique
+  companion            Companion     @default(ATLAS)
+  companionMode        CompanionMode @default(STANDARD)
+  themeMode            ThemeMode     @default(SYSTEM)
+  reducedMotion        Boolean       @default(false)
+  notificationsEnabled Boolean       @default(true)
+  aiMemoryEnabled      Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -159,19 +165,20 @@ model WorkoutSchedule {
 }
 
 model DeviceConnection {
-  id                String                  @id @default(uuid())
+  id                String                 @id @default(uuid())
   userId            String
   provider          String
   displayName       String
-  status            DeviceConnectionStatus  @default(PENDING)
+  status            DeviceConnectionStatus @default(PENDING)
   externalAccountId String?
   lastSyncedAt      DateTime?
-  metadata          Json                    @default("{}")
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  metadata          Json                   @default("{}")
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, provider])
   @@index([userId])
   @@index([provider])
   @@map("device_connections")

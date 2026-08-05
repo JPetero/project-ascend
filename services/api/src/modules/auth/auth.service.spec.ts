@@ -9,16 +9,24 @@ import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
+  let auditService: { record: jest.Mock };
+  let tx: { refreshToken: { updateMany: jest.Mock; create: jest.Mock } };
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock };
-    refreshToken: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    refreshToken: { findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
+    tx = {
+      refreshToken: { updateMany: jest.fn(), create: jest.fn() },
+    };
     prisma = {
       user: { findUnique: jest.fn(), create: jest.fn() },
-      refreshToken: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      refreshToken: { findUnique: jest.fn(), create: jest.fn(), updateMany: jest.fn() },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(tx)),
     };
+    auditService = { record: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -38,7 +46,7 @@ describe('AuthService', () => {
             }),
           },
         },
-        { provide: AuditService, useValue: { record: jest.fn() } },
+        { provide: AuditService, useValue: auditService },
       ],
     }).compile();
 
@@ -100,9 +108,61 @@ describe('AuthService', () => {
       await expect(authService.refresh('garbage')).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-    it('rejects a refresh token that has been revoked', async () => {
+    it('rejects a refresh token whose secret does not match the stored hash', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue({
         id: 'token-id',
+        familyId: 'family-1',
+        tokenHash: await argon2.hash('correct-secret'),
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+
+      await expect(authService.refresh('token-id.wrong-secret')).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rotates a valid token inside one transaction, keeping the same family', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: 'token-id',
+        userId: 'user-1',
+        familyId: 'family-1',
+        tokenHash: await argon2.hash('secret'),
+        revokedAt: null,
+        deviceName: 'iPhone',
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'ada@example.com',
+        status: 'ACTIVE',
+      });
+      tx.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+      tx.refreshToken.create.mockResolvedValue({ id: 'new-token-id' });
+
+      const result = await authService.refresh('token-id.secret');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { id: 'token-id', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      const createArgs = tx.refreshToken.create.mock.calls[0][0];
+      expect(createArgs.data.familyId).toBe('family-1');
+      expect(createArgs.data.deviceName).toBe('iPhone');
+      expect(result.refreshToken).toContain('new-token-id.');
+      // The old token is only ever revoked, never reused for a second
+      // replacement — the family-wide reuse-revoke path must not fire.
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+      expect(auditService.record).not.toHaveBeenCalled();
+    });
+
+    it('treats reuse of an already-revoked token as possible theft and revokes the family', async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: 'token-id',
+        userId: 'user-1',
+        familyId: 'family-1',
         tokenHash: await argon2.hash('secret'),
         revokedAt: new Date(),
         expiresAt: new Date(Date.now() + 100_000),
@@ -111,18 +171,53 @@ describe('AuthService', () => {
       await expect(authService.refresh('token-id.secret')).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+
+      // No transaction/rotation should ever be attempted for a token
+      // that's already dead.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { familyId: 'family-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          action: 'auth.refresh_token_reuse_detected',
+        }),
+      );
     });
 
-    it('rejects a refresh token whose secret does not match the stored hash', async () => {
+    it('treats losing the rotation race (concurrent reuse) the same as reuse, issuing no new token', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue({
         id: 'token-id',
-        tokenHash: await argon2.hash('correct-secret'),
-        revokedAt: null,
+        userId: 'user-1',
+        familyId: 'family-1',
+        tokenHash: await argon2.hash('secret'),
+        revokedAt: null, // still looked valid at read time...
         expiresAt: new Date(Date.now() + 100_000),
       });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'ada@example.com',
+        status: 'ACTIVE',
+      });
+      // ...but a concurrent request already committed the rotation by the
+      // time this transaction's guarded update runs.
+      tx.refreshToken.updateMany.mockResolvedValue({ count: 0 });
 
-      await expect(authService.refresh('token-id.wrong-secret')).rejects.toBeInstanceOf(
+      await expect(authService.refresh('token-id.secret')).rejects.toBeInstanceOf(
         UnauthorizedException,
+      );
+
+      // The transaction must never create a replacement token for the loser.
+      expect(tx.refreshToken.create).not.toHaveBeenCalled();
+      // And the loss is treated exactly like reuse: whole family revoked.
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { familyId: 'family-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.refresh_token_reuse_detected' }),
       );
     });
   });

@@ -15,15 +15,32 @@ export class DevicesService {
     });
   }
 
+  /**
+   * A user can only have one connection per provider (see the
+   * `@@unique([userId, provider])` constraint on DeviceConnection) —
+   * reconnecting an already-connected provider (e.g. a double-tapped
+   * toggle, or a retried request) updates that row instead of creating a
+   * duplicate.
+   */
   create(userId: string, dto: CreateDeviceDto) {
-    return this.prisma.deviceConnection.create({
-      data: {
+    const metadata = (dto.metadata ?? {}) as Prisma.InputJsonValue;
+
+    return this.prisma.deviceConnection.upsert({
+      where: { userId_provider: { userId, provider: dto.provider } },
+      create: {
         userId,
         provider: dto.provider,
         displayName: dto.displayName,
         status: dto.status ?? 'PENDING',
         externalAccountId: dto.externalAccountId,
-        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+        metadata,
+      },
+      update: {
+        displayName: dto.displayName,
+        status: dto.status ?? 'PENDING',
+        externalAccountId: dto.externalAccountId,
+        metadata,
+        ...(dto.status === 'CONNECTED' ? { lastSyncedAt: new Date() } : {}),
       },
     });
   }

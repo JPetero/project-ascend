@@ -94,6 +94,33 @@ class OnboardingScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            if (onboardingState.syncError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AscendSpacing.md,
+                  AscendSpacing.sm,
+                  AscendSpacing.md,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: AscendSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        onboardingState.syncError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(AscendSpacing.md),
               child: AscendPrimaryButton(

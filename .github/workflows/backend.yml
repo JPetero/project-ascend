@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "services/api/**"
+      - "infrastructure/docker/**"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "services/api/**"
+      - "infrastructure/docker/**"
       - ".github/workflows/backend.yml"
 
 jobs:
@@ -51,13 +53,23 @@ jobs:
           node-version: 20
           cache: "pnpm"
 
-      - name: Install dependencies
-        run: pnpm install --filter @project-ascend/api...
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --filter @project-ascend/api... --frozen-lockfile
+
+      - name: Validate Prisma schema
+        run: pnpm --filter @project-ascend/api exec prisma validate
+
+      - name: Check Prisma schema formatting
+        # `prisma format` has no --check flag (unlike `dart format`); it
+        # always formats in place, so drift is detected via git diff.
+        run: |
+          pnpm --filter @project-ascend/api exec prisma format
+          git diff --exit-code -- services/api/prisma/schema.prisma
 
       - name: Generate Prisma client
         run: pnpm --filter @project-ascend/api prisma:generate
 
-      - name: Apply migrations
+      - name: Apply migrations against Postgres
         run: pnpm --filter @project-ascend/api prisma:deploy
 
       - name: Lint
@@ -71,3 +83,35 @@ jobs:
 
       - name: Build
         run: pnpm --filter @project-ascend/api build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: runtime
+          push: false
+          load: true
+          tags: project-ascend-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: migrate
+          push: false
+          load: true
+          tags: project-ascend-migrate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
