@@ -1,0 +1,195 @@
+// Project Ascend — Prisma schema
+// Portability note: `daysOfWeek` on WorkoutSchedule uses a native PostgreSQL
+// text array (String[]) rather than a normalized child table. This is the
+// more portable choice for a small, bounded, order-insensitive set of values
+// (day names) that is always read/written as a whole with its parent record —
+// it avoids a join for a field that is never queried independently, while
+// remaining simple to migrate later if per-day metadata is ever needed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum SexForCalculations {
+  MALE
+  FEMALE
+  UNSPECIFIED
+}
+
+enum Companion {
+  ATLAS
+  NOVA
+}
+
+enum CompanionMode {
+  STANDARD
+  CHIBI
+}
+
+enum ThemeMode {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+enum DeviceConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  PENDING
+  ERROR
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  refreshTokens RefreshToken[]
+  profile       Profile?
+  preference    Preference?
+  equipment     Equipment[]
+  workoutSchedule WorkoutSchedule?
+  devices       DeviceConnection[]
+  auditEvents   AuditEvent[]
+
+  @@index([status])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  deviceName String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Profile {
+  id                  String              @id @default(uuid())
+  userId              String              @unique
+  firstName           String
+  dateOfBirth         DateTime?
+  countryCode         String?
+  languageCode        String              @default("en")
+  timezone            String              @default("UTC")
+  unitSystem          UnitSystem          @default(METRIC)
+  sexForCalculations  SexForCalculations  @default(UNSPECIFIED)
+  heightCm            Float?
+  weightKg            Float?
+  primaryGoal         String?
+  experienceLevel     String?
+  onboardingCompleted Boolean             @default(false)
+  onboardingStep      Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model Preference {
+  id                  String        @id @default(uuid())
+  userId              String        @unique
+  companion           Companion     @default(ATLAS)
+  companionMode       CompanionMode @default(STANDARD)
+  themeMode           ThemeMode     @default(SYSTEM)
+  reducedMotion       Boolean       @default(false)
+  notificationsEnabled Boolean      @default(true)
+  aiMemoryEnabled     Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("preferences")
+}
+
+model Equipment {
+  id         String  @id @default(uuid())
+  userId     String
+  type       String
+  customName String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("equipment")
+}
+
+model WorkoutSchedule {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  durationMinutes Int
+  preferredTime   String?
+  daysOfWeek      String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workout_schedules")
+}
+
+model DeviceConnection {
+  id                String                  @id @default(uuid())
+  userId            String
+  provider          String
+  displayName       String
+  status            DeviceConnectionStatus  @default(PENDING)
+  externalAccountId String?
+  lastSyncedAt      DateTime?
+  metadata          Json                    @default("{}")
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider])
+  @@map("device_connections")
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_events")
+}

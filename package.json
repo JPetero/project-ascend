@@ -1,0 +1,30 @@
+{
+  "name": "project-ascend",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Project Ascend monorepo root",
+  "scripts": {
+    "api:dev": "pnpm --filter @project-ascend/api start:dev",
+    "api:build": "pnpm --filter @project-ascend/api build",
+    "api:test": "pnpm --filter @project-ascend/api test",
+    "api:test:e2e": "pnpm --filter @project-ascend/api test:e2e",
+    "api:lint": "pnpm --filter @project-ascend/api lint",
+    "api:prisma:generate": "pnpm --filter @project-ascend/api prisma:generate",
+    "api:prisma:migrate": "pnpm --filter @project-ascend/api prisma:migrate",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "prisma"
+    ]
+  }
+}
