@@ -1,0 +1,50 @@
+# Root
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+node_modules/
+
+# pnpm
+.pnpm-store/
+
+# Backend (NestJS)
+services/api/dist/
+services/api/node_modules/
+services/api/coverage/
+services/api/.env
+services/api/generated/
+
+# Prisma
+services/api/prisma/*.db
+services/api/prisma/migrations/dev/
+
+# Flutter / Dart
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+apps/mobile/build/
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/ios/Flutter/Flutter.framework
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/android/.gradle/
+apps/mobile/android/local.properties
+apps/mobile/**/generated_plugin_registrant.dart
+apps/mobile/*.iml
+apps/mobile/coverage/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Docker
+infrastructure/docker/pgdata/
+
+# Misc
+*.tsbuildinfo
