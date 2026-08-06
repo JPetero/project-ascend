@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/validation/form_validators.dart';
 import '../../data/food_repository.dart';
 import '../providers/food_controller.dart';
 
@@ -36,12 +37,6 @@ class _CustomFoodEditorScreenState
     _carbs.dispose();
     _fat.dispose();
     super.dispose();
-  }
-
-  String? _requiredNumber(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Required';
-    if (double.tryParse(value) == null) return 'Enter a number';
-    return null;
   }
 
   Future<void> _save() async {
@@ -89,43 +84,41 @@ class _CustomFoodEditorScreenState
               AscendTextField(
                 controller: _name,
                 label: 'Food name',
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: requiredText,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _servingDescription,
                 label: 'Serving size (e.g. "1 cup cooked")',
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: requiredText,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _calories,
                 label: 'Calories per serving',
                 keyboardType: TextInputType.number,
-                validator: _requiredNumber,
+                validator: requiredNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _protein,
                 label: 'Protein (g) per serving',
                 keyboardType: TextInputType.number,
-                validator: _requiredNumber,
+                validator: requiredNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _carbs,
                 label: 'Carbs (g) per serving',
                 keyboardType: TextInputType.number,
-                validator: _requiredNumber,
+                validator: requiredNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _fat,
                 label: 'Fat (g) per serving',
                 keyboardType: TextInputType.number,
-                validator: _requiredNumber,
+                validator: requiredNumber,
               ),
               const SizedBox(height: AscendSpacing.lg),
               AscendPrimaryButton(

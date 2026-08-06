@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/validation/form_validators.dart';
 import '../../data/cardio_session_repository.dart';
 import '../../domain/cardio_session.dart';
 import '../providers/cardio_session_controller.dart';
@@ -42,19 +43,8 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
     super.dispose();
   }
 
-  String? _requiredMinutes(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Required';
-    final minutes = int.tryParse(value);
-    if (minutes == null || minutes <= 0) return 'Enter whole minutes';
-    return null;
-  }
-
-  String? _optionalPositive(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final parsed = double.tryParse(value);
-    if (parsed == null || parsed <= 0) return 'Enter a positive number';
-    return null;
-  }
+  String? _requiredMinutes(String? value) =>
+      requiredPositiveInt(value, message: 'Enter whole minutes');
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -151,21 +141,21 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
                 controller: _distance,
                 label: 'Distance (km) — optional',
                 keyboardType: TextInputType.number,
-                validator: _optionalPositive,
+                validator: optionalPositiveNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _elevation,
                 label: 'Elevation gain (m) — optional',
                 keyboardType: TextInputType.number,
-                validator: _optionalPositive,
+                validator: optionalPositiveNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(
                 controller: _calories,
                 label: 'Estimated calories — optional',
                 keyboardType: TextInputType.number,
-                validator: _optionalPositive,
+                validator: optionalPositiveNumber,
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(

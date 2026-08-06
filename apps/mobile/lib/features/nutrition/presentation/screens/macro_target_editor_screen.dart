@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/validation/form_validators.dart';
 import '../../data/macro_target_repository.dart';
 import '../../domain/macro_target.dart';
 import '../providers/macro_target_controller.dart';
@@ -38,12 +39,6 @@ class _MacroTargetEditorScreenState
     _fat.dispose();
     _fiber.dispose();
     super.dispose();
-  }
-
-  String? _requiredInt(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Required';
-    if (int.tryParse(value) == null) return 'Enter a whole number';
-    return null;
   }
 
   Future<void> _save() async {
@@ -129,28 +124,28 @@ class _MacroTargetEditorScreenState
             controller: _calories,
             label: 'Calories',
             keyboardType: TextInputType.number,
-            validator: _requiredInt,
+            validator: requiredInt,
           ),
           const SizedBox(height: AscendSpacing.md),
           AscendTextField(
             controller: _protein,
             label: 'Protein (g)',
             keyboardType: TextInputType.number,
-            validator: _requiredInt,
+            validator: requiredInt,
           ),
           const SizedBox(height: AscendSpacing.md),
           AscendTextField(
             controller: _carbs,
             label: 'Carbs (g)',
             keyboardType: TextInputType.number,
-            validator: _requiredInt,
+            validator: requiredInt,
           ),
           const SizedBox(height: AscendSpacing.md),
           AscendTextField(
             controller: _fat,
             label: 'Fat (g)',
             keyboardType: TextInputType.number,
-            validator: _requiredInt,
+            validator: requiredInt,
           ),
           const SizedBox(height: AscendSpacing.md),
           AscendTextField(
