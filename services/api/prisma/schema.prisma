@@ -70,6 +70,9 @@ model User {
   workoutSchedule WorkoutSchedule?
   devices         DeviceConnection[]
   auditEvents     AuditEvent[]
+  workoutPlans    WorkoutPlan[]
+  workoutSessions WorkoutSession[]
+  personalRecords PersonalRecord[]
 
   @@index([status])
   @@map("users")
@@ -199,4 +202,315 @@ model AuditEvent {
   @@index([action])
   @@index([createdAt])
   @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Workout Engine (Sprint 2)
+// ---------------------------------------------------------------------------
+// Two-tier workout model, the same shape as most content-catalog systems:
+//   - Workout / WorkoutExercise: a shared, curated catalog (seeded, not
+//     user-owned) that the "Browse workouts" surface reads.
+//   - WorkoutPlan / WorkoutPlanExercise: a user's own plan. Starting a plan
+//     "from" a catalog Workout copies its exercises in rather than
+//     referencing them live, so a user customizing their plan (reordering,
+//     changing target sets/reps) never mutates the shared catalog.
+//
+// There is deliberately no `WorkoutHistory` table. "History" is a read
+// model — a query over completed `WorkoutSession`/`WorkoutSet` rows, served
+// by the history module's service — not a separate table that would just be
+// another copy of the same facts to keep in sync for no query benefit.
+//
+// Weight/duration/distance are always stored in canonical metric units
+// (kg / seconds / meters), the same convention `Profile.heightCm` and
+// `Profile.weightKg` already use — the client converts for display based on
+// `Preference.unitSystem` (not modeled here; conversion is presentation-only).
+
+enum ExerciseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum MuscleRole {
+  PRIMARY
+  SECONDARY
+}
+
+enum WorkoutSessionStatus {
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+enum PersonalRecordType {
+  MAX_WEIGHT
+  MAX_REPS
+  MAX_DURATION
+  MAX_DISTANCE
+  MAX_VOLUME
+}
+
+model ExerciseCategory {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+
+  exercises Exercise[]
+  workouts  Workout[]
+
+  @@map("exercise_categories")
+}
+
+model MuscleGroup {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+
+  exerciseMuscles ExerciseMuscle[]
+
+  @@map("muscle_groups")
+}
+
+model EquipmentType {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+
+  exerciseEquipment ExerciseEquipment[]
+
+  @@map("equipment_types")
+}
+
+model Exercise {
+  id             String             @id @default(uuid())
+  name           String
+  slug           String             @unique
+  description    String
+  difficulty     ExerciseDifficulty @default(BEGINNER)
+  instructions   String
+  safetyTips     String
+  commonMistakes String
+  // Placeholders only in this sprint — no media pipeline yet (see
+  // packages/docs/roadmap.md). Nullable so seed data can omit them without
+  // every exercise needing a fake URL.
+  imageUrl       String?
+  videoUrl       String?
+  categoryId     String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  category  ExerciseCategory    @relation(fields: [categoryId], references: [id])
+  muscles   ExerciseMuscle[]
+  equipment ExerciseEquipment[]
+
+  alternativesFrom ExerciseAlternative[] @relation("ExerciseAlternativesFrom")
+  alternativesTo   ExerciseAlternative[] @relation("ExerciseAlternativesTo")
+
+  workoutExercises     WorkoutExercise[]
+  workoutPlanExercises WorkoutPlanExercise[]
+  workoutSets          WorkoutSet[]
+  personalRecords      PersonalRecord[]
+
+  @@index([categoryId])
+  @@map("exercises")
+}
+
+model ExerciseMuscle {
+  id            String     @id @default(uuid())
+  exerciseId    String
+  muscleGroupId String
+  role          MuscleRole
+
+  exercise    Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscleGroup MuscleGroup @relation(fields: [muscleGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, muscleGroupId])
+  @@index([muscleGroupId])
+  @@map("exercise_muscles")
+}
+
+model ExerciseEquipment {
+  id              String @id @default(uuid())
+  exerciseId      String
+  equipmentTypeId String
+
+  exercise      Exercise      @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  equipmentType EquipmentType @relation(fields: [equipmentTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, equipmentTypeId])
+  @@index([equipmentTypeId])
+  @@map("exercise_equipment")
+}
+
+// Seed data inserts both directions explicitly (A->B and B->A) rather than
+// making every read infer the reverse relationship — simpler queries, at
+// the cost of seed data needing to keep both directions consistent.
+model ExerciseAlternative {
+  id                    String @id @default(uuid())
+  exerciseId            String
+  alternativeExerciseId String
+
+  exercise            Exercise @relation("ExerciseAlternativesFrom", fields: [exerciseId], references: [id], onDelete: Cascade)
+  alternativeExercise Exercise @relation("ExerciseAlternativesTo", fields: [alternativeExerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, alternativeExerciseId])
+  @@index([alternativeExerciseId])
+  @@map("exercise_alternatives")
+}
+
+model Workout {
+  id                       String             @id @default(uuid())
+  name                     String
+  slug                     String             @unique
+  description              String
+  categoryId               String
+  difficulty               ExerciseDifficulty @default(BEGINNER)
+  estimatedDurationMinutes Int
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  category  ExerciseCategory  @relation(fields: [categoryId], references: [id])
+  exercises WorkoutExercise[]
+  plans     WorkoutPlan[]
+
+  @@index([categoryId])
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id                    String  @id @default(uuid())
+  workoutId             String
+  exerciseId            String
+  order                 Int
+  targetSets            Int
+  targetReps            Int?
+  targetDurationSeconds Int?
+  targetWeightKg        Float?
+  restSeconds           Int     @default(60)
+  notes                 String?
+
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@unique([workoutId, order])
+  @@index([exerciseId])
+  @@map("workout_exercises")
+}
+
+model WorkoutPlan {
+  id        String   @id @default(uuid())
+  userId    String
+  // The catalog Workout this plan started from, if any — kept only as a
+  // "based on" reference; WorkoutPlanExercise rows are this plan's own
+  // copy, so the plan is unaffected if the catalog Workout later changes.
+  workoutId String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout   Workout?              @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercises WorkoutPlanExercise[]
+  sessions  WorkoutSession[]
+
+  @@index([userId])
+  @@map("workout_plans")
+}
+
+model WorkoutPlanExercise {
+  id                    String  @id @default(uuid())
+  workoutPlanId         String
+  exerciseId            String
+  order                 Int
+  targetSets            Int
+  targetReps            Int?
+  targetDurationSeconds Int?
+  targetWeightKg        Float?
+  restSeconds           Int     @default(60)
+  notes                 String?
+
+  workoutPlan WorkoutPlan @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  exercise    Exercise    @relation(fields: [exerciseId], references: [id])
+
+  @@unique([workoutPlanId, order])
+  @@index([exerciseId])
+  @@map("workout_plan_exercises")
+}
+
+model WorkoutSession {
+  id                    String               @id @default(uuid())
+  userId                String
+  workoutPlanId         String?
+  status                WorkoutSessionStatus @default(IN_PROGRESS)
+  startedAt             DateTime             @default(now())
+  // Start of the *current* active streak — set on start() and every
+  // resume(). pause()/finish() add (now - resumedAt) to
+  // activeDurationSeconds before clearing/ignoring it, which is what makes
+  // multiple pause/resume cycles accumulate correctly instead of just the
+  // last streak.
+  resumedAt             DateTime             @default(now())
+  pausedAt              DateTime?
+  completedAt           DateTime?
+  // Accumulated active seconds, excluding paused time — updated on
+  // pause/resume/finish rather than derived from completedAt - startedAt,
+  // since that delta would incorrectly include any paused time.
+  activeDurationSeconds Int                  @default(0)
+  notes                 String?
+  createdAt             DateTime             @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutPlan     WorkoutPlan?     @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
+  sets            WorkoutSet[]
+  personalRecords PersonalRecord[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([workoutPlanId])
+  @@map("workout_sessions")
+}
+
+model WorkoutSet {
+  id               String   @id @default(uuid())
+  workoutSessionId String
+  exerciseId       String
+  setNumber        Int
+  reps             Int?
+  weightKg         Float?
+  durationSeconds  Int?
+  distanceMeters   Float?
+  isWarmup         Boolean  @default(false)
+  completedAt      DateTime @default(now())
+
+  workoutSession WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exercise       Exercise       @relation(fields: [exerciseId], references: [id])
+
+  @@unique([workoutSessionId, exerciseId, setNumber])
+  @@index([exerciseId])
+  @@map("workout_sets")
+}
+
+model PersonalRecord {
+  id               String             @id @default(uuid())
+  userId           String
+  exerciseId       String
+  type             PersonalRecordType
+  value            Float
+  unit             String
+  workoutSessionId String?
+  achievedAt       DateTime           @default(now())
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise       Exercise        @relation(fields: [exerciseId], references: [id])
+  workoutSession WorkoutSession? @relation(fields: [workoutSessionId], references: [id], onDelete: SetNull)
+
+  // One current-best row per (user, exercise, category) — broken records
+  // are updated in place, not appended. The session/date it was set on is
+  // still recoverable from `workoutSessionId` / `achievedAt`; a full
+  // append-only PR log isn't needed for "what's my current best" or
+  // "celebrate a new one", which is all this sprint's Personal Records page
+  // does.
+  @@unique([userId, exerciseId, type])
+  @@index([userId])
+  @@map("personal_records")
 }
