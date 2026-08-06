@@ -1,9 +1,11 @@
 import 'package:mobile/features/nutrition/data/food_repository.dart';
+import 'package:mobile/features/nutrition/data/macro_target_repository.dart';
 import 'package:mobile/features/nutrition/data/meal_entry_repository.dart';
 import 'package:mobile/features/nutrition/data/nutrition_summary_repository.dart';
 import 'package:mobile/features/nutrition/data/saved_meal_repository.dart';
 import 'package:mobile/features/nutrition/data/water_repository.dart';
 import 'package:mobile/features/nutrition/domain/food.dart';
+import 'package:mobile/features/nutrition/domain/macro_target.dart';
 import 'package:mobile/features/nutrition/domain/meal_entry.dart';
 import 'package:mobile/features/nutrition/domain/meal_type.dart';
 import 'package:mobile/features/nutrition/domain/nutrition_dashboard_summary.dart';
@@ -305,5 +307,49 @@ class FakeSavedMealRepository implements SavedMealRepository {
           ),
         )
         .toList();
+  }
+}
+
+final sampleMacroTarget = MacroTarget(
+  calorieTarget: 2200,
+  proteinGramsTarget: 140,
+  carbGramsTarget: 220,
+  fatGramsTarget: 70,
+  fiberGramsTarget: 30,
+  isEstimatedDefault: true,
+  disclaimer:
+      'This is a general estimate, not medical advice. If you are '
+      'pregnant, managing an eating disorder, kidney disease, diabetes, '
+      'or another condition affecting your nutrition needs, please set '
+      'targets with guidance from a qualified professional.',
+  updatedAt: DateTime.utc(2026, 1, 1),
+);
+
+/// In-memory stand-in for macro targets — `upsert` flips
+/// `isEstimatedDefault` to false, matching the real backend's behavior.
+class FakeMacroTargetRepository implements MacroTargetRepository {
+  FakeMacroTargetRepository({MacroTarget? initial})
+    : _current = initial ?? sampleMacroTarget;
+
+  MacroTarget _current;
+  final List<MacroTargetInput> upsertCalls = [];
+
+  @override
+  Future<MacroTarget> get() async => _current;
+
+  @override
+  Future<MacroTarget> upsert(MacroTargetInput input) async {
+    upsertCalls.add(input);
+    _current = MacroTarget(
+      calorieTarget: input.calorieTarget,
+      proteinGramsTarget: input.proteinGramsTarget,
+      carbGramsTarget: input.carbGramsTarget,
+      fatGramsTarget: input.fatGramsTarget,
+      fiberGramsTarget: input.fiberGramsTarget,
+      isEstimatedDefault: false,
+      disclaimer: _current.disclaimer,
+      updatedAt: DateTime.now(),
+    );
+    return _current;
   }
 }

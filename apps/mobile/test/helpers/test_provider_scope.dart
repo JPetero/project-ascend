@@ -6,6 +6,7 @@ import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
+import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/meal_entry_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/nutrition_summary_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/saved_meal_controller.dart';
@@ -48,6 +49,7 @@ Future<ProviderContainer> createTestContainer({
   FakeWaterRepository? waterRepository,
   FakeDeloadRepository? deloadRepository,
   FakeSavedMealRepository? savedMealRepository,
+  FakeMacroTargetRepository? macroTargetRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -120,6 +122,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       savedMealRepositoryProvider.overrideWithValue(
         savedMealRepository ?? FakeSavedMealRepository(),
+      ),
+      macroTargetRepositoryProvider.overrideWithValue(
+        macroTargetRepository ?? FakeMacroTargetRepository(),
       ),
     ],
   );

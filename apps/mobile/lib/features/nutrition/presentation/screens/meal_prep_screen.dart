@@ -73,7 +73,18 @@ class MealPrepScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
             children: [
-              const AscendSectionHeader(title: "Today's macros"),
+              AscendSectionHeader(
+                title: "Today's macros",
+                actionLabel: 'Edit targets',
+                onAction: () async {
+                  final saved = await context.push<bool>(
+                    RoutePaths.macroTargetEditor,
+                  );
+                  if (saved ?? false) {
+                    ref.invalidate(nutritionDashboardSummaryProvider);
+                  }
+                },
+              ),
               const SizedBox(height: AscendSpacing.sm),
               nutritionAsync.when(
                 data: (nutrition) => _TodaySummary(nutrition: nutrition),
