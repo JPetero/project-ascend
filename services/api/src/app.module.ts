@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './common/audit/audit.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
+import { AchievementsModule } from './modules/achievements/achievements.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthIdentitiesModule } from './modules/auth-identities/auth-identities.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -73,6 +74,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MacroTargetsModule,
     WaterModule,
     SavedMealsModule,
+    AchievementsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

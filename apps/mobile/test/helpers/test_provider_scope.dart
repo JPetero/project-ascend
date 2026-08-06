@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
+import 'package:mobile/features/achievements/presentation/providers/achievement_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
@@ -25,6 +26,7 @@ import 'package:mobile/features/workout/presentation/providers/workout_plan_cont
 import 'package:mobile/features/workout/presentation/providers/workout_session_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fake_achievement_repositories.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_repositories.dart';
 import 'fake_workout_repositories.dart';
@@ -50,6 +52,7 @@ Future<ProviderContainer> createTestContainer({
   FakeDeloadRepository? deloadRepository,
   FakeSavedMealRepository? savedMealRepository,
   FakeMacroTargetRepository? macroTargetRepository,
+  FakeAchievementRepository? achievementRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -125,6 +128,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       macroTargetRepositoryProvider.overrideWithValue(
         macroTargetRepository ?? FakeMacroTargetRepository(),
+      ),
+      achievementRepositoryProvider.overrideWithValue(
+        achievementRepository ?? FakeAchievementRepository(),
       ),
     ],
   );

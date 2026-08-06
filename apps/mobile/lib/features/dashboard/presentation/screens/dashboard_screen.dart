@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/entitlements/capability.dart';
 import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/progress/progress_util.dart';
+import '../../../../core/routing/route_paths.dart';
+import '../../../achievements/domain/achievement.dart';
+import '../../../achievements/presentation/providers/achievement_controller.dart';
+import '../../../achievements/presentation/widgets/achievement_icon.dart';
 import '../../../auth/domain/auth_identity.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_identity_controller.dart';
@@ -48,6 +54,7 @@ class DashboardScreen extends ConsumerWidget {
     final recordsAsync = ref.watch(personalRecordsProvider);
     final nutritionAsync = ref.watch(nutritionDashboardSummaryProvider);
     final identitiesAsync = ref.watch(authIdentitiesProvider);
+    final achievementsAsync = ref.watch(achievementsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
@@ -58,6 +65,7 @@ class DashboardScreen extends ConsumerWidget {
             ref.refresh(personalRecordsProvider.future),
             ref.refresh(nutritionDashboardSummaryProvider.future),
             ref.refresh(authIdentitiesProvider.future),
+            ref.refresh(achievementsProvider.future),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
@@ -99,6 +107,26 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: AscendSpacing.lg),
               const DeloadCard(),
               _BmiCard(profile: profile),
+              const SizedBox(height: AscendSpacing.lg),
+              AscendSectionHeader(
+                title: 'Achievements',
+                actionLabel: 'See all',
+                onAction: () => context.push(RoutePaths.achievements),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              achievementsAsync.when(
+                data: (achievements) =>
+                    _AchievementsSummaryCard(achievements: achievements),
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AscendSpacing.lg),
+                  child: AscendLoadingIndicator(label: 'Loading achievements'),
+                ),
+                error: (error, stackTrace) => const AscendEmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: "Couldn't load achievements",
+                  message: 'Pull to refresh to try again.',
+                ),
+              ),
               const SizedBox(height: AscendSpacing.lg),
               nutritionAsync.maybeWhen(
                 data: (nutrition) => Column(
@@ -549,6 +577,63 @@ class _MissedWorkoutNudge extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A compact "N of M earned" summary with up to 3 recent medals — the full
+/// grouped catalog lives on [AchievementsScreen] via the "See all" action
+/// on this section's header.
+class _AchievementsSummaryCard extends StatelessWidget {
+  const _AchievementsSummaryCard({required this.achievements});
+
+  final List<Achievement> achievements;
+
+  @override
+  Widget build(BuildContext context) {
+    if (achievements.isEmpty) {
+      return const AscendEmptyState(
+        icon: Icons.emoji_events_outlined,
+        title: 'No achievements yet',
+        message: 'Complete a workout or log a meal to start earning them.',
+      );
+    }
+
+    final earned = achievements.where((a) => a.isEarned).toList()
+      ..sort((a, b) => b.earnedAt!.compareTo(a.earnedAt!));
+    final theme = Theme.of(context);
+
+    return AscendCard(
+      semanticLabel:
+          '${earned.length} of ${achievements.length} achievements earned',
+      onTap: () => context.push(RoutePaths.achievements),
+      child: Row(
+        children: [
+          for (final achievement in earned.take(3))
+            Padding(
+              padding: const EdgeInsets.only(right: AscendSpacing.sm),
+              child: Icon(
+                achievementIconFor(achievement.iconAsset),
+                color: AscendColors.premiumGold,
+                size: 28,
+              ),
+            ),
+          if (earned.isEmpty)
+            Icon(
+              Icons.emoji_events_outlined,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 28,
+            ),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Text(
+              '${earned.length} of ${achievements.length} earned',
+              style: theme.textTheme.titleSmall,
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
       ),
     );
   }

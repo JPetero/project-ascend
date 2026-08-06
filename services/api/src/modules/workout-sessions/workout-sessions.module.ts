@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
+import { AchievementsModule } from '../achievements/achievements.module';
 import { PersonalRecordsModule } from '../personal-records/personal-records.module';
 import { WorkoutSessionsController } from './workout-sessions.controller';
 import { WorkoutSessionsService } from './workout-sessions.service';
 
 @Module({
-  imports: [PersonalRecordsModule],
+  imports: [PersonalRecordsModule, AchievementsModule],
   controllers: [WorkoutSessionsController],
   providers: [WorkoutSessionsService],
   exports: [WorkoutSessionsService],

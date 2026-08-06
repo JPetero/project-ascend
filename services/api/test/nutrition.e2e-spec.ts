@@ -284,6 +284,17 @@ describe('Nutrition Tracking (e2e)', () => {
         round1(riceFood.proteinGramsPerServing * multiplier),
       );
 
+      // This is user A's first-ever logged meal in this file, so
+      // "first_meal_logged" should be earned as a side effect.
+      const achievements = await request(app.getHttpServer())
+        .get('/achievements')
+        .set(authA())
+        .expect(200);
+      const firstMealLogged = achievements.body.data.find(
+        (a: { key: string }) => a.key === 'first_meal_logged',
+      );
+      expect(firstMealLogged.earnedAt).not.toBeNull();
+
       const entryId = created.body.data.id;
 
       // Another user cannot read, edit, or delete this entry.

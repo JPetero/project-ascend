@@ -16,6 +16,7 @@ abstract final class RoutePaths {
   static const leaderboards = '/leaderboards';
 
   static const dashboard = '/dashboard';
+  static const achievements = '/achievements';
 
   // Workout Engine — pushed on top of the shell (not nested tab routes) so
   // the immersive player/summary screens can hide the bottom navigation.

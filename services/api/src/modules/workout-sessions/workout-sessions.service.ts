@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../../common/audit/audit.service';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AchievementsService } from '../achievements/achievements.service';
 import { PersonalRecordsService } from '../personal-records/personal-records.service';
 import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
 import { LogSetDto } from './dto/log-set.dto';
@@ -36,6 +37,7 @@ export class WorkoutSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly personalRecordsService: PersonalRecordsService,
+    private readonly achievementsService: AchievementsService,
     private readonly auditService: AuditService,
     private readonly idempotencyService: IdempotencyService,
   ) {}
@@ -136,6 +138,9 @@ export class WorkoutSessionsService {
     const session = await this.endSession(userId, id, 'COMPLETED', dto.difficultyRating);
 
     const newPersonalRecords = await this.personalRecordsService.detectAndRecord(userId, id);
+    // Evaluated after personal-record detection so a PR set in this very
+    // session counts toward the "first personal record" achievement.
+    const newAchievements = await this.achievementsService.evaluateWorkoutAchievements(userId);
     await this.auditService.record({
       userId,
       action: 'workout.session_completed',
@@ -143,7 +148,7 @@ export class WorkoutSessionsService {
       entityId: id,
     });
 
-    return { session: this.serialize(session), newPersonalRecords };
+    return { session: this.serialize(session), newPersonalRecords, newAchievements };
   }
 
   async abandon(userId: string, id: string) {

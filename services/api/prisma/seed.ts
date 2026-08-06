@@ -5,6 +5,7 @@ import {
   MuscleRole,
   FoodSourceType,
   LegalDocumentType,
+  AchievementCategory,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -1524,6 +1525,97 @@ async function seedLegalDocuments() {
   console.log(`Seeded ${LEGAL_DOCUMENTS.length} legal documents.`);
 }
 
+// `key` is the stable identity `AchievementsService`'s rules match
+// against — see services/api/src/modules/achievements/achievements.service.ts.
+// GPS Cardio and Recovery achievements aren't seeded yet since those
+// verticals don't award anything this session; `AchievementCategory`
+// already reserves room for them.
+const ACHIEVEMENTS = [
+  {
+    key: 'first_workout',
+    title: 'First Steps',
+    description: 'Complete your first workout.',
+    iconAsset: 'fitness_center',
+    category: AchievementCategory.WORKOUT,
+    targetSteps: 1,
+  },
+  {
+    key: 'ten_workouts',
+    title: 'Building the Habit',
+    description: 'Complete 10 workouts.',
+    iconAsset: 'fitness_center',
+    category: AchievementCategory.WORKOUT,
+    targetSteps: 10,
+  },
+  {
+    key: 'fifty_workouts',
+    title: 'Iron Will',
+    description: 'Complete 50 workouts.',
+    iconAsset: 'military_tech',
+    category: AchievementCategory.WORKOUT,
+    targetSteps: 50,
+  },
+  {
+    key: 'first_personal_record',
+    title: 'New Best',
+    description: 'Set your first personal record.',
+    iconAsset: 'emoji_events',
+    category: AchievementCategory.WORKOUT,
+    targetSteps: 1,
+  },
+  {
+    key: 'seven_day_streak',
+    title: 'One Week Strong',
+    description: 'Reach a 7-day workout streak.',
+    iconAsset: 'local_fire_department',
+    category: AchievementCategory.CONSISTENCY,
+    targetSteps: 7,
+  },
+  {
+    key: 'thirty_day_streak',
+    title: 'Unstoppable',
+    description: 'Reach a 30-day workout streak.',
+    iconAsset: 'local_fire_department',
+    category: AchievementCategory.CONSISTENCY,
+    targetSteps: 30,
+  },
+  {
+    key: 'first_meal_logged',
+    title: 'Fueling Up',
+    description: 'Log your first meal.',
+    iconAsset: 'restaurant',
+    category: AchievementCategory.NUTRITION,
+    targetSteps: 1,
+  },
+  {
+    key: 'hundred_meals_logged',
+    title: 'Nutrition Nerd',
+    description: 'Log 100 meals.',
+    iconAsset: 'restaurant',
+    category: AchievementCategory.NUTRITION,
+    targetSteps: 100,
+  },
+] as const;
+
+async function seedAchievements() {
+  for (const achievement of ACHIEVEMENTS) {
+    await prisma.achievement.upsert({
+      where: { key: achievement.key },
+      create: achievement,
+      update: {
+        title: achievement.title,
+        description: achievement.description,
+        iconAsset: achievement.iconAsset,
+        category: achievement.category,
+        targetSteps: achievement.targetSteps,
+      },
+    });
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`Seeded ${ACHIEVEMENTS.length} achievements.`);
+}
+
 async function main() {
   const categoryIds = new Map<string, string>();
   for (const category of CATEGORIES) {
@@ -1673,6 +1765,7 @@ async function main() {
 
   await seedNutrition();
   await seedLegalDocuments();
+  await seedAchievements();
 }
 
 main()

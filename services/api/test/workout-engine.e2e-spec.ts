@@ -397,6 +397,24 @@ describe('Workout Engine (e2e)', () => {
       const maxWeightRecord = newRecords.find((r: { type: string }) => r.type === 'MAX_WEIGHT');
       expect(maxWeightRecord.value).toBe(67.5);
 
+      // This is this user's first-ever completed session, so both
+      // "first_workout" and "first_personal_record" should be newly
+      // earned in this same response.
+      const newAchievements = finished.body.data.newAchievements;
+      expect(newAchievements.map((a: { key: string }) => a.key)).toEqual(
+        expect.arrayContaining(['first_workout', 'first_personal_record']),
+      );
+
+      const achievements = await request(app.getHttpServer())
+        .get('/achievements')
+        .set(auth())
+        .expect(200);
+      const firstWorkout = achievements.body.data.find(
+        (a: { key: string }) => a.key === 'first_workout',
+      );
+      expect(firstWorkout.earnedAt).not.toBeNull();
+      expect(firstWorkout.progress).toBe(1);
+
       // No more sets can be logged once completed.
       await request(app.getHttpServer())
         .post(`/workout-sessions/${sessionId}/sets`)

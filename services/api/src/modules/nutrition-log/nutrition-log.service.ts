@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { FoodSourceType, Prisma } from '@prisma/client';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AchievementsService } from '../achievements/achievements.service';
 import { CopyMealEntriesDto } from './dto/copy-meal-entries.dto';
 import { CreateMealEntryDto } from './dto/create-meal-entry.dto';
 import { UpdateMealEntryDto } from './dto/update-meal-entry.dto';
@@ -29,6 +30,7 @@ export class NutritionLogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly idempotencyService: IdempotencyService,
+    private readonly achievementsService: AchievementsService,
   ) {}
 
   async getDaily(userId: string, date: string) {
@@ -217,6 +219,13 @@ export class NutritionLogService {
       },
       include: entryInclude,
     });
+
+    // Result intentionally not surfaced here — nutrition achievements are
+    // a lower-priority celebration than workout ones, and the Achievements
+    // screen reflects the up-to-date state regardless of whether a caller
+    // sees this particular award moment. The idempotent upsert inside
+    // means calling this on every log is always safe.
+    await this.achievementsService.evaluateNutritionAchievements(userId);
 
     return this.serialize(created);
   }

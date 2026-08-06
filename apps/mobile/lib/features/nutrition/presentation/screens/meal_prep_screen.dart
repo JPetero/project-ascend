@@ -60,7 +60,14 @@ class MealPrepScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Meal Prep'),
-        actions: const [ProfileIconAction()],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.military_tech_outlined),
+            tooltip: 'Achievements',
+            onPressed: () => context.push(RoutePaths.achievements),
+          ),
+          const ProfileIconAction(),
+        ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
