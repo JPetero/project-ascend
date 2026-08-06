@@ -5,26 +5,57 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../data/saved_meal_repository.dart';
 import '../../domain/meal_entry.dart';
 import '../../domain/meal_type.dart';
 import '../../domain/nutrition_dashboard_summary.dart';
+import '../../domain/saved_meal.dart';
 import '../providers/meal_entry_controller.dart';
 import '../providers/nutrition_summary_controller.dart';
+import '../providers/saved_meal_controller.dart';
 import '../providers/water_controller.dart';
 
-/// The Meal Prep tab — today's macro summary, per-meal food logging, and a
-/// water tracker, all backed by the real nutrition-log/foods/water
-/// endpoints (see services/api/src/modules/{foods,nutrition-log,water}).
-/// Saved meals and AI-generated meal plans are deliberately out of scope
-/// this session — see packages/docs/product/parking-lot.md — and say so
-/// honestly rather than showing placeholder content as if it were real.
+/// The Meal Prep tab — today's macro summary, per-meal food logging, a
+/// water tracker, and saved meals, all backed by real nutrition-log/foods/
+/// water/saved-meals endpoints (see
+/// services/api/src/modules/{foods,nutrition-log,water,saved-meals}).
+/// AI-generated meal plans are deliberately out of scope this session —
+/// see packages/docs/product/parking-lot.md.
 class MealPrepScreen extends ConsumerWidget {
   const MealPrepScreen({super.key});
+
+  Future<void> _copyFromYesterday(WidgetRef ref, BuildContext context) async {
+    final today = DateTime.now();
+    final yesterday = today.subtract(const Duration(days: 1));
+    try {
+      final copied = await ref
+          .read(mealEntryRepositoryProvider)
+          .copyEntries(sourceDate: yesterday, targetDate: today);
+      ref.invalidate(todaysMealEntriesProvider);
+      ref.invalidate(nutritionDashboardSummaryProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            copied.isEmpty
+                ? 'No meals logged yesterday to copy.'
+                : 'Copied ${copied.length} ${copied.length == 1 ? 'entry' : 'entries'} from yesterday.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't copy yesterday's meals.")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nutritionAsync = ref.watch(nutritionDashboardSummaryProvider);
     final entriesAsync = ref.watch(todaysMealEntriesProvider);
+    final savedMealsAsync = ref.watch(savedMealsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,6 +68,7 @@ class MealPrepScreen extends ConsumerWidget {
             ref.refresh(nutritionDashboardSummaryProvider.future),
             ref.refresh(todaysMealEntriesProvider.future),
             ref.refresh(todaysWaterProvider.future),
+            ref.refresh(savedMealsProvider.future),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
@@ -62,7 +94,11 @@ class MealPrepScreen extends ConsumerWidget {
               const SizedBox(height: AscendSpacing.sm),
               const _WaterTracker(),
               const SizedBox(height: AscendSpacing.lg),
-              const AscendSectionHeader(title: 'Meals'),
+              AscendSectionHeader(
+                title: 'Meals',
+                actionLabel: 'Copy yesterday',
+                onAction: () => _copyFromYesterday(ref, context),
+              ),
               const SizedBox(height: AscendSpacing.sm),
               entriesAsync.when(
                 data: (entries) => _MealSections(entries: entries),
@@ -79,10 +115,18 @@ class MealPrepScreen extends ConsumerWidget {
               const SizedBox(height: AscendSpacing.lg),
               const AscendSectionHeader(title: 'Saved meals'),
               const SizedBox(height: AscendSpacing.sm),
-              const AscendEmptyState(
-                icon: Icons.bookmark_outline,
-                title: 'Saved meals are coming soon',
-                message: 'Save a meal to reuse it here in a future release.',
+              savedMealsAsync.when(
+                data: (savedMeals) =>
+                    _SavedMealsSection(savedMeals: savedMeals),
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AscendSpacing.lg),
+                  child: AscendLoadingIndicator(label: 'Loading saved meals'),
+                ),
+                error: (error, stackTrace) => AscendEmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: "Couldn't load saved meals",
+                  message: 'Pull to refresh to try again.',
+                ),
               ),
             ],
           ),
@@ -235,6 +279,55 @@ class _MealSection extends ConsumerWidget {
     }
   }
 
+  Future<void> _saveAsMeal(WidgetRef ref, BuildContext context) async {
+    final controller = TextEditingController(text: mealTypeLabel(mealType));
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save as a saved meal'),
+        content: AscendTextField(controller: controller, label: 'Name'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+
+    try {
+      await ref
+          .read(savedMealRepositoryProvider)
+          .create(
+            name: name,
+            items: entries
+                .map(
+                  (e) => SavedMealItemInput(
+                    foodId: e.food.id,
+                    foodServingId: e.foodServing?.id,
+                    quantity: e.quantity,
+                  ),
+                )
+                .toList(),
+          );
+      ref.invalidate(savedMealsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved "$name".')));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't save that meal. Try again.")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final totalCalories = entries.fold<double>(0, (sum, e) => sum + e.calories);
@@ -255,6 +348,12 @@ class _MealSection extends ConsumerWidget {
                 Text(
                   '${totalCalories.round()} kcal',
                   style: Theme.of(context).textTheme.bodySmall,
+                ),
+              if (entries.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                  tooltip: 'Save as a saved meal',
+                  onPressed: () => _saveAsMeal(ref, context),
                 ),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline),
@@ -290,6 +389,116 @@ class _MealSection extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _SavedMealsSection extends ConsumerWidget {
+  const _SavedMealsSection({required this.savedMeals});
+
+  final List<SavedMeal> savedMeals;
+
+  Future<void> _delete(
+    WidgetRef ref,
+    BuildContext context,
+    SavedMeal meal,
+  ) async {
+    try {
+      await ref.read(savedMealRepositoryProvider).delete(meal.id);
+      ref.invalidate(savedMealsProvider);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't remove that saved meal.")),
+      );
+    }
+  }
+
+  Future<void> _log(WidgetRef ref, BuildContext context, SavedMeal meal) async {
+    final mealType = await showAscendBottomSheet<MealType>(
+      context: context,
+      title: 'Log "${meal.name}" to',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final type in MealType.values)
+            ListTile(
+              title: Text(mealTypeLabel(type)),
+              onTap: () => Navigator.of(context).pop(type),
+            ),
+        ],
+      ),
+    );
+    if (mealType == null) return;
+
+    try {
+      await ref
+          .read(savedMealRepositoryProvider)
+          .logMeal(id: meal.id, mealType: mealType, date: DateTime.now());
+      ref.invalidate(todaysMealEntriesProvider);
+      ref.invalidate(nutritionDashboardSummaryProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logged "${meal.name}" to ${mealTypeLabel(mealType)}.'),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't log that meal. Try again.")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (savedMeals.isEmpty) {
+      return const AscendEmptyState(
+        icon: Icons.bookmark_outline,
+        title: 'No saved meals yet',
+        message:
+            'Use the bookmark icon on a logged meal above to save it for reuse.',
+      );
+    }
+
+    return Column(
+      children: [
+        for (final meal in savedMeals)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+            child: AscendCard(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          meal.name,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        Text(
+                          '${meal.items.length} ${meal.items.length == 1 ? 'item' : 'items'}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AscendGhostButton(
+                    label: 'Log',
+                    onPressed: () => _log(ref, context, meal),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    tooltip: 'Delete saved meal',
+                    onPressed: () => _delete(ref, context, meal),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

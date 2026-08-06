@@ -1,11 +1,13 @@
 import 'package:mobile/features/nutrition/data/food_repository.dart';
 import 'package:mobile/features/nutrition/data/meal_entry_repository.dart';
 import 'package:mobile/features/nutrition/data/nutrition_summary_repository.dart';
+import 'package:mobile/features/nutrition/data/saved_meal_repository.dart';
 import 'package:mobile/features/nutrition/data/water_repository.dart';
 import 'package:mobile/features/nutrition/domain/food.dart';
 import 'package:mobile/features/nutrition/domain/meal_entry.dart';
 import 'package:mobile/features/nutrition/domain/meal_type.dart';
 import 'package:mobile/features/nutrition/domain/nutrition_dashboard_summary.dart';
+import 'package:mobile/features/nutrition/domain/saved_meal.dart';
 import 'package:mobile/features/nutrition/domain/water_entry.dart';
 
 const sampleNutritionDashboardSummary = NutritionDashboardSummary(
@@ -206,5 +208,102 @@ class FakeWaterRepository implements WaterRepository {
   @override
   Future<void> deleteEntry(String id) async {
     _entries.removeWhere((e) => e.id == id);
+  }
+}
+
+/// In-memory stand-in for saved-meal logging — resolves logged items'
+/// food snapshot from [availableFoods], same as [FakeMealEntryRepository].
+///
+/// [logMeal] writes through to [mealEntryRepository] (when supplied) the
+/// same way the real `SavedMealsService` calls `NutritionLogService`, so a
+/// logged saved meal actually shows up wherever `todaysMealEntriesProvider`
+/// reads from in tests.
+class FakeSavedMealRepository implements SavedMealRepository {
+  FakeSavedMealRepository({
+    List<Food>? availableFoods,
+    FakeMealEntryRepository? mealEntryRepository,
+  }) : _availableFoods = availableFoods ?? [sampleFood],
+       _mealEntryRepository = mealEntryRepository;
+
+  final List<Food> _availableFoods;
+  final FakeMealEntryRepository? _mealEntryRepository;
+  final List<SavedMeal> _savedMeals = [];
+  int _idCounter = 0;
+
+  @override
+  Future<List<SavedMeal>> list() async => List.unmodifiable(_savedMeals);
+
+  @override
+  Future<SavedMeal> create({
+    required String name,
+    required List<SavedMealItemInput> items,
+  }) async {
+    final savedMeal = SavedMeal(
+      id: 'saved-meal-${_idCounter++}',
+      name: name,
+      createdAt: DateTime.now(),
+      items: items
+          .map(
+            (i) => SavedMealItem(
+              id: 'saved-meal-item-${_idCounter++}',
+              food: _availableFoods
+                  .map(
+                    (f) => MealEntryFoodRef(
+                      id: f.id,
+                      name: f.name,
+                      isEstimated: f.isEstimated,
+                    ),
+                  )
+                  .firstWhere((f) => f.id == i.foodId),
+              quantity: i.quantity,
+            ),
+          )
+          .toList(),
+    );
+    _savedMeals.add(savedMeal);
+    return savedMeal;
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    _savedMeals.removeWhere((m) => m.id == id);
+  }
+
+  @override
+  Future<List<MealEntry>> logMeal({
+    required String id,
+    required MealType mealType,
+    required DateTime date,
+  }) async {
+    final meal = _savedMeals.firstWhere((m) => m.id == id);
+    final mealEntryRepository = _mealEntryRepository;
+    if (mealEntryRepository != null) {
+      return [
+        for (final item in meal.items)
+          await mealEntryRepository.addEntry(
+            foodId: item.food.id,
+            foodServingId: item.foodServing?.id,
+            mealType: mealType,
+            date: date,
+            quantity: item.quantity,
+          ),
+      ];
+    }
+    return meal.items
+        .map(
+          (item) => MealEntry(
+            id: 'entry-from-${item.id}',
+            food: item.food,
+            foodServing: item.foodServing,
+            mealType: mealType,
+            date: date,
+            quantity: item.quantity,
+            calories: 0,
+            proteinGrams: 0,
+            carbGrams: 0,
+            fatGrams: 0,
+          ),
+        )
+        .toList();
   }
 }

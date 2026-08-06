@@ -1,0 +1,115 @@
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateMealEntryDto } from '../nutrition-log/dto/create-meal-entry.dto';
+import { NutritionLogService } from '../nutrition-log/nutrition-log.service';
+import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
+import { LogSavedMealDto } from './dto/log-saved-meal.dto';
+
+const savedMealInclude = {
+  items: {
+    include: {
+      food: { select: { id: true, name: true, brand: true, isEstimated: true } },
+      foodServing: { select: { id: true, label: true } },
+    },
+  },
+} satisfies Prisma.SavedMealInclude;
+
+type SavedMealWithItems = Prisma.SavedMealGetPayload<{ include: typeof savedMealInclude }>;
+
+/**
+ * A named, reusable group of food entries — see
+ * packages/docs/product/user-scenario-bible.md Part 7 (Meal Prep). Logging
+ * a saved meal reuses NutritionLogService.addEntry for every item rather
+ * than re-deriving the calorie/macro-snapshot math, so both paths stay in
+ * agreement by construction (see engineering-bible.md's "don't duplicate
+ * logic" rule).
+ */
+@Injectable()
+export class SavedMealsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly nutritionLogService: NutritionLogService,
+  ) {}
+
+  async list(userId: string) {
+    const savedMeals = await this.prisma.savedMeal.findMany({
+      where: { userId },
+      include: savedMealInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return savedMeals.map((m) => this.serialize(m));
+  }
+
+  async create(userId: string, dto: CreateSavedMealDto) {
+    const savedMeal = await this.prisma.savedMeal.create({
+      data: {
+        userId,
+        name: dto.name,
+        items: {
+          create: dto.items.map((item) => ({
+            foodId: item.foodId,
+            foodServingId: item.foodServingId,
+            quantity: item.quantity,
+          })),
+        },
+      },
+      include: savedMealInclude,
+    });
+    return this.serialize(savedMeal);
+  }
+
+  async delete(userId: string, id: string): Promise<void> {
+    await this.findOwned(userId, id);
+    await this.prisma.savedMeal.delete({ where: { id } });
+  }
+
+  /** Logs every item in the saved meal as its own MealEntry for the given
+   * date/mealType — a real, separately-editable/deletable entry each, not
+   * a linked reference back to the SavedMeal. */
+  async logMeal(userId: string, id: string, dto: LogSavedMealDto) {
+    const savedMeal = await this.findOwned(userId, id);
+
+    const created = [];
+    for (const item of savedMeal.items) {
+      const entryDto: CreateMealEntryDto = {
+        foodId: item.foodId,
+        foodServingId: item.foodServingId ?? undefined,
+        mealType: dto.mealType,
+        date: dto.date,
+        quantity: item.quantity,
+        idempotencyKey: dto.idempotencyKey ? `${dto.idempotencyKey}-${item.id}` : undefined,
+      };
+      created.push(await this.nutritionLogService.addEntry(userId, entryDto));
+    }
+    return created;
+  }
+
+  private async findOwned(userId: string, id: string): Promise<SavedMealWithItems> {
+    const savedMeal = await this.prisma.savedMeal.findUnique({
+      where: { id },
+      include: savedMealInclude,
+    });
+    if (!savedMeal) {
+      throw new NotFoundException('Saved meal not found.');
+    }
+    if (savedMeal.userId !== userId) {
+      throw new ForbiddenException();
+    }
+    return savedMeal;
+  }
+
+  private serialize(savedMeal: SavedMealWithItems) {
+    return {
+      id: savedMeal.id,
+      name: savedMeal.name,
+      createdAt: savedMeal.createdAt,
+      items: savedMeal.items.map((item) => ({
+        id: item.id,
+        food: item.food,
+        foodServing: item.foodServing,
+        quantity: item.quantity,
+      })),
+    };
+  }
+}

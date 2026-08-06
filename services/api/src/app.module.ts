@@ -24,6 +24,7 @@ import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module
 import { PersonalRecordsModule } from './modules/personal-records/personal-records.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
+import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { UsersModule } from './modules/users/users.module';
 import { WaterModule } from './modules/water/water.module';
 import { WorkoutHistoryModule } from './modules/workout-history/workout-history.module';
@@ -71,6 +72,7 @@ import { PrismaModule } from './prisma/prisma.module';
     NutritionLogModule,
     MacroTargetsModule,
     WaterModule,
+    SavedMealsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

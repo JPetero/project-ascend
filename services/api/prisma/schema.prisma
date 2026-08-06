@@ -104,6 +104,9 @@ model User {
   authIdentities        AuthIdentity[]
   legalAcceptances      LegalAcceptance[]
   deloadRecommendations DeloadRecommendation[]
+  savedMeals            SavedMeal[]
+  achievementAwards     AchievementAward[]
+  cardioSessions        CardioSession[]
 
   @@index([status])
   @@map("users")
@@ -735,9 +738,10 @@ model Food {
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
-  owner       User?         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  servings    FoodServing[]
-  mealEntries MealEntry[]
+  owner          User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  servings       FoodServing[]
+  mealEntries    MealEntry[]
+  savedMealItems SavedMealItem[]
 
   @@index([ownerId])
   @@index([name])
@@ -754,8 +758,9 @@ model FoodServing {
   grams     Float?
   isDefault Boolean @default(false)
 
-  food        Food        @relation(fields: [foodId], references: [id], onDelete: Cascade)
-  mealEntries MealEntry[]
+  food           Food            @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  mealEntries    MealEntry[]
+  savedMealItems SavedMealItem[]
 
   @@index([foodId])
   @@map("food_servings")
@@ -903,4 +908,144 @@ model DeloadRecommendation {
 
   @@index([userId])
   @@map("deload_recommendations")
+}
+
+// --- Saved meals — see packages/docs/product/user-scenario-bible.md
+// Part 7 / Founder marathon "Finish Nutrition". A named, reusable group of
+// food entries a user can log in one action instead of re-searching each
+// item every time. ---
+
+model SavedMeal {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items SavedMealItem[]
+
+  @@index([userId])
+  @@map("saved_meals")
+}
+
+model SavedMealItem {
+  id            String  @id @default(uuid())
+  savedMealId   String
+  foodId        String
+  foodServingId String?
+  quantity      Float
+
+  savedMeal   SavedMeal    @relation(fields: [savedMealId], references: [id], onDelete: Cascade)
+  food        Food         @relation(fields: [foodId], references: [id])
+  foodServing FoodServing? @relation(fields: [foodServingId], references: [id])
+
+  @@index([savedMealId])
+  @@map("saved_meal_items")
+}
+
+// --- Achievements — Founder Scenario 11. Ascend owns the canonical
+// cross-platform record; award logic is idempotent via the unique
+// (userId, achievementId) pair below (an upsert, never a duplicate
+// insert). See packages/docs/product/wellness-ethics-bible.md's
+// "Achievement safety" section for the conditions this must never
+// reward. ---
+
+enum AchievementCategory {
+  WORKOUT
+  NUTRITION
+  CONSISTENCY
+  CARDIO
+  RECOVERY
+}
+
+model Achievement {
+  id          String              @id @default(uuid())
+  // Stable key the award-evaluation code matches against (e.g.
+  // "first_workout") — never renamed once shipped, since it's the
+  // durable identity an external sync (Play Games / Game Center,
+  // future) would eventually map to as well.
+  key         String              @unique
+  title       String
+  description String
+  iconAsset   String
+  category    AchievementCategory
+  // Steps needed to "complete" a multi-step achievement (e.g. 10 active
+  // days = 10). 1 for a simple one-shot achievement.
+  targetSteps Int                 @default(1)
+  createdAt   DateTime            @default(now())
+
+  awards AchievementAward[]
+
+  @@map("achievements")
+}
+
+model AchievementAward {
+  id            String    @id @default(uuid())
+  userId        String
+  achievementId String
+  progress      Int       @default(0)
+  // Null until targetSteps is reached — a row can exist purely to track
+  // in-progress steps toward a multi-step achievement without having
+  // "earned" it yet.
+  earnedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  // The idempotency guarantee: evaluating the same trigger twice for a
+  // user upserts this one row rather than creating a duplicate award.
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("achievement_awards")
+}
+
+// --- GPS cardio — Founder Scenario 12. This session implements manual/
+// summary cardio logging (duration, distance, activity type) with the
+// privacy fields a future live-GPS route recorder will need; it does not
+// implement live on-device GPS tracking — that requires platform location
+// permission plumbing (geolocator/permission_handler) that can't be
+// exercised or verified in this sandboxed build environment. See
+// packages/docs/product/parking-lot.md. ---
+
+enum CardioActivityType {
+  WALK
+  RUN
+  CYCLE
+  OTHER
+}
+
+model CardioSession {
+  id                  String             @id @default(uuid())
+  userId              String
+  activityType        CardioActivityType
+  startedAt           DateTime
+  durationSeconds     Int
+  distanceMeters      Float?
+  elevationGainMeters Float?
+  // A clear-estimate-labeled figure, never presented as precise — see
+  // wellness-ethics-bible.md's "explain uncertainty" principle.
+  estimatedCalories   Float?
+  // Coarse, user-entered region tag (e.g. "Quezon City") — never exact
+  // coordinates. Manual tags must never imply a measured/fabricated
+  // distance; distanceMeters stays null unless the user actually entered
+  // one.
+  regionLabel         String?
+  // Private-by-default route/location visibility, independent toggles
+  // per Scenario 12's "hide start / end / route" requirement — currently
+  // enforced because there is no route data to expose yet, and honored
+  // going forward once real route recording exists.
+  hideRoute           Boolean            @default(true)
+  hideStartLocation   Boolean            @default(true)
+  hideEndLocation     Boolean            @default(true)
+  notes               String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@map("cardio_sessions")
 }
