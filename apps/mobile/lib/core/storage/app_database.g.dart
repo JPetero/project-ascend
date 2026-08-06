@@ -1409,6 +1409,282 @@ class SyncStatusRowsCompanion extends UpdateCompanion<SyncStatusRow> {
   }
 }
 
+class $CachedWorkoutSessionRowsTable extends CachedWorkoutSessionRows
+    with TableInfo<$CachedWorkoutSessionRowsTable, CachedWorkoutSessionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedWorkoutSessionRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sessionJsonMeta = const VerificationMeta(
+    'sessionJson',
+  );
+  @override
+  late final GeneratedColumn<String> sessionJson = GeneratedColumn<String>(
+    'session_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, sessionJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_workout_session_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedWorkoutSessionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('session_json')) {
+      context.handle(
+        _sessionJsonMeta,
+        sessionJson.isAcceptableOrUnknown(
+          data['session_json']!,
+          _sessionJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedWorkoutSessionRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedWorkoutSessionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_json'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedWorkoutSessionRowsTable createAlias(String alias) {
+    return $CachedWorkoutSessionRowsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedWorkoutSessionRow extends DataClass
+    implements Insertable<CachedWorkoutSessionRow> {
+  final String id;
+  final String sessionJson;
+  final DateTime updatedAt;
+  const CachedWorkoutSessionRow({
+    required this.id,
+    required this.sessionJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['session_json'] = Variable<String>(sessionJson);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedWorkoutSessionRowsCompanion toCompanion(bool nullToAbsent) {
+    return CachedWorkoutSessionRowsCompanion(
+      id: Value(id),
+      sessionJson: Value(sessionJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedWorkoutSessionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedWorkoutSessionRow(
+      id: serializer.fromJson<String>(json['id']),
+      sessionJson: serializer.fromJson<String>(json['sessionJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sessionJson': serializer.toJson<String>(sessionJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedWorkoutSessionRow copyWith({
+    String? id,
+    String? sessionJson,
+    DateTime? updatedAt,
+  }) => CachedWorkoutSessionRow(
+    id: id ?? this.id,
+    sessionJson: sessionJson ?? this.sessionJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedWorkoutSessionRow copyWithCompanion(
+    CachedWorkoutSessionRowsCompanion data,
+  ) {
+    return CachedWorkoutSessionRow(
+      id: data.id.present ? data.id.value : this.id,
+      sessionJson: data.sessionJson.present
+          ? data.sessionJson.value
+          : this.sessionJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedWorkoutSessionRow(')
+          ..write('id: $id, ')
+          ..write('sessionJson: $sessionJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sessionJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedWorkoutSessionRow &&
+          other.id == this.id &&
+          other.sessionJson == this.sessionJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedWorkoutSessionRowsCompanion
+    extends UpdateCompanion<CachedWorkoutSessionRow> {
+  final Value<String> id;
+  final Value<String> sessionJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedWorkoutSessionRowsCompanion({
+    this.id = const Value.absent(),
+    this.sessionJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedWorkoutSessionRowsCompanion.insert({
+    required String id,
+    required String sessionJson,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sessionJson = Value(sessionJson),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedWorkoutSessionRow> custom({
+    Expression<String>? id,
+    Expression<String>? sessionJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionJson != null) 'session_json': sessionJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedWorkoutSessionRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sessionJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedWorkoutSessionRowsCompanion(
+      id: id ?? this.id,
+      sessionJson: sessionJson ?? this.sessionJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sessionJson.present) {
+      map['session_json'] = Variable<String>(sessionJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedWorkoutSessionRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionJson: $sessionJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1421,6 +1697,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $SyncStatusRowsTable syncStatusRows = $SyncStatusRowsTable(this);
+  late final $CachedWorkoutSessionRowsTable cachedWorkoutSessionRows =
+      $CachedWorkoutSessionRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1431,6 +1709,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedDashboardFixtures,
     onboardingDrafts,
     syncStatusRows,
+    cachedWorkoutSessionRows,
   ];
 }
 
@@ -2319,6 +2598,189 @@ typedef $$SyncStatusRowsTableProcessedTableManager =
       SyncStatusRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedWorkoutSessionRowsTableCreateCompanionBuilder =
+    CachedWorkoutSessionRowsCompanion Function({
+      required String id,
+      required String sessionJson,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedWorkoutSessionRowsTableUpdateCompanionBuilder =
+    CachedWorkoutSessionRowsCompanion Function({
+      Value<String> id,
+      Value<String> sessionJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedWorkoutSessionRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedWorkoutSessionRowsTable> {
+  $$CachedWorkoutSessionRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedWorkoutSessionRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedWorkoutSessionRowsTable> {
+  $$CachedWorkoutSessionRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedWorkoutSessionRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedWorkoutSessionRowsTable> {
+  $$CachedWorkoutSessionRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedWorkoutSessionRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedWorkoutSessionRowsTable,
+          CachedWorkoutSessionRow,
+          $$CachedWorkoutSessionRowsTableFilterComposer,
+          $$CachedWorkoutSessionRowsTableOrderingComposer,
+          $$CachedWorkoutSessionRowsTableAnnotationComposer,
+          $$CachedWorkoutSessionRowsTableCreateCompanionBuilder,
+          $$CachedWorkoutSessionRowsTableUpdateCompanionBuilder,
+          (
+            CachedWorkoutSessionRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedWorkoutSessionRowsTable,
+              CachedWorkoutSessionRow
+            >,
+          ),
+          CachedWorkoutSessionRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedWorkoutSessionRowsTableTableManager(
+    _$AppDatabase db,
+    $CachedWorkoutSessionRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedWorkoutSessionRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedWorkoutSessionRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedWorkoutSessionRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sessionJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedWorkoutSessionRowsCompanion(
+                id: id,
+                sessionJson: sessionJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sessionJson,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedWorkoutSessionRowsCompanion.insert(
+                id: id,
+                sessionJson: sessionJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedWorkoutSessionRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedWorkoutSessionRowsTable,
+      CachedWorkoutSessionRow,
+      $$CachedWorkoutSessionRowsTableFilterComposer,
+      $$CachedWorkoutSessionRowsTableOrderingComposer,
+      $$CachedWorkoutSessionRowsTableAnnotationComposer,
+      $$CachedWorkoutSessionRowsTableCreateCompanionBuilder,
+      $$CachedWorkoutSessionRowsTableUpdateCompanionBuilder,
+      (
+        CachedWorkoutSessionRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedWorkoutSessionRowsTable,
+          CachedWorkoutSessionRow
+        >,
+      ),
+      CachedWorkoutSessionRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2339,4 +2801,9 @@ class $AppDatabaseManager {
       $$OnboardingDraftsTableTableManager(_db, _db.onboardingDrafts);
   $$SyncStatusRowsTableTableManager get syncStatusRows =>
       $$SyncStatusRowsTableTableManager(_db, _db.syncStatusRows);
+  $$CachedWorkoutSessionRowsTableTableManager get cachedWorkoutSessionRows =>
+      $$CachedWorkoutSessionRowsTableTableManager(
+        _db,
+        _db.cachedWorkoutSessionRows,
+      );
 }

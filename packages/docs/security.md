@@ -13,9 +13,14 @@ exist before this could run in production.
   server-side secret, sent as a Bearer token.
 - **Rotating refresh tokens**: opaque, `{tokenId}.{secret}` format. Only the Argon2 hash of the
   secret is stored in `refresh_tokens.tokenHash` — the raw secret exists only in the token
-  handed to the client, never persisted server-side. Every refresh revokes the presented token
-  and issues a brand new pair, so a stolen-then-reused refresh token is detectable (the second
-  use fails).
+  handed to the client, never persisted server-side. Revoking the presented token and creating
+  its replacement happen inside a single Prisma transaction, so a client can never observe (or
+  race) a moment where both are simultaneously valid.
+- **Refresh-token family tracking & reuse detection**: every token descended from the same
+  login/register shares a `familyId`. Presenting a token that's already been rotated out (or
+  revoked) is treated as possible theft: `AuthService.handleRefreshTokenReuse` revokes every
+  still-active token in that family and records an `auth.refresh_token_reuse_detected` audit
+  event, without exposing the reason to the client beyond a generic "invalid or expired" 401.
 - Every route requires a valid access token by default (`JwtAuthGuard` registered as a global
   `APP_GUARD`); routes opt out explicitly with `@Public()`, not the other way around — a new
   route is locked down unless someone deliberately opens it.
@@ -40,8 +45,9 @@ exist before this could run in production.
 
 - `helmet()` applied globally for standard security headers.
 - CORS is configured (not left wide open by accident) via `CORS_ORIGIN`.
-- Rate limiting via `@nestjs/throttler` (100 requests/minute per client by default) on every
-  route.
+- Rate limiting via `@nestjs/throttler`: 100 requests/minute per client by default, tightened to
+  10 requests/minute (tracked per route, not shared) on `/auth/register`, `/auth/login`, and
+  `/auth/refresh` specifically, since those are the credential-guessing-prone endpoints.
 
 ### Privacy defaults
 
@@ -74,14 +80,13 @@ launch:
   sensitive actions), but it does not exist yet.
 - **Password reset.** The Sign In screen has a "Forgot password?" placeholder that shows a
   message and does nothing else. No reset-token flow exists.
-- **Refresh-token family/reuse-detection response.** A refresh token is correctly single-use and
-  rotated, but there is no automated response (e.g., revoking every token for that user) when a
-  revoked token is presented a second time — today it's just a rejected request. That reuse
-  event is exactly the signal that should trigger a "possible token theft" response in
-  production.
-- **Account lockout / brute-force protection beyond global rate limiting.** The 100 req/min
-  global throttle applies to every route, including `/auth/login`; there is no per-account
-  lockout or exponential backoff after repeated failed login attempts.
+- **User-facing notification of detected token reuse.** Reuse of a rotated-out refresh token
+  already revokes the entire token family and records an audit event server-side (see
+  "Implemented controls" above), but the affected user isn't notified (email/push) that a
+  session was force-revoked, and there's no admin/security-alerts UI surfacing these events yet.
+- **Account lockout / brute-force protection beyond rate limiting.** `/auth/login` is throttled
+  to 10 requests/minute per client, but there is no per-account lockout or exponential backoff
+  after repeated failed attempts against a single account from different clients/IPs.
 - **Secrets management.** `.env` files are fine for local development; production needs a real
   secrets manager (e.g., AWS Secrets Manager, GCP Secret Manager, Vault) rather than environment
   variables set by hand.

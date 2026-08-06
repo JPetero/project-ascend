@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/storage/app_database.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
@@ -13,11 +14,19 @@ class OnboardingState {
     this.page = OnboardingPage.companion,
     this.draft = const OnboardingFormDraft(),
     this.isSubmitting = false,
+    this.syncError,
   });
 
   final OnboardingPage page;
   final OnboardingFormDraft draft;
   final bool isSubmitting;
+
+  /// Set when the most recent `goNext()` failed to sync to the backend.
+  /// The local draft (and current page) are always preserved on failure —
+  /// this only surfaces the failure so the UI can show it and let the user
+  /// retry with the same "Next" tap, rather than losing progress or
+  /// silently retrying forever.
+  final String? syncError;
 
   int get pageIndex => page.index;
 
@@ -30,6 +39,7 @@ class OnboardingState {
       page: page ?? this.page,
       draft: draft ?? this.draft,
       isSubmitting: isSubmitting ?? this.isSubmitting,
+      syncError: syncError,
     );
   }
 }
@@ -108,7 +118,12 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       OnboardingPage.values.length - 1,
     );
 
-    state = state.copyWith(isSubmitting: true);
+    // Clear any previous sync error before retrying.
+    state = OnboardingState(
+      page: state.page,
+      draft: state.draft,
+      isSubmitting: true,
+    );
     try {
       await _ref
           .read(profileControllerProvider.notifier)
@@ -124,6 +139,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       } else {
         state = state.copyWith(page: OnboardingPage.values[nextIndex]);
       }
+    } on AppException catch (error) {
+      // The local draft and current page are untouched — the user can
+      // just tap "Next" again once they're back online.
+      state = OnboardingState(
+        page: state.page,
+        draft: state.draft,
+        syncError: error.message,
+      );
+      return;
     } finally {
       state = state.copyWith(isSubmitting: false);
     }

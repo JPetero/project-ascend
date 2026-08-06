@@ -30,6 +30,9 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+  // Ensures onModuleDestroy (e.g. PrismaService's $disconnect) actually runs
+  // when Docker sends SIGTERM on `docker stop`/`docker compose down`.
+  app.enableShutdownHooks();
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Project Ascend API')

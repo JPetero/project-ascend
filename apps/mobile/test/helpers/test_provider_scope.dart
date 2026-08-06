@@ -9,9 +9,16 @@ import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/exercise_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/personal_record_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/workout_catalog_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/workout_history_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/workout_plan_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/workout_session_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_repositories.dart';
+import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
 
 /// Builds a [ProviderContainer] wired entirely to in-memory fakes: no
@@ -25,6 +32,9 @@ Future<ProviderContainer> createTestContainer({
   bool signedIn = false,
   ProfileModel? initialProfile,
   PreferencesModel? initialPreferences,
+  FakeWorkoutSessionRepository? workoutSessionRepository,
+  FakeWorkoutHistoryRepository? workoutHistoryRepository,
+  bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final sharedPreferences = await SharedPreferences.getInstance();
@@ -50,6 +60,7 @@ Future<ProviderContainer> createTestContainer({
         FakeProfileRepository(
           database: database,
           initialProfile: initialProfile,
+          failFetch: failProfileFetch,
         ),
       ),
       preferencesRepositoryProvider.overrideWithValue(
@@ -59,6 +70,22 @@ Future<ProviderContainer> createTestContainer({
         ),
       ),
       deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
+      exerciseRepositoryProvider.overrideWithValue(FakeExerciseRepository()),
+      workoutCatalogRepositoryProvider.overrideWithValue(
+        FakeWorkoutCatalogRepository(),
+      ),
+      workoutPlanRepositoryProvider.overrideWithValue(
+        FakeWorkoutPlanRepository(),
+      ),
+      personalRecordRepositoryProvider.overrideWithValue(
+        FakePersonalRecordRepository(),
+      ),
+      workoutHistoryRepositoryProvider.overrideWithValue(
+        workoutHistoryRepository ?? FakeWorkoutHistoryRepository(),
+      ),
+      workoutSessionRepositoryProvider.overrideWithValue(
+        workoutSessionRepository ?? FakeWorkoutSessionRepository(),
+      ),
     ],
   );
 

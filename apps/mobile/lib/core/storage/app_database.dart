@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'tables/cached_dashboard_table.dart';
 import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
+import 'tables/cached_workout_session_table.dart';
 import 'tables/onboarding_draft_table.dart';
 import 'tables/sync_status_table.dart';
 
@@ -16,6 +17,7 @@ part 'app_database.g.dart';
 
 const _syncStatusRowId = 'singleton';
 const _onboardingDraftRowId = 'singleton';
+const _workoutSessionRowId = 'singleton';
 
 /// Project Ascend's offline foundation.
 ///
@@ -35,13 +37,24 @@ const _onboardingDraftRowId = 'singleton';
     CachedDashboardFixtures,
     OnboardingDrafts,
     SyncStatusRows,
+    CachedWorkoutSessionRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.createTable(cachedWorkoutSessionRows);
+      }
+    },
+  );
 
   static QueryExecutor _openConnection() {
     return LazyDatabase(() async {
@@ -153,6 +166,30 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> cacheWorkoutSession(Map<String, dynamic> session) async {
+    await into(cachedWorkoutSessionRows).insertOnConflictUpdate(
+      CachedWorkoutSessionRowsCompanion.insert(
+        id: _workoutSessionRowId,
+        sessionJson: jsonEncode(session),
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> readCachedWorkoutSession() async {
+    final row = await (select(
+      cachedWorkoutSessionRows,
+    )..where((t) => t.id.equals(_workoutSessionRowId))).getSingleOrNull();
+    if (row == null) return null;
+    return jsonDecode(row.sessionJson) as Map<String, dynamic>;
+  }
+
+  Future<void> clearCachedWorkoutSession() async {
+    await (delete(
+      cachedWorkoutSessionRows,
+    )..where((t) => t.id.equals(_workoutSessionRowId))).go();
+  }
+
   /// Clears all cached data. Called on sign-out so no data from a
   /// previous account lingers on a shared device.
   Future<void> clearAll() async {
@@ -162,6 +199,7 @@ class AppDatabase extends _$AppDatabase {
       delete(cachedDashboardFixtures).go(),
       delete(onboardingDrafts).go(),
       delete(syncStatusRows).go(),
+      delete(cachedWorkoutSessionRows).go(),
     ]);
   }
 }

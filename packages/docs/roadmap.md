@@ -2,30 +2,22 @@
 
 Sprint 0 + Sprint 1 delivered the foundation and first vertical slice: auth, onboarding,
 companion selection, a sample-data dashboard, and simulated wearable connections, all backed by a
-real NestJS API and Prisma schema. The modules below are the next layers to build on top of that
+real NestJS API and Prisma schema. Sprint 2 delivered the **Workout Engine**: the exercise
+catalog, workout browsing, user-owned workout plans, a full session lifecycle (start/pause/
+resume/finish/abandon) with offline-first set logging, deterministic progression suggestions, and
+automatic personal-record detection — see [architecture.md](architecture.md#workout-engine-sprint-2)
+for how it's built and [synchronization strategy](architecture.md#offline-and-synchronization-strategy)
+for how offline logging syncs. The modules below are the next layers to build on top of that
 foundation, roughly in the order they unlock the most further work.
 
-## 1. Exercise catalog
-
-A structured, searchable library of exercises (name, muscle groups, equipment required,
-difficulty, instructional media) that workout plans and logging both depend on. Needed before
-"Workout planning/logging" below can be more than a coming-soon shell.
-
-## 2. Workout planning & logging
-
-Turn the current `WorkoutSchedule` (days/duration preference, collected in onboarding) into
-actual generated or user-built workout plans, plus a logging flow (sets, reps, weight, RPE) that
-writes through the offline-first outbox described in [architecture.md](architecture.md#offline-foundation-drift).
-Replaces the current `WorkoutScreen` coming-soon shell.
-
-## 3. Nutrition tracking
+## 1. Nutrition tracking
 
 Meal logging (the "Log a meal" quick action already exists as a companion entry point, routing to
 Home today) backed by a real food/nutrition data source, macro targets tied to the user's
 `primaryGoal`, and the protein/hydration progress rings on the dashboard switching from sample
 data to real logged data.
 
-## 4. Real wearable adapters
+## 2. Real wearable adapters
 
 Implement the `WearableAdapter`/`HealthMetric`/`SyncCursor` design documented in
 [wearables.md](wearables.md#planned-architecture-for-real-integrations), starting with Apple
@@ -33,7 +25,7 @@ HealthKit and Android Health Connect (the two hubs that cover the widest device 
 least per-vendor integration work), then layering in direct vendor APIs (Garmin, Fitbit, etc.)
 by priority of user demand.
 
-## 5. AI gateway
+## 3. AI gateway
 
 Replace `LocalCompanionResponseService` with a real AI backend behind the same
 `CompanionChatController` interface, so the Ascend Command Center's UI doesn't need to change.
@@ -42,21 +34,21 @@ client — that would leak API keys), conversation memory tied to the `aiMemoryE
 that already exists, and the same safety/no-diagnosis constraints from the product identity
 section enforced server-side, not just in prompt copy.
 
-## 6. Community
+## 4. Community
 
 Replace the sample-data-only `CommunityScreen` with real posting, following, and a moderation
 story. Privacy-by-default (already the stated principle) needs to extend to: who can see a post,
 whether workout data attached to a post is shareable-safe (reusing the hide-weight/measurements/
 location pattern from `AscendShareService`), and a reporting/moderation queue.
 
-## 7. Subscription
+## 5. Subscription
 
 Free-tier-first, as stated in the product identity: essential fitness/health tracking must stay
 free. This module adds the premium tier (advanced AI interactions, richer analysis,
 customization, cloud capacity) — billing integration, entitlement checks gating specific
 features, and restore-purchase flows on both platforms.
 
-## 8. Scanners
+## 6. Scanners
 
 Camera-based input (e.g., food/barcode scanning, form-check style body estimates). Must ship with
 the disclaimers already required in [security.md](security.md#known-gaps-before-production): no

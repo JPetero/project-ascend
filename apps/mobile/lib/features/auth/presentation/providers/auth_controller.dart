@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/storage/app_database.dart';
 import '../../../../core/storage/secure_token_storage.dart';
@@ -44,6 +45,8 @@ class AuthController extends StateNotifier<AuthState> {
   final SecureTokenStorage _tokenStorage;
   final AppDatabase _database;
 
+  static const _maxBootstrapAttempts = 3;
+
   Future<void> _bootstrap() async {
     final hasSession = await _tokenStorage.hasSession();
     if (!hasSession) {
@@ -51,12 +54,30 @@ class AuthController extends StateNotifier<AuthState> {
       return;
     }
 
-    try {
-      final user = await _repository.me();
-      state = state.copyWith(status: AuthStatus.authenticated, user: user);
-    } catch (_) {
-      await _tokenStorage.clear();
-      state = state.copyWith(status: AuthStatus.unauthenticated);
+    for (var attempt = 1; attempt <= _maxBootstrapAttempts; attempt++) {
+      try {
+        final user = await _repository.me();
+        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        return;
+      } on AppException catch (error) {
+        final isLastAttempt = attempt == _maxBootstrapAttempts;
+        // Only a confirmed-invalid token (401) or exhausting our retries
+        // ends the session. A transient network error alone must never
+        // wipe out an otherwise-valid refresh token — that would silently
+        // sign a user out just because their connection blipped at
+        // startup.
+        if (error.code == 'UNAUTHORIZED') {
+          await _tokenStorage.clear();
+        }
+        if (error.code != 'NETWORK_ERROR' || isLastAttempt) {
+          state = state.copyWith(status: AuthStatus.unauthenticated);
+          return;
+        }
+        await Future.delayed(Duration(milliseconds: 300 * attempt));
+      } catch (_) {
+        state = state.copyWith(status: AuthStatus.unauthenticated);
+        return;
+      }
     }
   }
 

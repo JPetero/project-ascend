@@ -2,6 +2,7 @@
 // separately-stored `_tokenStorage` field (needed for logout/token
 // manipulation) reads less clearly than the explicit forwarding below.
 // ignore_for_file: use_super_parameters
+import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/core/networking/api_client.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
@@ -71,6 +72,7 @@ class FakeProfileRepository extends ProfileRepository {
   FakeProfileRepository({
     required AppDatabase database,
     ProfileModel? initialProfile,
+    this.failFetch = false,
   }) : _profile = initialProfile ?? _defaultProfile,
        super(apiClient: _unusedApiClient(), database: database);
 
@@ -86,8 +88,22 @@ class FakeProfileRepository extends ProfileRepository {
 
   ProfileModel _profile;
 
+  /// When true, every [fetchProfile] call throws — used to exercise the
+  /// Splash screen's "couldn't load your profile" retry/sign-out state.
+  /// Flip it back to false (e.g. from a test's "Try again" tap) to let a
+  /// subsequent fetch succeed.
+  bool failFetch;
+
   @override
-  Future<ProfileModel> fetchProfile(String userId) async => _profile;
+  Future<ProfileModel> fetchProfile(String userId) async {
+    if (failFetch) {
+      throw AppException(
+        message: 'Unable to reach Ascend.',
+        code: 'NETWORK_ERROR',
+      );
+    }
+    return _profile;
+  }
 
   @override
   Future<ProfileModel> updateProfile(

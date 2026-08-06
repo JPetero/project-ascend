@@ -3,14 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AppConfig } from '../../../config/configuration';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { UsersService } from '../../users/users.service';
 import { AuthenticatedUser, JwtPayload } from '../types/jwt-payload.type';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
   ) {
     const appConfig = configService.get<AppConfig>('app')!;
     super({
@@ -21,9 +21,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.usersService.findById(payload.sub);
 
-    if (!user || user.status !== 'ACTIVE') {
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
 

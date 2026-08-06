@@ -15,15 +15,40 @@ export class DevicesService {
     });
   }
 
+  /**
+   * A user can only have one connection per (provider, connectionKey) pair
+   * (see the `@@unique([userId, provider, connectionKey])` constraint on
+   * DeviceConnection) — reconnecting the same provider+key (e.g. a
+   * double-tapped toggle, or a retried request) updates that row instead
+   * of creating a duplicate. Omitting `connectionKey` defaults it to
+   * `"default"`, so single-device providers keep the original
+   * one-connection-per-provider behavior; a client that knows it's
+   * managing multiple physical devices for the same provider passes a
+   * distinct key per device to register them side by side.
+   */
   create(userId: string, dto: CreateDeviceDto) {
-    return this.prisma.deviceConnection.create({
-      data: {
+    const metadata = (dto.metadata ?? {}) as Prisma.InputJsonValue;
+    const connectionKey = dto.connectionKey ?? 'default';
+
+    return this.prisma.deviceConnection.upsert({
+      where: {
+        userId_provider_connectionKey: { userId, provider: dto.provider, connectionKey },
+      },
+      create: {
         userId,
         provider: dto.provider,
+        connectionKey,
         displayName: dto.displayName,
         status: dto.status ?? 'PENDING',
         externalAccountId: dto.externalAccountId,
-        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+        metadata,
+      },
+      update: {
+        displayName: dto.displayName,
+        status: dto.status ?? 'PENDING',
+        externalAccountId: dto.externalAccountId,
+        metadata,
+        ...(dto.status === 'CONNECTED' ? { lastSyncedAt: new Date() } : {}),
       },
     });
   }

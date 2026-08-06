@@ -13,6 +13,12 @@ const _publicPaths = [
   '/health',
 ];
 
+/// Marks a request as already having gone through one refresh-and-retry
+/// cycle, so a second 401 on the retried request is never retried again —
+/// without this a server that keeps rejecting a freshly-refreshed token
+/// (clock skew, a revoked session, a server bug) would refresh forever.
+const _retryFlag = 'ascend.isRetry';
+
 /// Wraps Dio with Project Ascend's base URL, automatic access-token
 /// attachment, and automatic refresh-and-retry on a 401.
 class ApiClient {
@@ -22,6 +28,7 @@ class ApiClient {
         BaseOptions(
           baseUrl: AppConfig.apiBaseUrl,
           connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
         ),
       ) {
     _refreshDio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
@@ -41,8 +48,9 @@ class ApiClient {
           final isPublicPath = _publicPaths.any(
             (path) => error.requestOptions.path.startsWith(path),
           );
+          final alreadyRetried = error.requestOptions.extra[_retryFlag] == true;
 
-          if (isUnauthorized && !isPublicPath) {
+          if (isUnauthorized && !isPublicPath && !alreadyRetried) {
             final retried = await _retryWithRefreshedToken(
               error.requestOptions,
             );
@@ -89,8 +97,12 @@ class ApiClient {
 
       failedRequest.headers['Authorization'] =
           'Bearer ${tokens['accessToken']}';
+      failedRequest.extra[_retryFlag] = true;
       return _dio.fetch(failedRequest);
-    } on DioException {
+    } catch (_) {
+      // Covers both a failed refresh call and a malformed refresh
+      // response — either way, the caller should treat this as "could not
+      // refresh" rather than crash on an unexpected type.
       return null;
     }
   }
@@ -130,20 +142,32 @@ class ApiClient {
     Future<Response<dynamic>> Function() call,
     T Function(dynamic) fromData,
   ) async {
+    final Response<dynamic> response;
     try {
-      final response = await call();
+      response = await call();
+    } on DioException catch (error) {
+      throw _mapError(error);
+    }
+
+    try {
       return ResponseEnvelope.fromJson(
         response.data as Map<String, dynamic>,
         fromData,
       );
-    } on DioException catch (error) {
-      throw _mapError(error);
+    } catch (_) {
+      // The request itself succeeded, but the body wasn't the JSON
+      // envelope we expected (e.g. an HTML error page from a proxy in
+      // front of the API). Never let a raw parsing TypeError escape to
+      // the UI layer.
+      throw AppException.unknown();
     }
   }
 
   AppException _mapError(DioException error) {
     if (error.type == DioExceptionType.connectionError ||
-        error.type == DioExceptionType.connectionTimeout) {
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout) {
       return AppException.network();
     }
 

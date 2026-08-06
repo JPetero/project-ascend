@@ -2,15 +2,31 @@ import * as crypto from 'crypto';
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { RefreshToken } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser, JwtPayload, TokenPair } from './types/jwt-payload.type';
 
 const REFRESH_SECRET_BYTES = 32;
+
+/**
+ * Thrown internally when a rotation transaction loses the race to revoke a
+ * refresh token (it was already revoked — either by history, or by a
+ * concurrent request that beat this one to it). Never escapes AuthService;
+ * it exists only to unwind the `$transaction` callback so Prisma rolls
+ * back the (not-yet-committed) replacement token, then triggers reuse
+ * handling once outside the transaction.
+ */
+class RefreshTokenReuseError extends Error {
+  constructor(readonly stored: RefreshToken) {
+    super('Refresh token reuse detected.');
+  }
+}
 
 @Injectable()
 export class AuthService {
@@ -21,6 +37,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly usersService: UsersService,
   ) {
     this.jwtConfig = this.configService.get<AppConfig>('app')!.jwt;
   }
@@ -34,7 +51,7 @@ export class AuthService {
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const existing = await this.usersService.findByEmail(normalizedEmail);
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
     }
@@ -69,9 +86,9 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
-    if (!user || user.status !== 'ACTIVE') {
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
@@ -95,7 +112,7 @@ export class AuthService {
     const { tokenId, secret } = this.parseRefreshToken(refreshToken);
 
     const stored = await this.prisma.refreshToken.findUnique({ where: { id: tokenId } });
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
+    if (!stored || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 
@@ -104,18 +121,75 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
-    if (!user || user.status !== 'ACTIVE') {
+    if (stored.revokedAt) {
+      // The presented token was already rotated out (or revoked). Reusing a
+      // dead token like this is exactly the signature of a stolen refresh
+      // token being replayed, so treat the whole session lineage as
+      // compromised rather than just rejecting this one request.
+      await this.handleRefreshTokenReuse(stored);
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 
-    // Rotate: revoke the presented token and issue a brand new pair atomically.
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
+    const user = await this.usersService.findById(stored.userId);
+    if (!this.usersService.isActive(user)) {
+      throw new UnauthorizedException('Refresh token is invalid or expired.');
+    }
 
-    return this.issueTokenPair(user.id, user.email, stored.deviceName ?? undefined);
+    const newSecret = crypto.randomBytes(REFRESH_SECRET_BYTES).toString('hex');
+    const newTokenHash = await argon2.hash(newSecret);
+    const expiresAt = new Date(Date.now() + this.parseDurationMs(this.jwtConfig.refreshTtl));
+
+    let newTokenId: string;
+    try {
+      // Revocation and replacement-creation happen in one transaction so a
+      // client can never observe (or make use of) a moment where both the
+      // old and new tokens are simultaneously valid. The `revokedAt: null`
+      // guard on the update turns this into an atomic compare-and-swap:
+      // under Postgres's default READ COMMITTED isolation, a concurrent
+      // request racing to rotate this same token will block on the row
+      // lock, then re-check the guard and affect zero rows once this
+      // transaction commits — which is exactly the reuse case handled below.
+      newTokenId = await this.prisma.$transaction(async (tx) => {
+        const revoked = await tx.refreshToken.updateMany({
+          where: { id: stored.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+
+        if (revoked.count === 0) {
+          throw new RefreshTokenReuseError(stored);
+        }
+
+        const created = await tx.refreshToken.create({
+          data: {
+            userId: stored.userId,
+            familyId: stored.familyId,
+            tokenHash: newTokenHash,
+            expiresAt,
+            deviceName: stored.deviceName,
+          },
+        });
+
+        return created.id;
+      });
+    } catch (error) {
+      if (error instanceof RefreshTokenReuseError) {
+        await this.handleRefreshTokenReuse(error.stored);
+        throw new UnauthorizedException('Refresh token is invalid or expired.');
+      }
+      throw error;
+    }
+
+    const accessToken = await this.jwtService.signAsync(
+      { sub: user.id, email: user.email } satisfies JwtPayload,
+      { secret: this.jwtConfig.accessSecret, expiresIn: this.jwtConfig.accessTtl },
+    );
+
+    return {
+      accessToken,
+      refreshToken: `${newTokenId}.${newSecret}`,
+      tokenType: 'Bearer',
+      expiresIn: this.jwtConfig.accessTtl,
+    };
   }
 
   async logout(refreshToken: string): Promise<void> {
@@ -127,12 +201,55 @@ export class AuthService {
     });
   }
 
+  /**
+   * Revokes every active refresh token across every family for this user —
+   * "sign out everywhere". Unlike reuse handling, this is a deliberate
+   * user action, not theft detection, so it doesn't record a
+   * `reusedAt`/reuse audit event, just an ordinary revoke plus its own
+   * audit trail entry.
+   */
+  async logoutAll(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.logout_all',
+      entityType: 'User',
+      entityId: userId,
+    });
+  }
+
   async me(userId: string): Promise<AuthenticatedUser> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    const user = await this.usersService.findById(userId);
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
     return { id: user.id, email: user.email };
+  }
+
+  /**
+   * Revokes every still-active token in the reused token's family and
+   * records an audit event. Deliberately does not surface *why* to the
+   * caller beyond the generic "invalid or expired" message `refresh()`
+   * throws — the security reason (possible theft) stays server-side.
+   */
+  private async handleRefreshTokenReuse(stored: RefreshToken): Promise<void> {
+    const now = new Date();
+    await this.prisma.refreshToken.updateMany({
+      where: { familyId: stored.familyId, revokedAt: null },
+      data: { revokedAt: now, reusedAt: now },
+    });
+
+    await this.auditService.record({
+      userId: stored.userId,
+      action: 'auth.refresh_token_reuse_detected',
+      entityType: 'RefreshToken',
+      entityId: stored.id,
+      metadata: { familyId: stored.familyId },
+    });
   }
 
   private async issueTokenPair(
@@ -153,6 +270,7 @@ export class AuthService {
     const refreshRecord = await this.prisma.refreshToken.create({
       data: {
         userId,
+        familyId: crypto.randomUUID(),
         tokenHash,
         expiresAt,
         deviceName,

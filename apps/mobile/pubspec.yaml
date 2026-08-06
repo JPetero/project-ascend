@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
 
   # State management & navigation
   flutter_riverpod: ^2.6.1
@@ -29,6 +28,11 @@ dependencies:
   # Motion & sharing
   flutter_animate: ^4.5.2
   share_plus: ^10.1.3
+
+  # Testable wall-clock access (RestTimer) — `clock.now()` instead of raw
+  # `DateTime.now()` so widget tests can drive it via Flutter's fake-time
+  # test zone instead of waiting on real wall-clock seconds.
+  clock: ^1.1.1
 
 dev_dependencies:
   flutter_test:

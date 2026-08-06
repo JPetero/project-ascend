@@ -1,9 +1,17 @@
 # Project Ascend
 
-An AI-first fitness, nutrition, progress, social, and wellness app. This repository is the
-**Sprint 0 + Sprint 1 foundation**: a real, runnable monorepo containing a NestJS backend and a
-Flutter mobile client, covering the first vertical slice — register, onboard, pick a companion
-(Atlas or Nova), land on a personalized dashboard, and navigate the main app shell.
+An AI-first fitness, nutrition, progress, social, and wellness app. This repository contains a
+real, runnable monorepo with a NestJS backend and a Flutter mobile client.
+
+- **Sprint 0 + Sprint 1** delivered the foundation and first vertical slice: register, onboard,
+  pick a companion (Atlas or Nova), land on a personalized dashboard, and navigate the main app
+  shell.
+- **Sprint 2** delivered the **Workout Engine**: browse a seeded exercise library and curated
+  workouts, start a workout plan, log sets (reps/weight/duration) with a rest timer, pause/resume/
+  finish, all working fully offline with best-effort background sync, deterministic
+  progressive-overload suggestions, automatic personal-record detection, and workout history. See
+  [Workout Engine (Sprint 2)](packages/docs/architecture.md#workout-engine-sprint-2) for how it's
+  built.
 
 See [`packages/docs/architecture.md`](packages/docs/architecture.md) for how the system fits
 together, [`packages/docs/security.md`](packages/docs/security.md) for current controls and
@@ -23,10 +31,14 @@ project-ascend/
 
 ## 1. Prerequisites
 
-- **Node.js** 20+
+- **Node.js** 20+ (verified with Node 22)
 - **pnpm** 9+ (`npm install -g pnpm`)
 - **Docker** and **Docker Compose** (for PostgreSQL, and optionally the API)
-- **Flutter** 3.24+ stable (includes Dart) — see https://docs.flutter.dev/get-started/install
+- **Flutter 3.44.8 (stable)**, which bundles **Dart 3.12.2** — this is the exact version
+  pinned in CI (`.github/workflows/mobile.yml`) and required by `apps/mobile/pubspec.yaml`'s
+  `sdk: ^3.12.2` constraint. Install via https://docs.flutter.dev/get-started/install, then
+  `flutter version 3.44.8` if you have a different version active. Using an older Flutter (e.g.
+  3.24, which bundles Dart ~3.5) will fail to resolve dependencies against this SDK constraint.
 - A configured Android emulator or iOS simulator (or a physical device) to run the mobile app
 
 ## 2. Clone the repository
@@ -84,6 +96,18 @@ cd ../..
 This applies the committed migration in `services/api/prisma/migrations/` and regenerates the
 Prisma client. Use `pnpm prisma:deploy` instead in CI/production (applies migrations without
 prompting to create a new one).
+
+Then seed the exercise/workout catalog (exercises, categories, muscle groups, equipment, and a
+handful of curated workouts) — required for the Workout Engine's "Browse workouts" and exercise
+library to show anything:
+
+```bash
+cd services/api
+pnpm prisma:seed
+cd ../..
+```
+
+This is idempotent (safe to re-run) and runs automatically in CI right after migrations.
 
 ## 7. Start the API
 
@@ -163,20 +187,233 @@ and your machine are on the same network with port 3000 reachable (check firewal
 iOS Simulator (unlike Android) shares the host's network namespace, so `http://localhost:3000`
 works there without any special alias.
 
-## Definition of Done checklist
+## Verified Build Results
 
-- [x] `docker compose up` starts PostgreSQL and the API
-- [x] Prisma migrations apply successfully
-- [x] Backend tests pass (`pnpm api:test`, `pnpm api:test:e2e`)
-- [x] The Flutter app analyzes without errors (`flutter analyze`)
-- [x] Flutter tests pass (`flutter test`)
-- [x] A user can register
-- [x] A user can sign in
-- [x] A user can complete onboarding
-- [x] Atlas or Nova is persisted
-- [x] The dashboard shows the user's first name
-- [x] Wearable preferences can be added and removed
-- [x] The companion quick sheet works
-- [x] Theme mode can change
-- [x] Sign out works
-- [x] Setup is fully documented (this file)
+The results below are from an actual production-readiness engineering audit pass (the most
+recent verification; supersedes earlier numbers), run in a sandboxed Linux container. Every
+command was executed for real; nothing here is inferred or assumed. Where a step could not be
+completed, that is stated explicitly rather than marked done.
+
+**Environment**
+
+| | |
+|---|---|
+| OS | Ubuntu 24.04.4 LTS (`Linux 6.18.5-fc-v18`, x86_64) |
+| Node.js | v22.22.2 |
+| pnpm | 10.33.0 |
+| Flutter | 3.44.8 (stable) |
+| Dart | 3.12.2 |
+| PostgreSQL | 16 (Docker service, per `docker-compose.yml`) |
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Install deps (frozen lockfile) | `pnpm install --filter @project-ascend/api... --frozen-lockfile` | PASSED |
+| Prisma client generation | `pnpm api:prisma:generate` | PASSED |
+| Prisma schema validation/format | `prisma validate`, `prisma format` + `git diff --exit-code` | PASSED |
+| Migrations applied to a live Postgres | `pnpm --filter @project-ascend/api prisma:deploy` (against `ascend_dev` and `ascend_test`) | PASSED |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 8/8 tests** |
+| E2E tests (real Postgres, real HTTP via Supertest) | `pnpm api:test:e2e` | **PASSED — 19/19 tests** |
+| Build | `pnpm api:build` | PASSED |
+| `GET /health` (DB-aware: fails if Postgres is unreachable) | `curl http://localhost:3100/health` against a directly-run instance of the built output (`node dist/main.js`) | PASSED — `{"data":{"status":"ok","timestamp":"..."},"meta":{},"error":null}` |
+| Auth rate limiting | 12 rapid `POST /auth/login` attempts against the same directly-run instance | PASSED — first 9 returned `401`, the 10th–12th returned `429` |
+
+The e2e suite exercises registration, login, refresh (including rotation and family-wide
+revocation on reuse), profile, preferences, devices (including duplicate-connection upserting),
+onboarding, and logout end-to-end against a real database.
+
+**Docker**
+
+`docker build` / `docker compose build` / `docker compose up` **could not be executed** in this
+sandbox: outbound pulls of the `node:20-alpine` base image are blocked by the sandbox's egress
+policy (`production.cloudfront.docker.com` returns `403 Forbidden`, reproduced again in this
+pass with `dockerd` actually running — same failure signature as before). This is an environment
+restriction, not a defect in the Dockerfile or compose config, and it was not worked around (no
+alternate registries, no disabling of the policy).
+
+To compensate, the logic the multi-stage `api.Dockerfile` performs was re-validated directly on
+the host, outside Docker, against the current code:
+- `pnpm --filter @project-ascend/api deploy --prod --legacy <dir>` was run to reproduce the
+  `build` stage's self-contained output, with the generated Prisma client (`.prisma/client`)
+  copied in exactly as the Dockerfile's `build` stage does.
+- The deployed output was run directly (`node dist/main.js`) with production-shaped environment
+  variables, and `/health`, `/auth/register`, `/auth/login`, and the tightened per-route rate
+  limit were all confirmed to work against a real Postgres instance.
+- `docker compose config --quiet` was run to confirm `docker-compose.yml` is still syntactically
+  valid.
+
+Because of this, the Docker health check and the "runs as non-root without pnpm at runtime"
+property are believed correct by construction (the `runtime` stage never installs pnpm and the
+`HEALTHCHECK` calls the same `/health` endpoint verified above) but were **not** verified inside
+an actual container in this sandbox.
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| `flutter --version` | — | `Flutter 3.44.8 • Dart 3.12.2` |
+| Dependencies | `flutter pub get` | PASSED |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 19/19 tests** |
+
+**Known limitations**
+
+- Docker images were never literally built or run as containers in this sandbox (see above);
+  the underlying `pnpm deploy` + Prisma-client packaging logic was validated by direct execution
+  instead. Anyone with unrestricted Docker Hub access should run `docker compose build && docker
+  compose up -d` to get a final container-level confirmation — the `docker-build` job in
+  `.github/workflows/backend.yml` does this automatically on every push/PR.
+- Concurrent refresh-token reuse (two simultaneous requests racing to rotate the same token) is
+  proven via unit tests that mock the transaction boundary, plus reasoning about PostgreSQL's
+  default READ COMMITTED isolation making the guarded `updateMany` a safe compare-and-swap — not
+  via literal simultaneous real HTTP requests hitting a live server.
+- No account lockout / exponential backoff exists beyond the per-route rate limit (see
+  [`packages/docs/security.md`](packages/docs/security.md#known-gaps-before-production) for the
+  full list of known gaps before a real production launch).
+
+## Sprint 2 (Workout Engine) — Verified Build Results
+
+Run for real in the same sandboxed Linux container immediately before the Sprint 2 commit, against
+a locally-running PostgreSQL 16 instance (Docker's daemon was unavailable in this pass, same
+restriction as the Sprint 0/1 audit above — see that section's "Docker" note).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Prisma schema validation/format | `prisma validate`, `prisma format` + `git diff --exit-code` | PASSED |
+| Migrations applied | `pnpm --filter @project-ascend/api prisma:deploy` | PASSED |
+| Catalog seed | `pnpm --filter @project-ascend/api prisma:seed` | PASSED — 5 categories, 8 muscle groups, 5 equipment types, 22 exercises, 4 workouts |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 20/20 tests** (up from 8; Sprint 2 added exercise-progression and personal-record-detection specs) |
+| E2E tests (real Postgres, real HTTP via Supertest) | `pnpm api:test:e2e` | **PASSED — 31/31 tests** (up from 19; Sprint 2 added `workout-engine.e2e-spec.ts`, covering the catalog, workout plans, and the full session lifecycle including pause/resume, set logging, and personal records) |
+| Build | `pnpm api:build` | PASSED — `dist/main.js` at the correct path (re-verified after adding `prisma/seed.ts`, which shifted TypeScript's inferred `rootDir` until `tsconfig.build.json` excluded it) |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 30/30 tests** (up from 19; Sprint 2 added the workout session controller's online/offline/retry-sync flow, the rest timer, Workout-tab navigation, and workout history rendering) |
+
+Docker itself was not re-verified as a container build in this pass, for the same environment
+reason as the Sprint 0/1 audit; `docker-build` in `.github/workflows/backend.yml` covers that on
+every push/PR.
+
+## Build Session 1 (P0) — Verified Build Results
+
+Foundation-repair pass. Full log with per-item reasoning in
+[`packages/docs/build-session-1.md`](packages/docs/build-session-1.md). Environment: same
+sandboxed Linux container, Node 22, pnpm 9.15.9, PostgreSQL 16 (local, not Docker — the daemon is
+unreachable in this sandbox; see below).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Migration created and applied | `prisma migrate diff` + `prisma migrate deploy` (non-interactive `migrate dev` isn't supported in this shell) | PASSED — `20260806024532_p0_refresh_token_reuse_and_device_key`, applied to both `ascend_dev` and `ascend_test` |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 21/21 tests** (up from 20; +1 `logoutAll` test) |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 33/33 tests** (up from 31; +1 multi-device `connectionKey` test, +1 `logout-all` test) |
+| Build | `pnpm api:build` | PASSED |
+| Deployed-output smoke test (Docker unavailable — see below) | `node dist/main.js` against real Postgres with production env vars | PASSED — `/health` returned `200`, `/auth/register` succeeded end-to-end, `Mapped {/auth/logout-all, POST} route` confirmed registered |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| `flutter --version` | — | `Flutter 3.44.8 • channel stable`, matches `pubspec.yaml`'s `sdk: ^3.12.2` and CI's pin exactly — no drift found |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 33/33 tests** (up from 30; +3 `splash_resilience_test.dart`: recoverable profile-fetch-failure state, sign-out from that state, session-expired handling) |
+
+**Docker**
+
+`docker compose up --build -d` could not be run: the Docker daemon is unreachable in this sandbox
+(`Cannot connect to the Docker daemon at unix:///var/run/docker.sock`; `service docker start`
+fails with `ulimit: error setting limit (Operation not permitted)`, a container-level privilege
+restriction — confirmed on two attempts, one with an unsandboxed shell). This is unchanged from
+the Sprint 0/1 and Sprint 2 audits above. `infrastructure/docker/api.Dockerfile` and
+`docker-compose.yml` were inspected and already satisfy every P0.6 requirement (non-root runtime
+user, healthcheck against `/health`, `migrate` stage running `prisma migrate deploy` — never
+`migrate dev` — gating the `api` service via `service_completed_successfully`); compensating
+verification was done by direct execution (see the Backend table above and
+`build-session-1.md`'s P0.6 entry for full detail). `docker-build` in
+`.github/workflows/backend.yml` builds both the `runtime` and `migrate` targets on every push/PR.
+
+**What changed**
+
+- `RefreshToken.reusedAt` (distinguishes family-revoked-by-reuse-detection from an ordinary
+  rotation revoke) and `POST /auth/logout-all` ("sign out everywhere").
+- `DeviceConnection.connectionKey` (`@@unique([userId, provider, connectionKey])`, default
+  `"default"`) so a provider that supports multiple physical devices (e.g. two paired watches) can
+  register more than one connection instead of silently upserting into a single row.
+- `apps/mobile/test/core/splash_resilience_test.dart` — new coverage for the recoverable
+  splash-error state and session-expired handling (both were already implemented in code; only
+  the tests were missing).
+
+Everything else audited under P0 (Flutter/Dart version pinning, onboarding's local-first
+persistence, both CI workflows) was already correct from prior session work and required no
+changes — see `build-session-1.md` for the item-by-item verification.
+
+## Build Session 1 (P1) — Verified Build Results
+
+Workout Engine MVP gap-closing pass (the vertical slice already existed from Sprint 2; this closed
+the remaining gaps against a fuller spec). Full log in
+[`packages/docs/build-session-1.md`](packages/docs/build-session-1.md), including the honest list
+of what's still **not** done (exercise substitution UI, a from-scratch plan editor, RPE input, and
+a formal idempotency-key column for offline sync — see that file's "Not implemented this session"
+section).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Type check | `pnpm exec tsc --noEmit` | PASSED, 0 errors |
+| Migration created and applied | `20260806025612_p1_measurement_type_and_distance_target` (adds `Exercise.measurementType`, `targetDistanceMeters` on prescribed exercises, `ESTIMATED_ONE_REP_MAX`/`BEST_PACE` personal-record types) | PASSED, applied to `ascend_dev` and `ascend_test` |
+| Seed idempotency | `pnpm prisma:seed` run twice, then real DB row counts queried via `psql` (not the seed script's own log line) | PASSED — `exercises=49`, `workouts=13`, `workout_exercises=52`, `exercise_alternatives=38`, identical after both runs |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 23/23 tests** (up from 21; +2 personal-record tests for estimated 1RM and best pace) |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 33/33 tests** (unchanged count; existing coverage continues to pass against the expanded 49-exercise/13-workout catalog) |
+| Build | `pnpm api:build` | PASSED |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Dependencies | `flutter pub get` | PASSED (added `clock: ^1.1.1` as a direct dependency, for a fake-clock-testable rest timer) |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 45/45 tests** (up from 33; +7 `workout_streak_test.dart`, +5 net on dashboard tests, rest-timer fix re-verified against its existing 2 tests) |
+
+**What changed**
+
+- `Exercise.measurementType` (`REPS_WEIGHT`/`REPS_ONLY`/`DURATION`/`DISTANCE_DURATION`/
+  `ASSISTED_WEIGHT`/`BODYWEIGHT`, filterable via `GET /exercises?measurementType=`) and
+  `targetDistanceMeters` on prescribed exercises, closing a real data-model gap (walking/running
+  entries had nowhere to prescribe a distance target).
+- Seed catalog expanded from 22 to 49 exercises (added bodyweight regressions, more dumbbell/
+  barbell/resistance-band movements, mobility stretches, and — previously entirely missing —
+  walking/running entries) and from 4 to 13 workouts (added the 9 required starter plans as
+  genuine additions, keeping the original 4 unchanged so existing e2e coverage keeps passing).
+- Two new personal-record types: `ESTIMATED_ONE_REP_MAX` (Epley formula, capped to ≤12-rep sets,
+  always labeled as an estimate) and `BEST_PACE` (m/s, from sets with both distance and duration).
+- Rest timer rewritten to compute from wall-clock timestamps instead of an in-memory tick
+  counter — catching and fixing two real off-by-one bugs (a lazy-`late`-field bug that shifted the
+  whole countdown a full tick late, and a truncation-vs-rounding bug) by actually running its
+  tests after each change, not just reading the diff.
+- Dashboard now shows real workout status (active/resumable session, or the most recent real
+  completed workout, or an honest empty state), a real streak (`computeWorkoutStreak()`, a pure
+  function over completed-session dates), and a real most-recent-personal-record card — replacing
+  the `DashboardFixture` sample data that previously stood in for all three. The remaining
+  nutrition/sleep/recovery cards stay fixture-backed and are now more specifically labeled
+  ("Nutrition, sleep & recovery — sample data") so they don't look like the newly-real sections
+  next to them.
+
+**Docker**: same unavailable-in-this-sandbox situation as P0 and the prior audits; no new Docker
+verification was needed for P1 since `infrastructure/docker/api.Dockerfile` and
+`docker-compose.yml` weren't touched this pass.

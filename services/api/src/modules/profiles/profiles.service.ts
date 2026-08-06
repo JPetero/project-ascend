@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Equipment, Prisma, Profile, WorkoutSchedule } from '@prisma/client';
+import { isPrismaNotFoundError } from '../../common/prisma/prisma-errors.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -9,40 +10,39 @@ export class ProfilesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(userId: string) {
-    const profile = await this.prisma.profile.findUnique({ where: { userId } });
-    if (!profile) {
+    // A single query via the User relation, rather than three separate
+    // round trips for profile/equipment/schedule.
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true, equipment: true, workoutSchedule: true },
+    });
+
+    if (!user?.profile) {
       throw new NotFoundException('Profile not found.');
     }
 
-    const [equipment, workoutSchedule] = await Promise.all([
-      this.prisma.equipment.findMany({ where: { userId } }),
-      this.prisma.workoutSchedule.findUnique({ where: { userId } }),
-    ]);
-
-    return this.serialize(profile, equipment, workoutSchedule);
+    return this.serialize(user.profile, user.equipment, user.workoutSchedule);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    await this.ensureProfileExists(userId);
-    await this.prisma.profile.update({ where: { userId }, data: this.toProfileUpdateData(dto) });
+    await this.updateProfileRow(userId, this.toProfileUpdateData(dto));
     return this.getProfile(userId);
   }
 
   async updateOnboarding(userId: string, dto: UpdateOnboardingDto) {
-    await this.ensureProfileExists(userId);
-
     const { onboardingStep, onboardingCompleted, equipment, workoutSchedule, ...profileFields } =
       dto;
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.profile.update({
-        where: { userId },
-        data: {
+      await this.updateProfileRow(
+        userId,
+        {
           ...this.toProfileUpdateData(profileFields),
           ...(onboardingStep !== undefined ? { onboardingStep } : {}),
           ...(onboardingCompleted !== undefined ? { onboardingCompleted } : {}),
         },
-      });
+        tx,
+      );
 
       if (equipment) {
         await tx.equipment.deleteMany({ where: { userId } });
@@ -78,13 +78,23 @@ export class ProfilesService {
     return this.getProfile(userId);
   }
 
-  private async ensureProfileExists(userId: string): Promise<void> {
-    const exists = await this.prisma.profile.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-    if (!exists) {
-      throw new NotFoundException('Profile not found.');
+  /**
+   * Updates the profile row directly and turns Prisma's "row didn't exist"
+   * error into a 404, instead of a separate existence check before every
+   * write.
+   */
+  private async updateProfileRow(
+    userId: string,
+    data: Prisma.ProfileUpdateInput,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<void> {
+    try {
+      await tx.profile.update({ where: { userId }, data });
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        throw new NotFoundException('Profile not found.');
+      }
+      throw error;
     }
   }
 

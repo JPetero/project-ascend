@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { isPrismaNotFoundError } from '../../common/prisma/prisma-errors.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
@@ -15,7 +16,13 @@ export class PreferencesService {
   }
 
   async updatePreferences(userId: string, dto: UpdatePreferencesDto) {
-    await this.getPreferences(userId);
-    return this.prisma.preference.update({ where: { userId }, data: dto });
+    try {
+      return await this.prisma.preference.update({ where: { userId }, data: dto });
+    } catch (error) {
+      if (isPrismaNotFoundError(error)) {
+        throw new NotFoundException('Preferences not found.');
+      }
+      throw error;
+    }
   }
 }

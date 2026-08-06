@@ -17,15 +17,35 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot job: applies pending Prisma migrations and exits. The api
+  # service below won't start until this exits 0, so `docker compose up`
+  # always leaves the database schema in sync before anything serves
+  # traffic — never `prisma migrate dev`, which is interactive/dev-only.
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+      target: migrate
+    container_name: ascend-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ascend:ascend_dev_password@postgres:5432/ascend_dev?schema=public
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: infrastructure/docker/api.Dockerfile
+      target: runtime
     container_name: ascend-api
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: development
       PORT: 3000
