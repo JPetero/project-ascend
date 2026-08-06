@@ -16,6 +16,7 @@ import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_identity_controller.dart';
 import '../../../cardio/presentation/providers/cardio_session_controller.dart';
 import '../../../companion/domain/companion_dialogue.dart';
+import '../../../companion/presentation/widgets/companion_quick_actions_sheet.dart';
 import '../../../nutrition/domain/nutrition_dashboard_summary.dart';
 import '../../../nutrition/presentation/providers/nutrition_summary_controller.dart';
 import '../../../profile/domain/preferences_model.dart';
@@ -310,8 +311,11 @@ class _CompanionCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final companion = preferences?.companion ?? Companion.atlas;
     final style = preferences?.coachingStyle ?? CoachingStyle.balanced;
+    final displayName = companion == Companion.nova ? 'Nova' : 'Atlas';
 
     return AscendCard(
+      semanticLabel: 'Open $displayName quick actions',
+      onTap: () => CompanionQuickActionsSheet.show(context),
       child: Row(
         children: [
           Icon(
@@ -326,7 +330,7 @@ class _CompanionCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  companion == Companion.nova ? 'Nova' : 'Atlas',
+                  displayName,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Text(

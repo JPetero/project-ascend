@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../../core/sync/sync_status_indicator.dart';
 import '../../domain/exercise.dart';
 import '../../domain/workout.dart';
 import '../../domain/workout_session.dart';
@@ -57,6 +58,7 @@ class WorkoutScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
             children: [
+              const SyncStatusIndicator(),
               if (activeSession != null && activeSession.isActive) ...[
                 _ActiveSessionBanner(session: activeSession),
                 const SizedBox(height: AscendSpacing.lg),

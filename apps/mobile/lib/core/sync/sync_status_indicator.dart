@@ -34,24 +34,28 @@ class SyncStatusIndicator extends ConsumerWidget {
       icon = Icons.cloud_upload_outlined;
     }
 
-    return Semantics(
-      label: label,
-      child: AscendCard(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AscendSpacing.md,
-          vertical: AscendSpacing.sm,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: AscendSpacing.sm),
-            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-            if (status.failedCount > 0 && !status.isSyncing)
-              TextButton(
-                onPressed: () => ref.read(syncEngineProvider).retryAllFailed(),
-                child: const Text('Retry'),
-              ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AscendSpacing.lg),
+      child: Semantics(
+        label: label,
+        child: AscendCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AscendSpacing.md,
+            vertical: AscendSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: AscendSpacing.sm),
+              Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+              if (status.failedCount > 0 && !status.isSyncing)
+                TextButton(
+                  onPressed: () =>
+                      ref.read(syncEngineProvider).retryAllFailed(),
+                  child: const Text('Retry'),
+                ),
+            ],
+          ),
         ),
       ),
     );
