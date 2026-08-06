@@ -427,3 +427,79 @@ Time ran out before these could be done properly — listed here rather than sil
 - **P2 (Nutrition Tracking foundation)**: not started. All available time went to closing real P1
   gaps; per the operating rules, P2 should not begin while P1 gaps remain open, and several
   genuine ones are listed above.
+
+---
+
+# End-of-session verification
+
+Ran every command from the session brief's end-of-session checklist, for real, after both
+commits landed. Postgres (a local, non-Docker instance in this sandbox) stopped once mid-session
+and was restarted (`service postgresql start`) before continuing — noted here since it briefly
+caused a spurious full e2e failure that was mistaken for a real regression until diagnosed.
+
+```
+$ pnpm install --frozen-lockfile      -> PASSED (required CI=true to skip an interactive
+                                          "recreate node_modules" prompt this shell would
+                                          otherwise hang on; same effective command as CI, which
+                                          already runs non-interactively)
+$ pnpm api:prisma:generate            -> PASSED
+$ pnpm api:lint                       -> PASSED, 0 errors/warnings
+$ pnpm api:test                       -> PASSED, 23/23 tests
+$ pnpm api:build                      -> PASSED
+$ docker compose build                -> NOT AVAILABLE — "Cannot connect to the Docker daemon at
+                                          unix:///var/run/docker.sock" (daemon unreachable in this
+                                          sandbox; `service docker start` fails with
+                                          "ulimit: error setting limit (Operation not permitted)",
+                                          a container-level privilege restriction, confirmed
+                                          earlier in this session on both a sandboxed and an
+                                          unsandboxed shell)
+$ docker compose up -d                -> NOT AVAILABLE, same reason
+$ pnpm api:test:e2e                   -> PASSED, 33/33 tests
+$ cd apps/mobile && flutter pub get   -> PASSED
+$ dart format --set-exit-if-changed . -> PASSED
+$ flutter analyze                     -> PASSED — "No issues found!"
+$ flutter test                        -> PASSED, 45/45 tests
+```
+
+Container status/health could not be inspected since no container was ever started (Docker
+unavailable). The Dockerfile/compose logic itself was compensated for via direct execution earlier
+in this log (P0.6) — that compensating verification was against the pre-P1 build and was not
+re-run after P1's backend changes, since P1 touched only Prisma schema/seed/service code already
+covered by the unit/e2e suites above, not anything Docker-specific.
+
+## Session summary
+
+**P0 — complete.** Commit `81371a6`, "Stabilize foundation and session security". Closed two real
+gaps (refresh-token `reusedAt` + `POST /auth/logout-all`; device `connectionKey` for multi-device
+providers) and added missing test coverage for already-correct behavior (splash error/retry/
+sign-out, session-expired handling). Everything else audited under P0 was already correct from
+prior session work.
+
+**P1 — substantially complete against its acceptance criteria; several capabilities from the
+fuller feature list intentionally deferred.** Commit `906df57`, "Implement Workout Engine MVP".
+Every P1 acceptance criterion in the session brief passes (migration succeeds, seed is genuinely
+idempotent — verified via direct DB row counts, not just log output —, lint/unit/e2e/build all
+green, Flutter format/analyze/test all green, offline completion and duplicate-sync-prevention
+both already worked and remain covered by existing tests, the dashboard now uses real workout
+data, no placeholder Workout screen exists). Closed real gaps: `measurementType` on `Exercise`,
+`targetDistanceMeters` on prescribed exercises, seed catalog expanded 22->49 exercises and
+4->13 workouts (adding the 9 required starter plans), two new personal-record types (estimated
+1RM, best pace), a rest-timer correctness rewrite (timestamp-based, two real bugs caught by
+actually running its tests), and full dashboard integration (real workout status, real streak,
+real most-recent-PR).
+
+Four items from P1's fuller capability list were **not** implemented this session, and are
+recorded honestly rather than silently dropped: exercise substitution mid-session (Flutter UI
+only — the backend already supports it structurally), a from-scratch custom-plan editor UI
+(same — the backend DTO already accepts it), RPE/effort-rating input, and a formal idempotency-key
+column for offline sync (the existing design gets safe retries a different, already-working way,
+but a literal duplicate network request rather than a client-state retry could in principle
+double-log a set without one).
+
+**P2 — not started.** Per the operating rules ("Begin only when all P1 acceptance criteria pass
+and useful session time remains"), P1's acceptance criteria do pass, but building a genuine P2
+foundation (nutrition domain models + migration, a full CRUD API, offline-first Flutter screens,
+tests, and documentation) is comparable in scope to everything above it in this log, and attempting
+it in whatever time remained risked exactly the "UI scaffolding presented as complete" outcome the
+operating rules explicitly forbid. Better to report zero P2 progress honestly than fabricate a
+shallow slice.
