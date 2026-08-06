@@ -6,6 +6,7 @@ import 'package:mobile/features/dashboard/presentation/screens/home_dashboard_sc
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/workout/presentation/providers/workout_session_controller.dart';
 
+import '../../helpers/fake_nutrition_repositories.dart';
 import '../../helpers/fake_workout_repositories.dart';
 import '../../helpers/pump_helpers.dart';
 import '../../helpers/test_provider_scope.dart';
@@ -134,6 +135,54 @@ void main() {
         find.textContaining(samplePersonalRecord.exercise.name),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'shows real protein and hydration values from the Nutrition backend, not the sample fixture',
+    (tester) async {
+      final container = await createTestContainer(
+        signedIn: true,
+        initialProfile: _profile,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: HomeDashboardScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      // sampleNutritionDashboardSummary.proteinGrams is 42 — the sample
+      // DashboardFixture's proteinGrams is 62, so this proves the ring
+      // reads from the real nutrition summary provider.
+      expect(find.text('42g'), findsOneWidget);
+      expect(find.text('0.8L'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows a graceful "no data" state instead of a fake value when the nutrition summary fails to load',
+    (tester) async {
+      final container = await createTestContainer(
+        signedIn: true,
+        initialProfile: _profile,
+        nutritionSummaryRepository: FakeNutritionSummaryRepository(
+          shouldFail: true,
+        ),
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: HomeDashboardScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('No data'), findsNWidgets(2));
+      expect(find.text('42g'), findsNothing);
     },
   );
 

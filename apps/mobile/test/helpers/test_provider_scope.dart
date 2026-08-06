@@ -4,6 +4,7 @@ import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
+import 'package:mobile/features/nutrition/presentation/providers/nutrition_summary_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
@@ -17,6 +18,7 @@ import 'package:mobile/features/workout/presentation/providers/workout_plan_cont
 import 'package:mobile/features/workout/presentation/providers/workout_session_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fake_nutrition_repositories.dart';
 import 'fake_repositories.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
@@ -34,6 +36,7 @@ Future<ProviderContainer> createTestContainer({
   PreferencesModel? initialPreferences,
   FakeWorkoutSessionRepository? workoutSessionRepository,
   FakeWorkoutHistoryRepository? workoutHistoryRepository,
+  FakeNutritionSummaryRepository? nutritionSummaryRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -85,6 +88,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       workoutSessionRepositoryProvider.overrideWithValue(
         workoutSessionRepository ?? FakeWorkoutSessionRepository(),
+      ),
+      nutritionSummaryRepositoryProvider.overrideWithValue(
+        nutritionSummaryRepository ?? FakeNutritionSummaryRepository(),
       ),
     ],
   );
