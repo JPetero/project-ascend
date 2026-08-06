@@ -5,14 +5,16 @@ import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
   let auditService: { record: jest.Mock };
+  let usersService: { findByEmail: jest.Mock; findById: jest.Mock; isActive: jest.Mock };
   let tx: { refreshToken: { updateMany: jest.Mock; create: jest.Mock } };
   let prisma: {
-    user: { findUnique: jest.Mock; create: jest.Mock };
+    user: { create: jest.Mock };
     refreshToken: { findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -22,11 +24,16 @@ describe('AuthService', () => {
       refreshToken: { updateMany: jest.fn(), create: jest.fn() },
     };
     prisma = {
-      user: { findUnique: jest.fn(), create: jest.fn() },
+      user: { create: jest.fn() },
       refreshToken: { findUnique: jest.fn(), create: jest.fn(), updateMany: jest.fn() },
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(tx)),
     };
     auditService = { record: jest.fn() };
+    usersService = {
+      findByEmail: jest.fn(),
+      findById: jest.fn(),
+      isActive: jest.fn((user: { status?: string } | null) => !!user && user.status === 'ACTIVE'),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -47,6 +54,7 @@ describe('AuthService', () => {
           },
         },
         { provide: AuditService, useValue: auditService },
+        { provide: UsersService, useValue: usersService },
       ],
     }).compile();
 
@@ -68,7 +76,7 @@ describe('AuthService', () => {
     });
 
     it('rejects registration when the email is already taken', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' });
+      usersService.findByEmail.mockResolvedValue({ id: 'existing-user' });
 
       await expect(
         authService.register({
@@ -82,7 +90,7 @@ describe('AuthService', () => {
     });
 
     it('creates a user with a hashed password and issues tokens', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
+      usersService.findByEmail.mockResolvedValue(null);
       prisma.user.create.mockResolvedValue({ id: 'new-user', email: 'ada@example.com' });
       prisma.refreshToken.create.mockResolvedValue({ id: 'token-id' });
 
@@ -133,7 +141,7 @@ describe('AuthService', () => {
         deviceName: 'iPhone',
         expiresAt: new Date(Date.now() + 100_000),
       });
-      prisma.user.findUnique.mockResolvedValue({
+      usersService.findById.mockResolvedValue({
         id: 'user-1',
         email: 'ada@example.com',
         status: 'ACTIVE',
@@ -196,7 +204,7 @@ describe('AuthService', () => {
         revokedAt: null, // still looked valid at read time...
         expiresAt: new Date(Date.now() + 100_000),
       });
-      prisma.user.findUnique.mockResolvedValue({
+      usersService.findById.mockResolvedValue({
         id: 'user-1',
         email: 'ada@example.com',
         status: 'ACTIVE',

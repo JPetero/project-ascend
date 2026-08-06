@@ -7,6 +7,7 @@ import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthenticatedUser, JwtPayload, TokenPair } from './types/jwt-payload.type';
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly usersService: UsersService,
   ) {
     this.jwtConfig = this.configService.get<AppConfig>('app')!.jwt;
   }
@@ -49,7 +51,7 @@ export class AuthService {
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const existing = await this.usersService.findByEmail(normalizedEmail);
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
     }
@@ -84,9 +86,9 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
-    if (!user || user.status !== 'ACTIVE') {
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
@@ -128,8 +130,8 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
-    if (!user || user.status !== 'ACTIVE') {
+    const user = await this.usersService.findById(stored.userId);
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 
@@ -200,8 +202,8 @@ export class AuthService {
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
+    const user = await this.usersService.findById(userId);
+    if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
     return { id: user.id, email: user.email };

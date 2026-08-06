@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,6 +14,7 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/workout/presentation/screens/workout_screen.dart';
+import '../design_system/design_system.dart';
 import 'app_shell.dart';
 import 'route_paths.dart';
 
@@ -32,6 +33,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: RoutePaths.splash,
     refreshListenable: refreshNotifier,
     redirect: (context, state) => _redirect(ref, state),
+    errorBuilder: (context, state) => const _RouteNotFoundScreen(),
     routes: [
       GoRoute(
         path: RoutePaths.splash,
@@ -102,6 +104,30 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Shown for any location that doesn't match a route (a stale deep link,
+/// a malformed push-notification target, etc.) instead of the framework's
+/// default error page.
+class _RouteNotFoundScreen extends StatelessWidget {
+  const _RouteNotFoundScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: AscendEmptyState(
+            icon: Icons.explore_off_outlined,
+            title: "That page doesn't exist",
+            message: "Let's get you back to somewhere familiar.",
+            actionLabel: 'Go home',
+            onAction: () => context.go(RoutePaths.splash),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 const _unauthenticatedPaths = {
   RoutePaths.welcome,

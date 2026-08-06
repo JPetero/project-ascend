@@ -1,8 +1,8 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class WorkoutScheduleDto {
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsInt()
   @Min(5)
   @Max(240)

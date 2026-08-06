@@ -53,7 +53,10 @@ export function validateEnv(config: Record<string, unknown>) {
   const errors = validateSync(validatedConfig, { skipMissingProperties: false });
 
   if (errors.length > 0) {
-    throw new Error(`Invalid environment configuration:\n${errors.toString()}`);
+    const details = errors
+      .flatMap((error) => Object.values(error.constraints ?? {}))
+      .join('\n  - ');
+    throw new Error(`Invalid environment configuration:\n  - ${details}`);
   }
 
   if (

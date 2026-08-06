@@ -1,14 +1,14 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeviceConnectionStatus } from '@prisma/client';
 import { IsEnum, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateDeviceDto {
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
   @MaxLength(60)
   provider!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
   @MaxLength(120)
   displayName!: string;

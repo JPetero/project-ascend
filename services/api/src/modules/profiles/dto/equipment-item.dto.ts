@@ -1,8 +1,8 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class EquipmentItemDto {
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
   @MaxLength(80)
   type!: string;

@@ -169,9 +169,10 @@ works there without any special alias.
 
 ## Verified Build Results
 
-The results below are from an actual foundation-stabilization pass, run in a sandboxed Linux
-container. Every command was executed for real; nothing here is inferred or assumed. Where a
-step could not be completed, that is stated explicitly rather than marked done.
+The results below are from an actual production-readiness engineering audit pass (the most
+recent verification; supersedes earlier numbers), run in a sandboxed Linux container. Every
+command was executed for real; nothing here is inferred or assumed. Where a step could not be
+completed, that is stated explicitly rather than marked done.
 
 **Environment**
 
@@ -194,9 +195,10 @@ step could not be completed, that is stated explicitly rather than marked done.
 | Migrations applied to a live Postgres | `pnpm --filter @project-ascend/api prisma:deploy` (against `ascend_dev` and `ascend_test`) | PASSED |
 | Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
 | Unit tests | `pnpm api:test` | **PASSED — 8/8 tests** |
-| E2E tests (real Postgres, real HTTP via Supertest) | `pnpm api:test:e2e` | **PASSED — 19/19 tests**, run twice for reproducibility |
+| E2E tests (real Postgres, real HTTP via Supertest) | `pnpm api:test:e2e` | **PASSED — 19/19 tests** |
 | Build | `pnpm api:build` | PASSED |
-| `GET /health` | `curl http://localhost:3000/health` against a directly-run instance of the built output (`node dist/main.js`) | PASSED — `{"data":{"status":"ok","timestamp":"..."},"meta":{},"error":null}` |
+| `GET /health` (DB-aware: fails if Postgres is unreachable) | `curl http://localhost:3100/health` against a directly-run instance of the built output (`node dist/main.js`) | PASSED — `{"data":{"status":"ok","timestamp":"..."},"meta":{},"error":null}` |
+| Auth rate limiting | 12 rapid `POST /auth/login` attempts against the same directly-run instance | PASSED — first 9 returned `401`, the 10th–12th returned `429` |
 
 The e2e suite exercises registration, login, refresh (including rotation and family-wide
 revocation on reuse), profile, preferences, devices (including duplicate-connection upserting),
@@ -206,22 +208,21 @@ onboarding, and logout end-to-end against a real database.
 
 `docker build` / `docker compose build` / `docker compose up` **could not be executed** in this
 sandbox: outbound pulls of the `node:20-alpine` base image are blocked by the sandbox's egress
-policy (`production.cloudfront.docker.com` returns `403`, confirmed via the proxy's own
-diagnostics). This is an environment restriction, not a defect in the Dockerfile or compose
-config, and it was not worked around (no alternate registries, no disabling of the policy).
+policy (`production.cloudfront.docker.com` returns `403 Forbidden`, reproduced again in this
+pass with `dockerd` actually running — same failure signature as before). This is an environment
+restriction, not a defect in the Dockerfile or compose config, and it was not worked around (no
+alternate registries, no disabling of the policy).
 
-To compensate, the logic the multi-stage `api.Dockerfile` performs was validated directly on the
-host, outside Docker:
+To compensate, the logic the multi-stage `api.Dockerfile` performs was re-validated directly on
+the host, outside Docker, against the current code:
 - `pnpm --filter @project-ascend/api deploy --prod --legacy <dir>` was run to reproduce the
-  `build` stage's self-contained output.
-- The generated Prisma client (`.prisma/client`) was confirmed present in that output (this was
-  not true on the first attempt — see Known Limitations).
-- The deployed output was run directly (`node dist/main.js`) with the same environment variables
-  the `runtime` stage would set, and `/health`, `/auth/register`, and `/auth/login` were all
-  confirmed to work against a real Postgres instance.
-- `docker compose config --quiet` (which doesn't require pulling images) was run to confirm
-  `docker-compose.yml` is syntactically valid and its `migrate`/`api` dependency ordering
-  (`service_healthy` / `service_completed_successfully`) is well-formed.
+  `build` stage's self-contained output, with the generated Prisma client (`.prisma/client`)
+  copied in exactly as the Dockerfile's `build` stage does.
+- The deployed output was run directly (`node dist/main.js`) with production-shaped environment
+  variables, and `/health`, `/auth/register`, `/auth/login`, and the tightened per-route rate
+  limit were all confirmed to work against a real Postgres instance.
+- `docker compose config --quiet` was run to confirm `docker-compose.yml` is still syntactically
+  valid.
 
 Because of this, the Docker health check and the "runs as non-root without pnpm at runtime"
 property are believed correct by construction (the `runtime` stage never installs pnpm and the
@@ -236,16 +237,19 @@ an actual container in this sandbox.
 | Dependencies | `flutter pub get` | PASSED |
 | Static analysis | `flutter analyze` | PASSED — "No issues found!" |
 | Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
-| Tests | `flutter test` | **PASSED — 18/18 tests** |
+| Tests | `flutter test` | **PASSED — 19/19 tests** |
 
 **Known limitations**
 
 - Docker images were never literally built or run as containers in this sandbox (see above);
   the underlying `pnpm deploy` + Prisma-client packaging logic was validated by direct execution
   instead. Anyone with unrestricted Docker Hub access should run `docker compose build && docker
-  compose up -d` to get a final container-level confirmation — the `docker-build` job added to
+  compose up -d` to get a final container-level confirmation — the `docker-build` job in
   `.github/workflows/backend.yml` does this automatically on every push/PR.
 - Concurrent refresh-token reuse (two simultaneous requests racing to rotate the same token) is
   proven via unit tests that mock the transaction boundary, plus reasoning about PostgreSQL's
   default READ COMMITTED isolation making the guarded `updateMany` a safe compare-and-swap — not
   via literal simultaneous real HTTP requests hitting a live server.
+- No account lockout / exponential backoff exists beyond the per-route rate limit (see
+  [`packages/docs/security.md`](packages/docs/security.md#known-gaps-before-production) for the
+  full list of known gaps before a real production launch).
