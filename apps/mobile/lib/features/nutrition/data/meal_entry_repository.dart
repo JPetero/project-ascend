@@ -1,5 +1,6 @@
 import '../../../core/networking/api_client.dart';
 import '../../../core/sync/idempotency_key.dart';
+import '../../achievements/domain/achievement.dart';
 import '../domain/meal_entry.dart';
 import '../domain/meal_type.dart';
 
@@ -24,7 +25,10 @@ class MealEntryRepository {
         .toList();
   }
 
-  Future<MealEntry> addEntry({
+  /// Returns both the created entry and anything newly earned by logging
+  /// it — see `NutritionLogService.addEntry`'s `meta.newAchievements` on
+  /// the backend. The entry itself is unaffected either way.
+  Future<({MealEntry entry, List<Achievement> newAchievements})> addEntry({
     required String foodId,
     String? foodServingId,
     required MealType mealType,
@@ -45,7 +49,14 @@ class MealEntryRepository {
             idempotencyKey ?? generateIdempotencyKey('meal-entry'),
       },
     );
-    return MealEntry.fromJson(envelope.data!);
+    final newAchievements =
+        (envelope.meta['newAchievements'] as List<dynamic>? ?? [])
+            .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
+            .toList();
+    return (
+      entry: MealEntry.fromJson(envelope.data!),
+      newAchievements: newAchievements,
+    );
   }
 
   /// PATCH — naturally idempotent (applying the same absolute field values

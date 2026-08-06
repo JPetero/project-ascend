@@ -1,5 +1,6 @@
 import '../../../core/networking/api_client.dart';
 import '../../../core/sync/idempotency_key.dart';
+import '../../achievements/domain/achievement.dart';
 import '../domain/cardio_session.dart';
 
 class CardioSessionInput {
@@ -63,13 +64,25 @@ class CardioSessionRepository {
         .toList();
   }
 
-  Future<CardioSession> create(CardioSessionInput input) async {
+  /// Returns both the created session and anything newly earned by
+  /// logging it — see `CardioService.create`'s `meta.newAchievements` on
+  /// the backend.
+  Future<({CardioSession session, List<Achievement> newAchievements})> create(
+    CardioSessionInput input,
+  ) async {
     final envelope = await _apiClient.post(
       '/cardio-sessions',
       (data) => data as Map<String, dynamic>,
       data: input.toJson(),
     );
-    return CardioSession.fromJson(envelope.data!);
+    final newAchievements =
+        (envelope.meta['newAchievements'] as List<dynamic>? ?? [])
+            .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
+            .toList();
+    return (
+      session: CardioSession.fromJson(envelope.data!),
+      newAchievements: newAchievements,
+    );
   }
 
   Future<CardioSession> updatePrivacy(

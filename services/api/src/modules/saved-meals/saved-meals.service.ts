@@ -110,11 +110,18 @@ export class SavedMealsService {
 
   /** Logs every item in the saved meal as its own MealEntry for the given
    * date/mealType — a real, separately-editable/deletable entry each, not
-   * a linked reference back to the SavedMeal. */
+   * a linked reference back to the SavedMeal. Returns the same
+   * `{ data, meta, error }` shape `NutritionLogService.addEntry` does:
+   * `data` is the list of created entries (unchanged from before this
+   * session), `meta.newAchievements` aggregates anything newly earned
+   * across every item logged (deduplicated — evaluating the same
+   * achievement twice in one call is a harmless idempotent no-op, but
+   * only the first evaluation actually returns it as "new"). */
   async logMeal(userId: string, id: string, dto: LogSavedMealDto) {
     const savedMeal = await this.findOwned(userId, id);
 
     const created = [];
+    const newAchievements = [];
     for (const item of savedMeal.items) {
       const entryDto: CreateMealEntryDto = {
         foodId: item.foodId,
@@ -124,9 +131,11 @@ export class SavedMealsService {
         quantity: item.quantity,
         idempotencyKey: dto.idempotencyKey ? `${dto.idempotencyKey}-${item.id}` : undefined,
       };
-      created.push(await this.nutritionLogService.addEntry(userId, entryDto));
+      const result = await this.nutritionLogService.addEntry(userId, entryDto);
+      created.push(result.data);
+      newAchievements.push(...((result.meta.newAchievements as unknown[]) ?? []));
     }
-    return created;
+    return { data: created, meta: { newAchievements }, error: null };
   }
 
   private async findOwned(userId: string, id: string): Promise<SavedMealWithItems> {

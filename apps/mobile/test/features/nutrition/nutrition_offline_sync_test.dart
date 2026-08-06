@@ -8,6 +8,8 @@ import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/sync/outbox_entry.dart';
 import 'package:mobile/core/sync/outbox_store.dart';
 import 'package:mobile/core/sync/sync_engine.dart';
+import 'package:mobile/features/achievements/domain/achievement.dart';
+import 'package:mobile/features/achievements/presentation/providers/achievement_celebration_controller.dart';
 import 'package:mobile/features/nutrition/data/food_repository.dart'
     show CustomFoodInput;
 import 'package:mobile/features/nutrition/data/water_repository.dart';
@@ -93,6 +95,10 @@ void main() {
           database: database,
           syncEngine: syncEngine,
           userId: 'user-1',
+          celebrationController: AchievementCelebrationController(
+            database: database,
+            userId: 'user-1',
+          ),
         );
         addTearDown(controller.dispose);
 
@@ -288,6 +294,10 @@ void main() {
           database: database,
           syncEngine: syncEngine,
           userId: 'user-1',
+          celebrationController: AchievementCelebrationController(
+            database: database,
+            userId: 'user-1',
+          ),
         );
         addTearDown(controller.dispose);
 
@@ -336,6 +346,10 @@ void main() {
           database: database,
           syncEngine: syncEngine,
           userId: 'user-1',
+          celebrationController: AchievementCelebrationController(
+            database: database,
+            userId: 'user-1',
+          ),
         );
         addTearDown(controller.dispose);
 
@@ -371,6 +385,10 @@ void main() {
           database: database,
           syncEngine: syncEngine,
           userId: 'user-1',
+          celebrationController: AchievementCelebrationController(
+            database: database,
+            userId: 'user-1',
+          ),
         );
         addTearDown(controller.dispose);
 
@@ -408,6 +426,10 @@ void main() {
         database: database,
         syncEngine: syncEngineA,
         userId: 'user-a',
+        celebrationController: AchievementCelebrationController(
+          database: database,
+          userId: 'user-a',
+        ),
       );
       addTearDown(controllerA.dispose);
 
@@ -425,6 +447,10 @@ void main() {
         database: database,
         syncEngine: syncEngineB,
         userId: 'user-b',
+        celebrationController: AchievementCelebrationController(
+          database: database,
+          userId: 'user-b',
+        ),
       );
       addTearDown(controllerB.dispose);
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -467,6 +493,10 @@ void main() {
           database: database,
           syncEngine: syncEngine,
           userId: 'user-1',
+          celebrationController: AchievementCelebrationController(
+            database: database,
+            userId: 'user-1',
+          ),
         );
         addTearDown(mealEntryController.dispose);
 
@@ -582,7 +612,7 @@ class _AlwaysOfflineMealEntryRepository extends FakeMealEntryRepository {
   int deleteEntryCalls = 0;
 
   @override
-  Future<MealEntry> addEntry({
+  Future<({MealEntry entry, List<Achievement> newAchievements})> addEntry({
     required String foodId,
     String? foodServingId,
     required MealType mealType,

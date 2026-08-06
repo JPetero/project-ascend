@@ -110,7 +110,11 @@ describe('SavedMealsService', () => {
 
   it('logs every item through NutritionLogService.addEntry, never duplicating its macro math', async () => {
     prisma.savedMeal.findUnique.mockResolvedValue(savedMeal());
-    nutritionLogService.addEntry.mockResolvedValue({ id: 'entry-1' });
+    nutritionLogService.addEntry.mockResolvedValue({
+      data: { id: 'entry-1' },
+      meta: { newAchievements: [] },
+      error: null,
+    });
 
     const result = await service.logMeal('user-1', 'saved-meal-1', {
       mealType: MealType.BREAKFAST,
@@ -126,7 +130,24 @@ describe('SavedMealsService', () => {
       quantity: 2,
       idempotencyKey: 'log-key-item-1',
     });
-    expect(result).toEqual([{ id: 'entry-1' }]);
+    expect(result.data).toEqual([{ id: 'entry-1' }]);
+    expect(result.meta.newAchievements).toEqual([]);
+  });
+
+  it('aggregates newly earned achievements across every logged item', async () => {
+    prisma.savedMeal.findUnique.mockResolvedValue(savedMeal());
+    nutritionLogService.addEntry.mockResolvedValue({
+      data: { id: 'entry-1' },
+      meta: { newAchievements: [{ id: 'ach-1', key: 'first_meal_logged' }] },
+      error: null,
+    });
+
+    const result = await service.logMeal('user-1', 'saved-meal-1', {
+      mealType: MealType.LUNCH,
+      date: '2026-08-06',
+    });
+
+    expect(result.meta.newAchievements).toEqual([{ id: 'ach-1', key: 'first_meal_logged' }]);
   });
 
   it('rejects logging a saved meal owned by another user', async () => {

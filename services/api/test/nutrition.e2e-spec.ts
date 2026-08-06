@@ -607,4 +607,46 @@ describe('Nutrition Tracking (e2e)', () => {
       expect(listAfterDelete.body.data).toHaveLength(0);
     });
   });
+
+  describe('achievement celebration meta', () => {
+    it("surfaces a newly earned achievement in the response meta on a fresh user's first meal log", async () => {
+      const register = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Fresh',
+          email: 'nutrition-fresh@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const freshAuth = { Authorization: `Bearer ${register.body.data.tokens.accessToken}` };
+
+      const search = await request(app.getHttpServer())
+        .get('/foods')
+        .query({ search: 'Cooked White Rice' })
+        .set(freshAuth)
+        .expect(200);
+      const rice = search.body.data.data.find(
+        (f: { name: string }) => f.name === 'Cooked White Rice',
+      );
+
+      const logged = await request(app.getHttpServer())
+        .post('/nutrition-log')
+        .set(freshAuth)
+        .send({ foodId: rice.id, mealType: 'BREAKFAST', date: '2026-08-06', quantity: 1 })
+        .expect(201);
+
+      expect(logged.body.meta.newAchievements).toBeDefined();
+      expect(
+        logged.body.meta.newAchievements.some(
+          (a: { key: string }) => a.key === 'first_meal_logged',
+        ),
+      ).toBe(true);
+      // The entry itself (`data`) keeps its existing flat shape — meta is
+      // purely additive, not a breaking change to what already consumed
+      // this endpoint.
+      expect(logged.body.data.food.name).toBe('Cooked White Rice');
+    });
+  });
 });

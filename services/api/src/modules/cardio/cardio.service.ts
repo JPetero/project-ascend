@@ -21,6 +21,12 @@ export class CardioService {
     private readonly achievementsService: AchievementsService,
   ) {}
 
+  /**
+   * Returns a full `{ data, meta, error }` envelope — `data` stays exactly
+   * the serialized session, `meta.newAchievements` additively carries any
+   * achievement newly earned by this cardio session finishing. See the
+   * matching comment on `NutritionLogService.addEntry`.
+   */
   async create(userId: string, dto: CreateCardioSessionDto) {
     const run = async () => {
       const created = await this.prisma.cardioSession.create({
@@ -40,26 +46,27 @@ export class CardioService {
         },
       });
 
-      // Result intentionally not surfaced in this response — see the same
-      // decision documented on NutritionLogService.createEntry(). The
-      // idempotent upsert makes calling this on every log always safe.
-      await this.achievementsService.evaluateCardioAchievements(userId);
+      const newAchievements = await this.achievementsService.evaluateCardioAchievements(userId);
 
-      return { entityId: created.id, payload: this.serialize(created) };
+      return {
+        entityId: created.id,
+        payload: { session: this.serialize(created), newAchievements },
+      };
     };
 
-    if (dto.idempotencyKey) {
-      return this.idempotencyService.run(
-        {
-          userId,
-          idempotencyKey: dto.idempotencyKey,
-          entityType: 'CARDIO_SESSION',
-          operationType: 'CREATE',
-        },
-        run,
-      );
-    }
-    return (await run()).payload;
+    const result = dto.idempotencyKey
+      ? await this.idempotencyService.run(
+          {
+            userId,
+            idempotencyKey: dto.idempotencyKey,
+            entityType: 'CARDIO_SESSION',
+            operationType: 'CREATE',
+          },
+          run,
+        )
+      : (await run()).payload;
+
+    return { data: result.session, meta: { newAchievements: result.newAchievements }, error: null };
   }
 
   async list(userId: string, query: QueryCardioSessionsDto) {

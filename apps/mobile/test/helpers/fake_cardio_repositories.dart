@@ -1,3 +1,4 @@
+import 'package:mobile/features/achievements/domain/achievement.dart';
 import 'package:mobile/features/cardio/data/cardio_session_repository.dart';
 import 'package:mobile/features/cardio/domain/cardio_session.dart';
 
@@ -20,6 +21,9 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
   final List<CardioSession> _sessions;
   int _idCounter = 0;
 
+  /// Achievements returned by the *next* [create] call.
+  List<Achievement> nextAchievements = const [];
+
   @override
   Future<List<CardioSession>> list({int page = 1, int limit = 20}) async {
     final sorted = List<CardioSession>.of(_sessions)
@@ -28,7 +32,9 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
   }
 
   @override
-  Future<CardioSession> create(CardioSessionInput input) async {
+  Future<({CardioSession session, List<Achievement> newAchievements})> create(
+    CardioSessionInput input,
+  ) async {
     final session = CardioSession(
       id: 'cardio-${_idCounter++}',
       activityType: input.activityType,
@@ -44,7 +50,7 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
       notes: input.notes,
     );
     _sessions.add(session);
-    return session;
+    return (session: session, newAchievements: nextAchievements);
   }
 
   @override

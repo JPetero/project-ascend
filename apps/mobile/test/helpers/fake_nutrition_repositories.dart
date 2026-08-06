@@ -1,3 +1,4 @@
+import 'package:mobile/features/achievements/domain/achievement.dart';
 import 'package:mobile/features/nutrition/data/food_repository.dart';
 import 'package:mobile/features/nutrition/data/macro_target_repository.dart';
 import 'package:mobile/features/nutrition/data/meal_entry_repository.dart';
@@ -159,13 +160,18 @@ class FakeMealEntryRepository implements MealEntryRepository {
   final List<MealEntry> _entries = [];
   int _idCounter = 0;
 
+  /// Achievements returned by the *next* [addEntry] call — mirrors
+  /// `FakeWorkoutSessionRepository.nextAchievements`. Tests that don't care
+  /// about celebrations never need to touch this (defaults to none).
+  List<Achievement> nextAchievements = const [];
+
   @override
   Future<List<MealEntry>> listForDate(DateTime date) async {
     return _entries.where((e) => _isSameDay(e.date, date)).toList();
   }
 
   @override
-  Future<MealEntry> addEntry({
+  Future<({MealEntry entry, List<Achievement> newAchievements})> addEntry({
     required String foodId,
     String? foodServingId,
     required MealType mealType,
@@ -190,7 +196,7 @@ class FakeMealEntryRepository implements MealEntryRepository {
       fatGrams: food.fatGramsPerServing * quantity,
     );
     _entries.add(entry);
-    return entry;
+    return (entry: entry, newAchievements: nextAchievements);
   }
 
   @override
@@ -424,8 +430,12 @@ class FakeSavedMealRepository implements SavedMealRepository {
     _savedMeals.removeWhere((m) => m.id == id);
   }
 
+  /// Achievements returned by the *next* [logMeal] call.
+  List<Achievement> nextLogAchievements = const [];
+
   @override
-  Future<List<MealEntry>> logMeal({
+  Future<({List<MealEntry> entries, List<Achievement> newAchievements})>
+  logMeal({
     required String id,
     required MealType mealType,
     required DateTime date,
@@ -434,18 +444,19 @@ class FakeSavedMealRepository implements SavedMealRepository {
     final meal = _savedMeals.firstWhere((m) => m.id == id);
     final mealEntryRepository = _mealEntryRepository;
     if (mealEntryRepository != null) {
-      return [
+      final entries = [
         for (final item in meal.items)
-          await mealEntryRepository.addEntry(
+          (await mealEntryRepository.addEntry(
             foodId: item.food.id,
             foodServingId: item.foodServing?.id,
             mealType: mealType,
             date: date,
             quantity: item.quantity,
-          ),
+          )).entry,
       ];
+      return (entries: entries, newAchievements: nextLogAchievements);
     }
-    return meal.items
+    final entries = meal.items
         .map(
           (item) => MealEntry(
             id: 'entry-from-${item.id}',
@@ -461,6 +472,7 @@ class FakeSavedMealRepository implements SavedMealRepository {
           ),
         )
         .toList();
+    return (entries: entries, newAchievements: nextLogAchievements);
   }
 }
 

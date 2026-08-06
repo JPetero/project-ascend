@@ -192,4 +192,35 @@ describe('GPS Cardio (e2e)', () => {
       .set(authA())
       .expect(404);
   });
+
+  it("surfaces a newly earned achievement in the response meta on a fresh user's first session", async () => {
+    const register = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Fresh',
+        email: 'cardio-fresh@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    const freshToken = register.body.data.tokens.accessToken;
+
+    const created = await request(app.getHttpServer())
+      .post('/cardio-sessions')
+      .set({ Authorization: `Bearer ${freshToken}` })
+      .send({
+        activityType: 'WALK',
+        startedAt: '2026-08-06T09:00:00.000Z',
+        durationSeconds: 600,
+      })
+      .expect(201);
+
+    expect(created.body.meta.newAchievements).toBeDefined();
+    expect(
+      created.body.meta.newAchievements.some(
+        (a: { key: string }) => a.key === 'first_cardio_session',
+      ),
+    ).toBe(true);
+  });
 });

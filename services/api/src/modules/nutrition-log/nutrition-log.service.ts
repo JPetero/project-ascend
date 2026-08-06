@@ -79,24 +79,34 @@ export class NutritionLogService {
     return { startDate: start.toISOString().slice(0, 10), endDate: endDate, days, average };
   }
 
+  /**
+   * Returns a full `{ data, meta, error }` envelope rather than the plain
+   * entry: `data` stays exactly the serialized entry (unchanged shape for
+   * every existing caller), while `meta.newAchievements` additively
+   * carries any achievement newly earned by this log — the same
+   * "celebrate at the moment it's earned" contract `WorkoutSessionsService
+   * .finish()` already honors. See `ResponseEnvelopeInterceptor`: a
+   * service returning this exact shape is passed through unwrapped.
+   */
   async addEntry(userId: string, dto: CreateMealEntryDto) {
     const run = async () => {
-      const entry = await this.createEntry(userId, dto);
-      return { entityId: entry.id, payload: entry };
+      const result = await this.createEntry(userId, dto);
+      return { entityId: result.entry.id, payload: result };
     };
 
-    if (dto.idempotencyKey) {
-      return this.idempotencyService.run(
-        {
-          userId,
-          idempotencyKey: dto.idempotencyKey,
-          entityType: 'MEAL_ENTRY',
-          operationType: 'CREATE',
-        },
-        run,
-      );
-    }
-    return (await run()).payload;
+    const result = dto.idempotencyKey
+      ? await this.idempotencyService.run(
+          {
+            userId,
+            idempotencyKey: dto.idempotencyKey,
+            entityType: 'MEAL_ENTRY',
+            operationType: 'CREATE',
+          },
+          run,
+        )
+      : (await run()).payload;
+
+    return { data: result.entry, meta: { newAchievements: result.newAchievements }, error: null };
   }
 
   async updateEntry(userId: string, id: string, dto: UpdateMealEntryDto) {
@@ -220,14 +230,14 @@ export class NutritionLogService {
       include: entryInclude,
     });
 
-    // Result intentionally not surfaced here — nutrition achievements are
-    // a lower-priority celebration than workout ones, and the Achievements
-    // screen reflects the up-to-date state regardless of whether a caller
-    // sees this particular award moment. The idempotent upsert inside
-    // means calling this on every log is always safe.
-    await this.achievementsService.evaluateNutritionAchievements(userId);
+    // Session 5 revisits the earlier "not surfaced" decision here: meal
+    // logging is one of the required immediate-celebration triggers, so
+    // this now flows back through `addEntry`'s envelope `meta`. The
+    // idempotent upsert inside means calling this on every log stays safe
+    // even on a retried/replayed request.
+    const newAchievements = await this.achievementsService.evaluateNutritionAchievements(userId);
 
-    return this.serialize(created);
+    return { entry: this.serialize(created), newAchievements };
   }
 
   /**

@@ -10,6 +10,7 @@ import '../../../../core/sync/idempotency_key.dart';
 import '../../../../core/sync/sync_engine.dart';
 import '../../../../core/sync/sync_handler.dart';
 import '../../../../core/sync/sync_providers.dart';
+import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/meal_entry_repository.dart';
 import '../../domain/food.dart';
@@ -66,10 +67,12 @@ class MealEntryController extends StateNotifier<AsyncValue<List<MealEntry>>> {
     required AppDatabase database,
     required SyncEngine syncEngine,
     required String userId,
+    required AchievementCelebrationController celebrationController,
   }) : _repository = repository,
        _database = database,
        _syncEngine = syncEngine,
        _userId = userId,
+       _celebrationController = celebrationController,
        super(const AsyncValue.loading()) {
     _registerHandlers();
     _subscription = _database.watchMealEntries(_userId, _todayKey()).listen((
@@ -84,6 +87,7 @@ class MealEntryController extends StateNotifier<AsyncValue<List<MealEntry>>> {
   final AppDatabase _database;
   final SyncEngine _syncEngine;
   final String _userId;
+  final AchievementCelebrationController _celebrationController;
   StreamSubscription<List<CachedMealEntry>>? _subscription;
 
   @override
@@ -174,8 +178,14 @@ class MealEntryController extends StateNotifier<AsyncValue<List<MealEntry>>> {
             idempotencyKey: idempotencyKey,
           );
           final localRowId = payload['localRowId'] as String;
-          await _database.upsertMealEntry(_syncedCompanion(localRowId, result));
-          return SyncHandlerResult(entityId: result.id, response: const {});
+          await _database.upsertMealEntry(
+            _syncedCompanion(localRowId, result.entry),
+          );
+          await _celebrationController.enqueue(result.newAchievements);
+          return SyncHandlerResult(
+            entityId: result.entry.id,
+            response: const {},
+          );
         } on AppException catch (error) {
           throw SyncFailure(message: error.message, code: error.code);
         }
@@ -482,5 +492,8 @@ final todaysMealEntriesProvider =
         database: ref.watch(appDatabaseProvider),
         syncEngine: ref.watch(syncEngineProvider),
         userId: userId ?? '',
+        celebrationController: ref.watch(
+          achievementCelebrationControllerProvider.notifier,
+        ),
       );
     });

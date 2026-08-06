@@ -11,6 +11,7 @@ import '../../../../core/sync/idempotency_key.dart';
 import '../../../../core/sync/sync_engine.dart';
 import '../../../../core/sync/sync_handler.dart';
 import '../../../../core/sync/sync_providers.dart';
+import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/meal_entry_repository.dart' show formatDateOnly;
 import '../../data/saved_meal_repository.dart';
@@ -105,10 +106,12 @@ class SavedMealController extends StateNotifier<AsyncValue<List<SavedMeal>>> {
     required AppDatabase database,
     required SyncEngine syncEngine,
     required String userId,
+    required AchievementCelebrationController celebrationController,
   }) : _repository = repository,
        _database = database,
        _syncEngine = syncEngine,
        _userId = userId,
+       _celebrationController = celebrationController,
        super(const AsyncValue.loading()) {
     _registerHandlers();
     _subscription = _database.watchSavedMeals(_userId).listen((rows) {
@@ -121,6 +124,7 @@ class SavedMealController extends StateNotifier<AsyncValue<List<SavedMeal>>> {
   final AppDatabase _database;
   final SyncEngine _syncEngine;
   final String _userId;
+  final AchievementCelebrationController _celebrationController;
   StreamSubscription<List<CachedSavedMeal>>? _subscription;
 
   @override
@@ -271,14 +275,14 @@ class SavedMealController extends StateNotifier<AsyncValue<List<SavedMeal>>> {
       _logEntityType,
       FunctionSyncHandler(({required payload, required idempotencyKey}) async {
         try {
-          final created = await _repository.logMeal(
+          final result = await _repository.logMeal(
             id: payload['id'] as String,
             mealType: mealTypeFromJson(payload['mealType'] as String),
             date: DateTime.parse(payload['date'] as String),
             idempotencyKey: idempotencyKey,
           );
           final today = formatDateOnly(DateTime.now());
-          for (final entry in created) {
+          for (final entry in result.entries) {
             if (formatDateOnly(entry.date) != today) continue;
             await _database.upsertMealEntry(
               CachedMealEntriesCompanion.insert(
@@ -305,6 +309,7 @@ class SavedMealController extends StateNotifier<AsyncValue<List<SavedMeal>>> {
               ),
             );
           }
+          await _celebrationController.enqueue(result.newAchievements);
           return const SyncHandlerResult(entityId: null, response: {});
         } on AppException catch (error) {
           throw SyncFailure(message: error.message, code: error.code);
@@ -475,5 +480,8 @@ final savedMealsProvider =
         database: ref.watch(appDatabaseProvider),
         syncEngine: ref.watch(syncEngineProvider),
         userId: userId ?? '',
+        celebrationController: ref.watch(
+          achievementCelebrationControllerProvider.notifier,
+        ),
       );
     });

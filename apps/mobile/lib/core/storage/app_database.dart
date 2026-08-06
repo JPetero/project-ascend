@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import 'tables/achievement_celebration_table.dart';
 import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
 import 'tables/cached_workout_session_table.dart';
@@ -25,8 +26,9 @@ const _workoutSessionRowId = 'singleton';
 /// Caches the profile and preferences, preserves in-progress onboarding
 /// form state, and exposes a simple sync status the UI can surface (e.g.
 /// "synced 2 minutes ago"), plus an outbox for queued offline mutations,
-/// plus (as of schema version 5) the full offline-first Nutrition cache —
-/// see packages/docs/build-session-5.md.
+/// plus (as of schema version 5) the full offline-first Nutrition cache,
+/// plus (as of schema version 6) a durable queue of pending achievement
+/// celebrations — see packages/docs/build-session-5.md.
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -41,13 +43,14 @@ const _workoutSessionRowId = 'singleton';
     CachedSavedMeals,
     CachedWaterEntries,
     CachedMacroTargets,
+    PendingCelebrations,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +79,9 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(cachedSavedMeals);
         await m.createTable(cachedWaterEntries);
         await m.createTable(cachedMacroTargets);
+      }
+      if (from < 6) {
+        await m.createTable(pendingCelebrations);
       }
     },
   );
@@ -431,6 +437,29 @@ class AppDatabase extends _$AppDatabase {
     await into(cachedMacroTargets).insertOnConflictUpdate(row);
   }
 
+  // ---------------------------------------------------------------------
+  // Achievement celebrations (schema version 6) — see
+  // tables/achievement_celebration_table.dart's doc comment.
+  // ---------------------------------------------------------------------
+
+  Stream<List<PendingCelebration>> watchPendingCelebrations(String userId) {
+    return (select(pendingCelebrations)
+          ..where((t) => t.userId.equals(userId))
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .watch();
+  }
+
+  Future<void> enqueueCelebration(PendingCelebrationsCompanion row) async {
+    await into(pendingCelebrations).insertOnConflictUpdate(row);
+  }
+
+  /// Marks a celebration as shown — deleting the row is what makes
+  /// "appears once, even after restart" true: there is no separate
+  /// `shown` flag to accidentally leave set to false.
+  Future<void> markCelebrationShown(String id) async {
+    await (delete(pendingCelebrations)..where((t) => t.id.equals(id))).go();
+  }
+
   /// Clears all cached data. Called on sign-out so no data from a
   /// previous account lingers on a shared device.
   Future<void> clearAll() async {
@@ -447,6 +476,7 @@ class AppDatabase extends _$AppDatabase {
       delete(cachedSavedMeals).go(),
       delete(cachedWaterEntries).go(),
       delete(cachedMacroTargets).go(),
+      delete(pendingCelebrations).go(),
     ]);
   }
 }

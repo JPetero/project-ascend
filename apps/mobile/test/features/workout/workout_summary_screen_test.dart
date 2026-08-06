@@ -77,6 +77,7 @@ void main() {
       final result = WorkoutFinishResult(
         session: _finishedSession(),
         newPersonalRecords: const [],
+        newAchievements: const [],
         synced: true,
       );
 

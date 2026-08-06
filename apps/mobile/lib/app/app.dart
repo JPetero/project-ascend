@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/design_system/ascend_theme.dart';
 import '../core/routing/app_router.dart';
+import '../features/achievements/presentation/widgets/achievement_celebration_overlay.dart';
 import '../features/profile/domain/preferences_model.dart';
 import '../features/profile/presentation/providers/preferences_controller.dart';
 
@@ -36,6 +37,12 @@ class AscendApp extends ConsumerWidget {
           AppThemeMode.system => ThemeMode.system,
         },
         routerConfig: router,
+        // Mounts inside the routed app (not wrapping it) so the overlay's
+        // own BuildContext is inside the GoRouter/Navigator — see
+        // AchievementCelebrationOverlay's doc comment for why that's
+        // required, and why AppShell wouldn't be a wide-enough mount point.
+        builder: (context, child) =>
+            AchievementCelebrationOverlay(child: child!),
       ),
     );
   }

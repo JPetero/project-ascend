@@ -1,5 +1,6 @@
 import '../../../core/networking/api_client.dart';
 import '../../../core/sync/idempotency_key.dart';
+import '../../achievements/domain/achievement.dart';
 import '../domain/meal_entry.dart';
 import '../domain/meal_type.dart';
 import '../domain/saved_meal.dart';
@@ -79,7 +80,8 @@ class SavedMealRepository {
     await _apiClient.delete('/saved-meals/$id', (_) => null);
   }
 
-  Future<List<MealEntry>> logMeal({
+  Future<({List<MealEntry> entries, List<Achievement> newAchievements})>
+  logMeal({
     required String id,
     required MealType mealType,
     required DateTime date,
@@ -95,8 +97,13 @@ class SavedMealRepository {
             idempotencyKey ?? generateIdempotencyKey('saved-meal-log'),
       },
     );
-    return (envelope.data ?? [])
+    final entries = (envelope.data ?? [])
         .map((e) => MealEntry.fromJson(e as Map<String, dynamic>))
         .toList();
+    final newAchievements =
+        (envelope.meta['newAchievements'] as List<dynamic>? ?? [])
+            .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
+            .toList();
+    return (entries: entries, newAchievements: newAchievements);
   }
 }

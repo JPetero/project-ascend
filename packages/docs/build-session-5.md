@@ -248,3 +248,169 @@ availability, checked once for the whole session.
   `clearAll()`-on-sign-out behavior rather than per-row filtering. If a
   future "switch accounts without signing out" flow is ever added, this
   would need revisiting.
+
+---
+
+## Part 2 — Achievement unlock celebrations
+
+### Design decision: an additive envelope, not a new endpoint
+
+The Achievement Engine (Marathon session) already awards achievements
+idempotently on every workout/meal/cardio mutation — what was missing was
+*telling the client* when one was just earned. Rather than add a
+"what did I just earn?" polling endpoint, each mutation's existing
+response now carries the answer alongside the data it already returns:
+`{data: <exactly what the endpoint already returned>, meta:
+{newAchievements: [...]}, error: null}`. `ResponseEnvelopeInterceptor`
+already passes through any service return shaped `{data, meta, error}`
+unchanged, so this is invisible to every existing consumer of `data` —
+verified directly in `nutrition.e2e-spec.ts`'s new test, which asserts
+`logged.body.data.food.name` is untouched by the change.
+
+Three endpoints now surface `meta.newAchievements` this way:
+`POST /nutrition-log` (`NutritionLogService.addEntry`), `POST
+/cardio-sessions` (`CardioService.create`), and `POST
+/saved-meals/:id/log` (`SavedMealsService.logMeal`, which aggregates
+achievements across every entry it logs in one call).
+
+### Design decision: a durable local queue, not an in-memory event
+
+"Celebrations appear once, even after restart" ruled out anything
+in-memory — a `PendingCelebrations` Drift table (schema v5 → v6, additive
+`createTable` only) is the source of truth. Every trigger point (workout
+finish, meal log, saved-meal log, cardio save) enqueues straight into this
+table via `AchievementCelebrationController.enqueue`, keyed by
+`userId:achievementId` so a re-enqueue of an already-earned achievement is
+a harmless upsert, never a duplicate row. A celebration is deleted — not
+flagged — the moment it's shown (`markShown`), which is what makes
+"appears once" true with no separate `shown` boolean that could be left
+in the wrong state by a crash mid-write.
+
+`AchievementCelebrationController` is deliberately not `.autoDispose`
+(same reasoning as `todaysMealEntriesProvider` from Part 1): it owns a
+live `watchPendingCelebrations` stream that needs to persist for the app
+session, not be torn down and rebuilt every time nothing is watching it
+transiently.
+
+### Reused, not rebuilt
+
+- `CompanionDialogue.celebration()` already existed (written earlier in
+  the session but never wired to anything) — the overlay calls it
+  directly instead of writing new Atlas/Nova copy.
+- The app-wide `MediaQuery(disableAnimations: reducedMotion)` override in
+  `app.dart` (from `PreferencesModel.reducedMotion`) already covers
+  reduced-motion for every animation in the app, including the overlay's
+  bottom sheet/dialog transitions — nothing overlay-specific was needed.
+- `showAscendBottomSheet` and the existing achievement icon-mapping
+  widget are used as-is for the common-achievement toast.
+
+### Where the overlay is mounted, and why
+
+`AchievementCelebrationOverlay` is mounted via `MaterialApp.router`'s
+`builder:` parameter in `app.dart`, not inside `AppShell`. `AppShell`
+only wraps the five tab routes — mounting there would miss a celebration
+earned while the user is mid-workout-summary, on the Dashboard, or on any
+other pushed route outside the tab shell. `builder:` puts the overlay
+inside the app's `Navigator`/`GoRouter` context (needed for the "View
+medal" action's `context.push`), while still being visible from anywhere
+in the app.
+
+Presentation tier: `isMilestoneAchievement` (targetSteps >= 10, matching
+the seeded catalog's `ten_workouts` / `fifty_workouts` /
+`thirty_day_streak` / `hundred_meals_logged` / `ten_cardio_sessions`)
+presents as a full `AlertDialog`; everything else presents as a
+`showAscendBottomSheet` toast. Both paths announce via
+`SemanticsService.sendAnnouncement` and wrap their content in
+`Semantics(liveRegion: true, ...)` for screen readers, and both are
+dismissible immediately (barrier tap, back button, or an explicit
+Dismiss/View medal action) — never a forced wait.
+
+### A real bug found and fixed while writing the required tests: double-presentation on dismiss
+
+Writing the "no duplicate celebration" widget test caught a genuine race
+in the first draft of `_maybePresentNext`: its `presentation.whenComplete`
+callback awaited `markShown` (which deletes the Drift row) and then
+immediately called `_maybePresentNext(ref.read(achievementCelebrationControllerProvider))`
+to advance to the next queued item. `ref.read` returns the
+`StateNotifier`'s *current* `.state` — but that state only updates when
+the Drift watch stream backing it re-emits, which is a separate,
+not-yet-guaranteed-synchronous event relative to the delete completing.
+In practice the stream hadn't caught up yet, so `ref.read` still returned
+the just-shown achievement, and it was presented a second time as a
+brand-new dialog. The fix removes that redundant, racy re-read entirely:
+`ref.listen` (already registered in `build()`) fires once the stream
+*actually* reflects the deletion, and that's what reliably advances to
+the next queued achievement (or does nothing if the queue is now empty).
+This is exactly the kind of bug the required "no duplicate celebration"
+test exists to catch, and it did.
+
+### Required tests (all six scenarios)
+
+`test/features/achievements/achievement_celebration_controller_test.dart`
+(Drift-backed, in-memory `NativeDatabase`, testing the controller
+directly):
+- immediate online award (enqueue surfaces in `.state` right away)
+- delayed offline award (a row written before any controller existed is
+  picked up the moment one is constructed)
+- multiple simultaneous achievements (all queued, order preserved)
+- no duplicate celebration (re-enqueuing the same id upserts, not
+  duplicates; `markShown` empties the queue)
+- restart before viewing (a controller is disposed without `markShown`
+  ever being called; a second controller instance against the same
+  database still sees the pending celebration; once shown, a third
+  instance does not see it again)
+- bonus: `enqueue` is a no-op for an empty list or an empty (signed-out)
+  `userId`
+
+`test/features/achievements/achievement_celebration_overlay_test.dart`
+(widget-level, real `AchievementCelebrationOverlay` + real
+`AppDatabase`/providers via `createTestContainer`):
+- a celebration already queued at mount time presents as a bottom sheet
+- reduced motion — presents correctly with `disableAnimations: true`
+- a milestone-tier achievement presents as an `AlertDialog`, not a
+  bottom sheet
+- dismissing marks it shown, and reopening the screen (a fresh overlay
+  instance against the same now-updated database) does not replay it —
+  this is the test that caught the double-presentation bug above
+- multiple simultaneous achievements present one at a time, in order
+
+### Commands run and results
+
+Backend (from repo root):
+```
+npx tsc --noEmit -p tsconfig.json                    # clean
+npx eslint '{src,test}/**/*.ts' --max-warnings=0      # clean
+npx jest --silent                                     # 16 suites, 158
+                                                        # tests passed
+                                                        # (was 156)
+npx jest --config ./test/jest-e2e.json --silent       # 4 suites, 58
+                                                        # tests passed
+                                                        # (was 56)
+```
+
+Flutter (from `apps/mobile`):
+```
+dart run build_runner build   # regenerated app_database.g.dart for schema v6
+dart analyze                  # no issues
+dart format --output=none --set-exit-if-changed .   # clean
+flutter test                                         # 189 tests passed
+                                                       # (was 178; +11 new
+                                                       # achievement-
+                                                       # celebration tests)
+```
+
+### Known scope decisions / honest limitations
+
+- Trigger-point wiring covers workout completion, meal logging (both
+  direct food logging and saved-meal logging), and cardio completion —
+  the four backend mutations the Achievement Engine can currently award
+  from. No other mutation currently awards achievements, so there's
+  nothing else to wire yet.
+- The overlay presents at most one celebration at a time by design
+  (serial, not stacked) — multiple simultaneous achievements queue and
+  are shown back-to-back as the user dismisses each one, never as
+  overlapping dialogs.
+- Profile medal navigation ("View medal") pushes to the existing
+  Achievements screen (`RoutePaths.achievements`); it does not deep-link
+  to scroll to or highlight the specific medal within that screen, since
+  the Achievements screen has no such anchor/highlight mechanism yet.

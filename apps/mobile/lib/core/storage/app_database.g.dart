@@ -6496,6 +6496,679 @@ class CachedMacroTargetsCompanion extends UpdateCompanion<CachedMacroTarget> {
   }
 }
 
+class $PendingCelebrationsTable extends PendingCelebrations
+    with TableInfo<$PendingCelebrationsTable, PendingCelebration> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PendingCelebrationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _achievementIdMeta = const VerificationMeta(
+    'achievementId',
+  );
+  @override
+  late final GeneratedColumn<String> achievementId = GeneratedColumn<String>(
+    'achievement_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _achievementKeyMeta = const VerificationMeta(
+    'achievementKey',
+  );
+  @override
+  late final GeneratedColumn<String> achievementKey = GeneratedColumn<String>(
+    'achievement_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iconAssetMeta = const VerificationMeta(
+    'iconAsset',
+  );
+  @override
+  late final GeneratedColumn<String> iconAsset = GeneratedColumn<String>(
+    'icon_asset',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetStepsMeta = const VerificationMeta(
+    'targetSteps',
+  );
+  @override
+  late final GeneratedColumn<int> targetSteps = GeneratedColumn<int>(
+    'target_steps',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _earnedAtMeta = const VerificationMeta(
+    'earnedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> earnedAt = GeneratedColumn<DateTime>(
+    'earned_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    userId,
+    achievementId,
+    achievementKey,
+    title,
+    description,
+    iconAsset,
+    category,
+    targetSteps,
+    earnedAt,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pending_celebrations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PendingCelebration> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('achievement_id')) {
+      context.handle(
+        _achievementIdMeta,
+        achievementId.isAcceptableOrUnknown(
+          data['achievement_id']!,
+          _achievementIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_achievementIdMeta);
+    }
+    if (data.containsKey('achievement_key')) {
+      context.handle(
+        _achievementKeyMeta,
+        achievementKey.isAcceptableOrUnknown(
+          data['achievement_key']!,
+          _achievementKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_achievementKeyMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_descriptionMeta);
+    }
+    if (data.containsKey('icon_asset')) {
+      context.handle(
+        _iconAssetMeta,
+        iconAsset.isAcceptableOrUnknown(data['icon_asset']!, _iconAssetMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_iconAssetMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_categoryMeta);
+    }
+    if (data.containsKey('target_steps')) {
+      context.handle(
+        _targetStepsMeta,
+        targetSteps.isAcceptableOrUnknown(
+          data['target_steps']!,
+          _targetStepsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetStepsMeta);
+    }
+    if (data.containsKey('earned_at')) {
+      context.handle(
+        _earnedAtMeta,
+        earnedAt.isAcceptableOrUnknown(data['earned_at']!, _earnedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_earnedAtMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PendingCelebration map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PendingCelebration(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      achievementId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}achievement_id'],
+      )!,
+      achievementKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}achievement_key'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      iconAsset: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_asset'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      targetSteps: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_steps'],
+      )!,
+      earnedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}earned_at'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PendingCelebrationsTable createAlias(String alias) {
+    return $PendingCelebrationsTable(attachedDatabase, alias);
+  }
+}
+
+class PendingCelebration extends DataClass
+    implements Insertable<PendingCelebration> {
+  final String id;
+  final String userId;
+  final String achievementId;
+  final String achievementKey;
+  final String title;
+  final String description;
+  final String iconAsset;
+  final String category;
+  final int targetSteps;
+  final DateTime earnedAt;
+  final DateTime createdAt;
+  const PendingCelebration({
+    required this.id,
+    required this.userId,
+    required this.achievementId,
+    required this.achievementKey,
+    required this.title,
+    required this.description,
+    required this.iconAsset,
+    required this.category,
+    required this.targetSteps,
+    required this.earnedAt,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['user_id'] = Variable<String>(userId);
+    map['achievement_id'] = Variable<String>(achievementId);
+    map['achievement_key'] = Variable<String>(achievementKey);
+    map['title'] = Variable<String>(title);
+    map['description'] = Variable<String>(description);
+    map['icon_asset'] = Variable<String>(iconAsset);
+    map['category'] = Variable<String>(category);
+    map['target_steps'] = Variable<int>(targetSteps);
+    map['earned_at'] = Variable<DateTime>(earnedAt);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  PendingCelebrationsCompanion toCompanion(bool nullToAbsent) {
+    return PendingCelebrationsCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      achievementId: Value(achievementId),
+      achievementKey: Value(achievementKey),
+      title: Value(title),
+      description: Value(description),
+      iconAsset: Value(iconAsset),
+      category: Value(category),
+      targetSteps: Value(targetSteps),
+      earnedAt: Value(earnedAt),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory PendingCelebration.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PendingCelebration(
+      id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String>(json['userId']),
+      achievementId: serializer.fromJson<String>(json['achievementId']),
+      achievementKey: serializer.fromJson<String>(json['achievementKey']),
+      title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String>(json['description']),
+      iconAsset: serializer.fromJson<String>(json['iconAsset']),
+      category: serializer.fromJson<String>(json['category']),
+      targetSteps: serializer.fromJson<int>(json['targetSteps']),
+      earnedAt: serializer.fromJson<DateTime>(json['earnedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String>(userId),
+      'achievementId': serializer.toJson<String>(achievementId),
+      'achievementKey': serializer.toJson<String>(achievementKey),
+      'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String>(description),
+      'iconAsset': serializer.toJson<String>(iconAsset),
+      'category': serializer.toJson<String>(category),
+      'targetSteps': serializer.toJson<int>(targetSteps),
+      'earnedAt': serializer.toJson<DateTime>(earnedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  PendingCelebration copyWith({
+    String? id,
+    String? userId,
+    String? achievementId,
+    String? achievementKey,
+    String? title,
+    String? description,
+    String? iconAsset,
+    String? category,
+    int? targetSteps,
+    DateTime? earnedAt,
+    DateTime? createdAt,
+  }) => PendingCelebration(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    achievementId: achievementId ?? this.achievementId,
+    achievementKey: achievementKey ?? this.achievementKey,
+    title: title ?? this.title,
+    description: description ?? this.description,
+    iconAsset: iconAsset ?? this.iconAsset,
+    category: category ?? this.category,
+    targetSteps: targetSteps ?? this.targetSteps,
+    earnedAt: earnedAt ?? this.earnedAt,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  PendingCelebration copyWithCompanion(PendingCelebrationsCompanion data) {
+    return PendingCelebration(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      achievementId: data.achievementId.present
+          ? data.achievementId.value
+          : this.achievementId,
+      achievementKey: data.achievementKey.present
+          ? data.achievementKey.value
+          : this.achievementKey,
+      title: data.title.present ? data.title.value : this.title,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      iconAsset: data.iconAsset.present ? data.iconAsset.value : this.iconAsset,
+      category: data.category.present ? data.category.value : this.category,
+      targetSteps: data.targetSteps.present
+          ? data.targetSteps.value
+          : this.targetSteps,
+      earnedAt: data.earnedAt.present ? data.earnedAt.value : this.earnedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingCelebration(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('achievementId: $achievementId, ')
+          ..write('achievementKey: $achievementKey, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('iconAsset: $iconAsset, ')
+          ..write('category: $category, ')
+          ..write('targetSteps: $targetSteps, ')
+          ..write('earnedAt: $earnedAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    userId,
+    achievementId,
+    achievementKey,
+    title,
+    description,
+    iconAsset,
+    category,
+    targetSteps,
+    earnedAt,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PendingCelebration &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.achievementId == this.achievementId &&
+          other.achievementKey == this.achievementKey &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.iconAsset == this.iconAsset &&
+          other.category == this.category &&
+          other.targetSteps == this.targetSteps &&
+          other.earnedAt == this.earnedAt &&
+          other.createdAt == this.createdAt);
+}
+
+class PendingCelebrationsCompanion extends UpdateCompanion<PendingCelebration> {
+  final Value<String> id;
+  final Value<String> userId;
+  final Value<String> achievementId;
+  final Value<String> achievementKey;
+  final Value<String> title;
+  final Value<String> description;
+  final Value<String> iconAsset;
+  final Value<String> category;
+  final Value<int> targetSteps;
+  final Value<DateTime> earnedAt;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const PendingCelebrationsCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.achievementId = const Value.absent(),
+    this.achievementKey = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.iconAsset = const Value.absent(),
+    this.category = const Value.absent(),
+    this.targetSteps = const Value.absent(),
+    this.earnedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PendingCelebrationsCompanion.insert({
+    required String id,
+    required String userId,
+    required String achievementId,
+    required String achievementKey,
+    required String title,
+    required String description,
+    required String iconAsset,
+    required String category,
+    required int targetSteps,
+    required DateTime earnedAt,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       userId = Value(userId),
+       achievementId = Value(achievementId),
+       achievementKey = Value(achievementKey),
+       title = Value(title),
+       description = Value(description),
+       iconAsset = Value(iconAsset),
+       category = Value(category),
+       targetSteps = Value(targetSteps),
+       earnedAt = Value(earnedAt),
+       createdAt = Value(createdAt);
+  static Insertable<PendingCelebration> custom({
+    Expression<String>? id,
+    Expression<String>? userId,
+    Expression<String>? achievementId,
+    Expression<String>? achievementKey,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<String>? iconAsset,
+    Expression<String>? category,
+    Expression<int>? targetSteps,
+    Expression<DateTime>? earnedAt,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (achievementId != null) 'achievement_id': achievementId,
+      if (achievementKey != null) 'achievement_key': achievementKey,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (iconAsset != null) 'icon_asset': iconAsset,
+      if (category != null) 'category': category,
+      if (targetSteps != null) 'target_steps': targetSteps,
+      if (earnedAt != null) 'earned_at': earnedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PendingCelebrationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? userId,
+    Value<String>? achievementId,
+    Value<String>? achievementKey,
+    Value<String>? title,
+    Value<String>? description,
+    Value<String>? iconAsset,
+    Value<String>? category,
+    Value<int>? targetSteps,
+    Value<DateTime>? earnedAt,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return PendingCelebrationsCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      achievementId: achievementId ?? this.achievementId,
+      achievementKey: achievementKey ?? this.achievementKey,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      iconAsset: iconAsset ?? this.iconAsset,
+      category: category ?? this.category,
+      targetSteps: targetSteps ?? this.targetSteps,
+      earnedAt: earnedAt ?? this.earnedAt,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (achievementId.present) {
+      map['achievement_id'] = Variable<String>(achievementId.value);
+    }
+    if (achievementKey.present) {
+      map['achievement_key'] = Variable<String>(achievementKey.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (iconAsset.present) {
+      map['icon_asset'] = Variable<String>(iconAsset.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (targetSteps.present) {
+      map['target_steps'] = Variable<int>(targetSteps.value);
+    }
+    if (earnedAt.present) {
+      map['earned_at'] = Variable<DateTime>(earnedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PendingCelebrationsCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('achievementId: $achievementId, ')
+          ..write('achievementKey: $achievementKey, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('iconAsset: $iconAsset, ')
+          ..write('category: $category, ')
+          ..write('targetSteps: $targetSteps, ')
+          ..write('earnedAt: $earnedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6523,6 +7196,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedWaterEntriesTable(this);
   late final $CachedMacroTargetsTable cachedMacroTargets =
       $CachedMacroTargetsTable(this);
+  late final $PendingCelebrationsTable pendingCelebrations =
+      $PendingCelebrationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6540,6 +7215,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedSavedMeals,
     cachedWaterEntries,
     cachedMacroTargets,
+    pendingCelebrations,
   ];
 }
 
@@ -9876,6 +10552,344 @@ typedef $$CachedMacroTargetsTableProcessedTableManager =
       CachedMacroTarget,
       PrefetchHooks Function()
     >;
+typedef $$PendingCelebrationsTableCreateCompanionBuilder =
+    PendingCelebrationsCompanion Function({
+      required String id,
+      required String userId,
+      required String achievementId,
+      required String achievementKey,
+      required String title,
+      required String description,
+      required String iconAsset,
+      required String category,
+      required int targetSteps,
+      required DateTime earnedAt,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$PendingCelebrationsTableUpdateCompanionBuilder =
+    PendingCelebrationsCompanion Function({
+      Value<String> id,
+      Value<String> userId,
+      Value<String> achievementId,
+      Value<String> achievementKey,
+      Value<String> title,
+      Value<String> description,
+      Value<String> iconAsset,
+      Value<String> category,
+      Value<int> targetSteps,
+      Value<DateTime> earnedAt,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$PendingCelebrationsTableFilterComposer
+    extends Composer<_$AppDatabase, $PendingCelebrationsTable> {
+  $$PendingCelebrationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get achievementId => $composableBuilder(
+    column: $table.achievementId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get achievementKey => $composableBuilder(
+    column: $table.achievementKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconAsset => $composableBuilder(
+    column: $table.iconAsset,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetSteps => $composableBuilder(
+    column: $table.targetSteps,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get earnedAt => $composableBuilder(
+    column: $table.earnedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PendingCelebrationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PendingCelebrationsTable> {
+  $$PendingCelebrationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get achievementId => $composableBuilder(
+    column: $table.achievementId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get achievementKey => $composableBuilder(
+    column: $table.achievementKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconAsset => $composableBuilder(
+    column: $table.iconAsset,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetSteps => $composableBuilder(
+    column: $table.targetSteps,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get earnedAt => $composableBuilder(
+    column: $table.earnedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PendingCelebrationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PendingCelebrationsTable> {
+  $$PendingCelebrationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get achievementId => $composableBuilder(
+    column: $table.achievementId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get achievementKey => $composableBuilder(
+    column: $table.achievementKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get iconAsset =>
+      $composableBuilder(column: $table.iconAsset, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<int> get targetSteps => $composableBuilder(
+    column: $table.targetSteps,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get earnedAt =>
+      $composableBuilder(column: $table.earnedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$PendingCelebrationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PendingCelebrationsTable,
+          PendingCelebration,
+          $$PendingCelebrationsTableFilterComposer,
+          $$PendingCelebrationsTableOrderingComposer,
+          $$PendingCelebrationsTableAnnotationComposer,
+          $$PendingCelebrationsTableCreateCompanionBuilder,
+          $$PendingCelebrationsTableUpdateCompanionBuilder,
+          (
+            PendingCelebration,
+            BaseReferences<
+              _$AppDatabase,
+              $PendingCelebrationsTable,
+              PendingCelebration
+            >,
+          ),
+          PendingCelebration,
+          PrefetchHooks Function()
+        > {
+  $$PendingCelebrationsTableTableManager(
+    _$AppDatabase db,
+    $PendingCelebrationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PendingCelebrationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PendingCelebrationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$PendingCelebrationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> achievementId = const Value.absent(),
+                Value<String> achievementKey = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<String> iconAsset = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<int> targetSteps = const Value.absent(),
+                Value<DateTime> earnedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PendingCelebrationsCompanion(
+                id: id,
+                userId: userId,
+                achievementId: achievementId,
+                achievementKey: achievementKey,
+                title: title,
+                description: description,
+                iconAsset: iconAsset,
+                category: category,
+                targetSteps: targetSteps,
+                earnedAt: earnedAt,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String userId,
+                required String achievementId,
+                required String achievementKey,
+                required String title,
+                required String description,
+                required String iconAsset,
+                required String category,
+                required int targetSteps,
+                required DateTime earnedAt,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PendingCelebrationsCompanion.insert(
+                id: id,
+                userId: userId,
+                achievementId: achievementId,
+                achievementKey: achievementKey,
+                title: title,
+                description: description,
+                iconAsset: iconAsset,
+                category: category,
+                targetSteps: targetSteps,
+                earnedAt: earnedAt,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PendingCelebrationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PendingCelebrationsTable,
+      PendingCelebration,
+      $$PendingCelebrationsTableFilterComposer,
+      $$PendingCelebrationsTableOrderingComposer,
+      $$PendingCelebrationsTableAnnotationComposer,
+      $$PendingCelebrationsTableCreateCompanionBuilder,
+      $$PendingCelebrationsTableUpdateCompanionBuilder,
+      (
+        PendingCelebration,
+        BaseReferences<
+          _$AppDatabase,
+          $PendingCelebrationsTable,
+          PendingCelebration
+        >,
+      ),
+      PendingCelebration,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9910,4 +10924,6 @@ class $AppDatabaseManager {
       $$CachedWaterEntriesTableTableManager(_db, _db.cachedWaterEntries);
   $$CachedMacroTargetsTableTableManager get cachedMacroTargets =>
       $$CachedMacroTargetsTableTableManager(_db, _db.cachedMacroTargets);
+  $$PendingCelebrationsTableTableManager get pendingCelebrations =>
+      $$PendingCelebrationsTableTableManager(_db, _db.pendingCelebrations);
 }
