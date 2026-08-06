@@ -461,3 +461,39 @@ Prep tab.
 
 **Docker**: unavailable in this sandbox (`docker ps` — no daemon). Not exercised this session;
 `docker-compose.yml` was not modified.
+
+## Build Session 4 (Autonomous Implementation Marathon) — Verified Build Results
+
+Deload recommendation UI, Nutrition production-readiness (saved meals, meal copying, a macro
+target editor), a coaching-style- and companion-aware Atlas & Nova dialogue layer, the
+Achievement Engine (idempotent award service, 10-item seeded catalog, Flutter screen), GPS Cardio
+manual/summary logging with a privacy-flag model ready for future route recording, a shared
+Flutter form-validators module, and a repository cleanup pass (dead code removed, two orphaned
+widgets wired back in). Full log, including the honest "not done this session" list, in
+[`packages/docs/build-session-4.md`](packages/docs/build-session-4.md).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Migration created and applied | `20260806140257_saved_meals_achievements_cardio` (adds `SavedMeal`/`SavedMealItem`, `Achievement`/`AchievementAward`, `CardioSession`, plus the `AchievementCategory`/`CardioActivityType` enums) | PASSED — verified against both a fresh database and a throwaway database seeded with legacy-shaped rows |
+| Seed idempotency | `npx prisma db seed` re-run after adding the Cardio achievements | PASSED — achievement count went 8 → 10 correctly, pre-existing 8 unchanged |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 153/153 tests** (up from 140; new `saved-meals`, `achievements`, `cardio` suites) |
+| Build | `pnpm api:build` | PASSED |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 54/54 tests** (up from 49; new `cardio.e2e-spec.ts`, plus achievement-award assertions added to the existing nutrition/workout-engine specs) |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 168/168 tests** (up from 127; new `achievements/`, `cardio/`, `companion/` dialogue, and `form_validators`/`sync_status_indicator` suites) |
+
+**What changed**: see `build-session-4.md` for the full breakdown across all 8 parts completed
+this session (Workout gaps, Nutrition, Dashboard audit, Atlas & Nova, Achievements, GPS Cardio,
+shared-platform strengthening, repository cleanup).
+
+**Docker**: unavailable in this sandbox (`docker ps` — no daemon). Not exercised this session;
+`docker-compose.yml` was not modified.

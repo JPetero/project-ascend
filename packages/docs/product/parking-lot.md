@@ -48,12 +48,21 @@ Scenarios 11–20 addendum. None are implemented this session; only
 documentation and (where explicitly noted elsewhere) small, safe
 extension points exist.
 
-- **Achievements (11)** — full backend (`Achievement`/`AchievementAward`
-  models, idempotent award service) and Flutter (profile display,
-  celebration) build-out. Foundation: the existing
-  `AchievementRule<TContext>` abstraction in `common/progress/`.
-- **GPS cardio tracking (12)** — location permission flow, route
-  recording, conflict-with-scheduled-workout handling, privacy controls.
+- **Achievements (11)** — ✅ core build-out shipped in `build-session-4.md`:
+  `Achievement`/`AchievementAward` models, an idempotent
+  `AchievementsService` (workout/streak/PR/nutrition/cardio triggers), a
+  10-item seeded catalog, and an `AchievementsScreen`. Still open:
+  Google Play Games / Game Center sync (explicitly deferred, not
+  "not started" — see that session's notes), a proper celebration
+  moment surfaced at the point an achievement is newly earned (rather
+  than only visible next time the screen is opened), and Recovery-
+  category achievements once deload has a countable trigger.
+- **GPS cardio tracking (12)** — manual/summary logging (activity type,
+  duration, distance/elevation/calorie estimate, privacy-flag model)
+  shipped in `build-session-4.md`. Still open: the actual location
+  permission flow, live route recording, conflict-with-scheduled-workout
+  handling, and wearable-sourced sessions — the `CardioSession` schema's
+  privacy flags are already shaped for when that lands.
 - **Stranger proximity matching (12)** — explicitly not to be built
   without re-reading the full restriction list in `user-scenario-bible.md`:
   coarse zones only, mutual opt-in, expiring matches, instant block/
