@@ -1,6 +1,9 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/providers/core_providers.dart';
+import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/screens/custom_food_editor_screen.dart';
 
@@ -12,8 +15,13 @@ void main() {
     tester,
   ) async {
     final foodRepository = FakeFoodRepository();
+    final database = AppDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
     final container = ProviderContainer(
-      overrides: [foodRepositoryProvider.overrideWithValue(foodRepository)],
+      overrides: [
+        foodRepositoryProvider.overrideWithValue(foodRepository),
+        appDatabaseProvider.overrideWithValue(database),
+      ],
     );
     addTearDown(container.dispose);
 

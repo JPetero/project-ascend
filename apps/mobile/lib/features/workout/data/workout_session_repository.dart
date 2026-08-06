@@ -1,4 +1,5 @@
 import '../../../core/networking/api_client.dart';
+import '../../achievements/domain/achievement.dart';
 import '../domain/personal_record.dart';
 import '../domain/workout_session.dart';
 
@@ -51,7 +52,13 @@ class WorkoutSessionRepository {
     return envelope.data!;
   }
 
-  Future<(Map<String, dynamic> session, List<PersonalRecord> newRecords)>
+  Future<
+    (
+      Map<String, dynamic> session,
+      List<PersonalRecord> newRecords,
+      List<Achievement> newAchievements,
+    )
+  >
   finish(String sessionId, {int? difficultyRating}) async {
     final envelope = await _apiClient.post(
       '/workout-sessions/$sessionId/finish',
@@ -62,7 +69,10 @@ class WorkoutSessionRepository {
     final records = (body['newPersonalRecords'] as List<dynamic>? ?? [])
         .map((r) => PersonalRecord.fromJson(r as Map<String, dynamic>))
         .toList();
-    return (body['session'] as Map<String, dynamic>, records);
+    final achievements = (body['newAchievements'] as List<dynamic>? ?? [])
+        .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
+        .toList();
+    return (body['session'] as Map<String, dynamic>, records, achievements);
   }
 
   Future<Map<String, dynamic>> abandon(String sessionId) async {

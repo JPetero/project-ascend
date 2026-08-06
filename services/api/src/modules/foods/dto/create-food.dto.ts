@@ -12,6 +12,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+
 import { FoodServingDto } from './food-serving.dto';
 
 /**
@@ -104,4 +105,13 @@ export class CreateFoodDto {
   @ValidateNested({ each: true })
   @Type(() => FoodServingDto)
   servings?: FoodServingDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Client-generated key identifying this exact create attempt, so a network retry never creates a duplicate custom food.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey?: string;
 }

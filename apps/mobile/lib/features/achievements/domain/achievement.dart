@@ -61,3 +61,15 @@ class Achievement {
     );
   }
 }
+
+/// Whether an earned achievement is rare enough to warrant the fuller
+/// "milestone" celebration (a modal) rather than the lighter toast/bottom
+/// sheet every other achievement gets. Ten-or-more-steps achievements
+/// (`ten_workouts`, `fifty_workouts`, `thirty_day_streak`,
+/// `hundred_meals_logged`, `ten_cardio_sessions` in the seeded catalog —
+/// see prisma/seed.ts) are meaningfully harder to earn than a "first X"
+/// achievement, which is why `targetSteps` is the signal used here rather
+/// than a hand-maintained list of keys that would drift out of sync with
+/// the catalog.
+bool isMilestoneAchievement(Achievement achievement) =>
+    achievement.targetSteps >= 10;

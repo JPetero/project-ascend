@@ -44,8 +44,8 @@ class _CustomFoodEditorScreenState
     setState(() => _isSaving = true);
     try {
       final created = await ref
-          .read(foodRepositoryProvider)
-          .createCustom(
+          .read(customFoodControllerProvider)
+          .create(
             CustomFoodInput(
               name: _name.text.trim(),
               servingDescription: _servingDescription.text.trim(),

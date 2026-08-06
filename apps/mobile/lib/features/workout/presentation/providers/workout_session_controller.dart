@@ -7,6 +7,8 @@ import '../../../../core/sync/idempotency_key.dart';
 import '../../../../core/sync/sync_engine.dart';
 import '../../../../core/sync/sync_handler.dart';
 import '../../../../core/sync/sync_providers.dart';
+import '../../../achievements/domain/achievement.dart';
+import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/workout_session_repository.dart';
 import '../../domain/exercise_substitution.dart';
@@ -21,11 +23,13 @@ class WorkoutFinishResult {
   const WorkoutFinishResult({
     required this.session,
     required this.newPersonalRecords,
+    required this.newAchievements,
     required this.synced,
   });
 
   final WorkoutSessionState session;
   final List<PersonalRecord> newPersonalRecords;
+  final List<Achievement> newAchievements;
   final bool synced;
 }
 
@@ -43,10 +47,12 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     required AppDatabase database,
     required SyncEngine syncEngine,
     required String userId,
+    required AchievementCelebrationController celebrationController,
   }) : _repository = repository,
        _database = database,
        _syncEngine = syncEngine,
        _userId = userId,
+       _celebrationController = celebrationController,
        super(null) {
     _syncEngine.registerHandler(
       _substitutionEntityType,
@@ -70,6 +76,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
   final AppDatabase _database;
   final SyncEngine _syncEngine;
   final String _userId;
+  final AchievementCelebrationController _celebrationController;
 
   Future<void> _restore() async {
     final cached = await _database.readCachedWorkoutSession();
@@ -389,12 +396,14 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       working = working.copyWith(sets: syncedSets);
 
       List<PersonalRecord> newRecords = const [];
+      List<Achievement> newAchievements = const [];
       if (andFinish) {
-        final (_, records) = await _repository.finish(
+        final (_, records, achievements) = await _repository.finish(
           working.serverId!,
           difficultyRating: working.difficultyRating,
         );
         newRecords = records;
+        newAchievements = achievements;
       }
 
       working = working.copyWith(
@@ -403,9 +412,15 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       );
       await _clear();
 
+      // Queued durably even if the celebration UI never gets a chance to
+      // show right now (app backgrounded mid-transition, etc.) — see
+      // AchievementCelebrationController.
+      await _celebrationController.enqueue(newAchievements);
+
       return WorkoutFinishResult(
         session: working,
         newPersonalRecords: newRecords,
+        newAchievements: newAchievements,
         synced: true,
       );
     } on AppException catch (error) {
@@ -417,6 +432,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       return WorkoutFinishResult(
         session: failed,
         newPersonalRecords: const [],
+        newAchievements: const [],
         synced: false,
       );
     }
@@ -441,5 +457,8 @@ final workoutSessionControllerProvider =
         database: ref.watch(appDatabaseProvider),
         syncEngine: ref.watch(syncEngineProvider),
         userId: userId ?? '',
+        celebrationController: ref.watch(
+          achievementCelebrationControllerProvider.notifier,
+        ),
       );
     });

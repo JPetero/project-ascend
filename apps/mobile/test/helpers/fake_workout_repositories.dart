@@ -1,6 +1,7 @@
 import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/core/networking/api_client.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
+import 'package:mobile/features/achievements/domain/achievement.dart';
 import 'package:mobile/features/workout/data/deload_repository.dart';
 import 'package:mobile/features/workout/data/exercise_repository.dart';
 import 'package:mobile/features/workout/data/personal_record_repository.dart';
@@ -151,6 +152,7 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   final List<String> startedSessionIds = [];
   final List<Map<String, dynamic>> loggedSets = [];
   List<PersonalRecord> nextPersonalRecords = const [];
+  List<Achievement> nextAchievements = const [];
 
   final List<Map<String, dynamic>> appliedSubstitutions = [];
 
@@ -181,10 +183,16 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   }
 
   @override
-  Future<(Map<String, dynamic> session, List<PersonalRecord> newRecords)>
+  Future<
+    (
+      Map<String, dynamic> session,
+      List<PersonalRecord> newRecords,
+      List<Achievement> newAchievements,
+    )
+  >
   finish(String sessionId, {int? difficultyRating}) async {
     if (failNetwork) throw AppException.network();
-    return ({'id': sessionId}, nextPersonalRecords);
+    return ({'id': sessionId}, nextPersonalRecords, nextAchievements);
   }
 
   @override

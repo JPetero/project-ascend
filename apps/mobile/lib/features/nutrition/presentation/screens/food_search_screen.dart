@@ -78,7 +78,6 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
       child: _LogFoodSheet(food: food, mealType: widget.mealType),
     );
     if (logged == true) {
-      ref.invalidate(todaysMealEntriesProvider);
       if (mounted) Navigator.of(context).pop();
     }
   }
@@ -196,11 +195,10 @@ class _LogFoodSheetState extends ConsumerState<_LogFoodSheet> {
     setState(() => _isSaving = true);
     try {
       await ref
-          .read(mealEntryRepositoryProvider)
+          .read(todaysMealEntriesProvider.notifier)
           .addEntry(
-            foodId: widget.food.id,
+            food: widget.food,
             mealType: widget.mealType,
-            date: DateTime.now(),
             quantity: _quantity,
           );
       if (!mounted) return;

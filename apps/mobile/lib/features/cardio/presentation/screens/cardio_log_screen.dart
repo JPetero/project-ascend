@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/validation/form_validators.dart';
+import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
 import '../../data/cardio_session_repository.dart';
 import '../../domain/cardio_session.dart';
 import '../providers/cardio_session_controller.dart';
@@ -50,7 +51,7 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
     try {
-      await ref
+      final result = await ref
           .read(cardioSessionRepositoryProvider)
           .create(
             CardioSessionInput(
@@ -76,6 +77,9 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
             ),
           );
       ref.invalidate(cardioSessionsProvider);
+      await ref
+          .read(achievementCelebrationControllerProvider.notifier)
+          .enqueue(result.newAchievements);
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;

@@ -88,7 +88,7 @@ describe('CardioService', () => {
         }),
       }),
     );
-    expect(result.id).toBe('cardio-1');
+    expect(result.data.id).toBe('cardio-1');
   });
 
   it('evaluates cardio achievements idempotently after every log', async () => {
@@ -101,6 +101,22 @@ describe('CardioService', () => {
     });
 
     expect(achievementsService.evaluateCardioAchievements).toHaveBeenCalledWith('user-1');
+  });
+
+  it('surfaces newly earned achievements in the response envelope meta', async () => {
+    prisma.cardioSession.create.mockResolvedValue(cardioSession());
+    const earned = [{ id: 'ach-1', key: 'first_cardio_session', title: 'First Steps' }];
+    achievementsService.evaluateCardioAchievements.mockResolvedValue(earned);
+
+    const result = await service.create('user-1', {
+      activityType: CardioActivityType.RUN,
+      startedAt: '2026-08-06T08:00:00.000Z',
+      durationSeconds: 1800,
+    });
+
+    expect(result.meta.newAchievements).toEqual(earned);
+    expect(result.data.id).toBe('cardio-1');
+    expect(result.error).toBeNull();
   });
 
   it('respects explicit privacy overrides', async () => {

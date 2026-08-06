@@ -1,5 +1,6 @@
 import '../../../core/networking/api_client.dart';
 import '../../../core/sync/idempotency_key.dart';
+import '../../achievements/domain/achievement.dart';
 import '../domain/meal_entry.dart';
 import '../domain/meal_type.dart';
 import '../domain/saved_meal.dart';
@@ -41,11 +42,36 @@ class SavedMealRepository {
   Future<SavedMeal> create({
     required String name,
     required List<SavedMealItemInput> items,
+    String? idempotencyKey,
   }) async {
     final envelope = await _apiClient.post(
       '/saved-meals',
       (data) => data as Map<String, dynamic>,
-      data: {'name': name, 'items': items.map((i) => i.toJson()).toList()},
+      data: {
+        'name': name,
+        'items': items.map((i) => i.toJson()).toList(),
+        'idempotencyKey':
+            idempotencyKey ?? generateIdempotencyKey('saved-meal'),
+      },
+    );
+    return SavedMeal.fromJson(envelope.data!);
+  }
+
+  /// PATCH — replaces the name and/or the full item list, naturally
+  /// idempotent for offline retry the same way `FoodRepository.updateCustom`
+  /// is.
+  Future<SavedMeal> update({
+    required String id,
+    String? name,
+    List<SavedMealItemInput>? items,
+  }) async {
+    final envelope = await _apiClient.patch(
+      '/saved-meals/$id',
+      (data) => data as Map<String, dynamic>,
+      data: {
+        'name': ?name,
+        if (items != null) 'items': items.map((i) => i.toJson()).toList(),
+      },
     );
     return SavedMeal.fromJson(envelope.data!);
   }
@@ -54,10 +80,12 @@ class SavedMealRepository {
     await _apiClient.delete('/saved-meals/$id', (_) => null);
   }
 
-  Future<List<MealEntry>> logMeal({
+  Future<({List<MealEntry> entries, List<Achievement> newAchievements})>
+  logMeal({
     required String id,
     required MealType mealType,
     required DateTime date,
+    String? idempotencyKey,
   }) async {
     final envelope = await _apiClient.post(
       '/saved-meals/$id/log',
@@ -65,11 +93,17 @@ class SavedMealRepository {
       data: {
         'mealType': mealTypeToJson(mealType),
         'date': formatDateOnly(date),
-        'idempotencyKey': generateIdempotencyKey('saved-meal-log'),
+        'idempotencyKey':
+            idempotencyKey ?? generateIdempotencyKey('saved-meal-log'),
       },
     );
-    return (envelope.data ?? [])
+    final entries = (envelope.data ?? [])
         .map((e) => MealEntry.fromJson(e as Map<String, dynamic>))
         .toList();
+    final newAchievements =
+        (envelope.meta['newAchievements'] as List<dynamic>? ?? [])
+            .map((a) => Achievement.fromJson(a as Map<String, dynamic>))
+            .toList();
+    return (entries: entries, newAchievements: newAchievements);
   }
 }
