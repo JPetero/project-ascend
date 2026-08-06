@@ -84,6 +84,73 @@ partially-complete week feel like real progress, not a failure. A missed
 day breaks a *display* streak counter, never the user's sense that their
 overall consistency matters.
 
+## Media and content policy (Founder Scenario 14)
+
+Ascend is a fitness and wellness platform, not a general social network
+and never an adult-content platform, at any entitlement tier.
+
+**Allowed**: normal workout photos, progress photos, meals, achievements,
+exercise clips, appropriate athletic clothing.
+
+**Prohibited, without exception, regardless of age verification or
+subscription tier**: pornography, explicit sexual activity, sexual
+solicitation, sexualized content involving minors, non-consensual
+intimate imagery, covert recordings, exploitation, graphic abuse, and any
+content whose primary purpose is promoting adult sexual services. Age
+verification alone never makes explicit content appropriate for Ascend —
+there is no Premium tier or gate that changes this rule.
+
+Progress-photo handling still needs to be privacy-sensitive even under
+this strict content policy: private-by-default albums, manual blur/crop
+tools, audience controls, a report-and-appeal system, automated
+moderation, limited human review only when content is reported or
+flagged, strict audit logs, and retention limits.
+
+## Achievement safety (Founder Scenario 11)
+
+Achievement conditions must never reward unsafe daily intense training —
+no achievement for training every single day without rest, no achievement
+that implicitly discourages a needed rest day. Cardio, mobility, walking,
+and recovery activities may count differently than heavy strength volume
+toward a milestone. This rule must never contradict the deload logic
+(the "Consistency over perfection" section above and Scenario 10) — an
+achievement should never celebrate exactly the pattern a deload
+recommendation exists to flag.
+
+## Location and camera privacy (Founder Scenarios 12, 16a, 17)
+
+Exact GPS coordinates and precise routes are private by default and must
+never be exposed publicly (leaderboards, social features, or anywhere
+else) — use coarse regions instead, and let the user hide their route's
+start/end points independently. Any future camera/scanner feature
+requires explicit consent every time it's used, processes on-device where
+practical, minimizes retention, allows deletion, and never uses a user's
+images for model training without a separate, explicit consent. None of
+this claims Ascend is an emergency service — guidance about concerning
+symptoms or injuries always points to seeking real medical attention, and
+a camera feature must never claim it can reliably detect an emergency or
+delay a user from calling for real help.
+
+## Global and respectful meal guidance (Founder Scenario 16b)
+
+Meal Prep must never stereotype a user based only on their nationality or
+assumed circumstances. Ask about budget and ingredient availability
+directly instead of guessing from a country or region. Acceptable framing:
+"Based on the foods you said are available, [x, y, z] could make an
+affordable, protein-containing meal. Nutrition values are estimates and
+depend on portions and preparation." Never generalize about what "people
+from your country" can or cannot afford, or anything in that register.
+
+## Research and evidence quality (Founder Scenario 19)
+
+Any future research-backed guidance must prioritize peer-reviewed
+research, professional medical organizations, government health agencies,
+established universities, and official clinical guidance. A general web
+search engine is a discovery tool, not an evidence-quality category —
+never present "found via search" as equivalent to a cited, quality-labeled
+source. The system must admit uncertainty and must never invent a
+citation.
+
 ## Terms of Service content requirements
 
 The in-product Terms must state, in plain language:

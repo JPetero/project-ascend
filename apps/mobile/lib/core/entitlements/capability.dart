@@ -20,6 +20,16 @@ enum AppCapability {
   supportedAccountAuth,
   offlineUse,
   dataExport,
+  // Founder Scenarios 11-20 addendum — see
+  // packages/docs/product/user-scenario-bible.md. None of these are
+  // built yet; the entries exist so the free/premium boundary is
+  // explicit ahead of implementation.
+  achievements,
+  gpsCardioTracking,
+  rankedLeaderboardOptIn,
+  profilePrivacyControls,
+  blockAndReport,
+  accessibleScheduling,
 
   // Premium-future — see free-premium-policy.md's Premium list. Not
   // implemented yet; listed so the boundary is explicit.
@@ -30,6 +40,11 @@ enum AppCapability {
   scannerFeatures,
   largerMediaStorage,
   deeperWearableInsights,
+  // Founder Scenarios 11-20 addendum premium-future entries.
+  achievementCosmetics,
+  socialJointSessionHosting,
+  profileCosmeticCustomization,
+  deepAdaptiveScheduling,
 }
 
 const _freeCapabilities = {
@@ -44,6 +59,12 @@ const _freeCapabilities = {
   AppCapability.supportedAccountAuth,
   AppCapability.offlineUse,
   AppCapability.dataExport,
+  AppCapability.achievements,
+  AppCapability.gpsCardioTracking,
+  AppCapability.rankedLeaderboardOptIn,
+  AppCapability.profilePrivacyControls,
+  AppCapability.blockAndReport,
+  AppCapability.accessibleScheduling,
 };
 
 /// True when [capability] is available at [tier]. Free capabilities are

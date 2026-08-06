@@ -41,6 +41,55 @@ actually in scope for the current session.
 - **AI-generated meal plans** — deferred until the AI milestone; Meal Prep
   uses deterministic, rule-based recommendation cards for now.
 
+## Founder Scenarios 11–20 (addendum) — deferred items
+
+Full requirements for all of these live in `user-scenario-bible.md`'s
+Scenarios 11–20 addendum. None are implemented this session; only
+documentation and (where explicitly noted elsewhere) small, safe
+extension points exist.
+
+- **Achievements (11)** — full backend (`Achievement`/`AchievementAward`
+  models, idempotent award service) and Flutter (profile display,
+  celebration) build-out. Foundation: the existing
+  `AchievementRule<TContext>` abstraction in `common/progress/`.
+- **GPS cardio tracking (12)** — location permission flow, route
+  recording, conflict-with-scheduled-workout handling, privacy controls.
+- **Stranger proximity matching (12)** — explicitly not to be built
+  without re-reading the full restriction list in `user-scenario-bible.md`:
+  coarse zones only, mutual opt-in, expiring matches, instant block/
+  report/leave/disable, no minors, friend-only joint sessions preferred
+  as the actual MVP over any stranger-matching feature.
+- **Subscription/pricing configuration (13)** — centrally configurable,
+  localized pricing model; no payment processing yet.
+- **Student/disability-access eligibility verification (13)** — prefer a
+  trusted third-party verification service; no in-house raw-ID scanning.
+- **Profile customization and safe media (14)** — free basics (bio,
+  default avatar, one cover image, privacy controls) plus a moderation
+  pipeline before any user media upload ships; premium cosmetics are a
+  separate, later layer. Privacy controls ship free from day one of this
+  feature, not added later.
+- **Friends, messaging, and joint workouts (15)** — full social graph,
+  chat, and moderation system; friend-only joint workouts as the initial
+  scope, not stranger-based.
+- **Location-based leaderboards (16a)** — ships as an honest coming-soon
+  state; real ranking needs the achievement/activity model above plus the
+  coarse-region privacy model.
+- **Global affordable meal support (16b)** — partially addressed already
+  (Meal Prep's existing balanced-guidance rules); the explicit budget/
+  ingredient-availability prompt and anti-stereotyping copy review is
+  still open.
+- **Premium camera and computer vision (17)** — explicitly deferred, full
+  safety-rail requirements documented in `user-scenario-bible.md` and
+  `wellness-ethics-bible.md` ahead of any build.
+- **Richer companion voice (18)** — premium voice conversation; free
+  deterministic dialogue is what exists today and stays free.
+- **Assistant research mode with citations (19)** — live web-backed
+  research with source verification; today's Assistant is deterministic
+  local dialogue only.
+- **Deep adaptive scheduling (20)** — advanced calendar automation,
+  clinician/trainer collaboration tools; basic accessible scheduling
+  stays free and is a smaller, nearer-term item.
+
 ## Ideas not yet scheduled
 
 - Data export (capability defined, not implemented).
@@ -48,8 +97,6 @@ actually in scope for the current session.
 - Push-notification strategy that stays consistent with the
   no-manipulative-engagement principle.
 - Localization beyond English copy.
-- A real achievement/badge catalog built on top of the existing
-  `AchievementRule<TContext>` shared abstraction (`common/progress/`).
 
 ## How to promote something out of the parking lot
 

@@ -13,6 +13,12 @@ const _freeCapabilities = [
   AppCapability.supportedAccountAuth,
   AppCapability.offlineUse,
   AppCapability.dataExport,
+  AppCapability.achievements,
+  AppCapability.gpsCardioTracking,
+  AppCapability.rankedLeaderboardOptIn,
+  AppCapability.profilePrivacyControls,
+  AppCapability.blockAndReport,
+  AppCapability.accessibleScheduling,
 ];
 
 const _premiumCapabilities = [
@@ -23,6 +29,10 @@ const _premiumCapabilities = [
   AppCapability.scannerFeatures,
   AppCapability.largerMediaStorage,
   AppCapability.deeperWearableInsights,
+  AppCapability.achievementCosmetics,
+  AppCapability.socialJointSessionHosting,
+  AppCapability.profileCosmeticCustomization,
+  AppCapability.deepAdaptiveScheduling,
 ];
 
 void main() {

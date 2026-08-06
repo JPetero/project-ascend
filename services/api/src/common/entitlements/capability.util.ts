@@ -29,6 +29,16 @@ export enum AppCapability {
   SUPPORTED_ACCOUNT_AUTH = 'SUPPORTED_ACCOUNT_AUTH',
   OFFLINE_USE = 'OFFLINE_USE',
   DATA_EXPORT = 'DATA_EXPORT',
+  // Founder Scenarios 11-20 addendum — see
+  // packages/docs/product/user-scenario-bible.md. None of these are
+  // built yet; the entries exist so the free/premium boundary is
+  // explicit ahead of implementation, per free-premium-policy.md.
+  ACHIEVEMENTS = 'ACHIEVEMENTS',
+  GPS_CARDIO_TRACKING = 'GPS_CARDIO_TRACKING',
+  RANKED_LEADERBOARD_OPT_IN = 'RANKED_LEADERBOARD_OPT_IN',
+  PROFILE_PRIVACY_CONTROLS = 'PROFILE_PRIVACY_CONTROLS',
+  BLOCK_AND_REPORT = 'BLOCK_AND_REPORT',
+  ACCESSIBLE_SCHEDULING = 'ACCESSIBLE_SCHEDULING',
 
   // Premium-future — see free-premium-policy.md's Premium list. Not
   // implemented yet; listed so the boundary is explicit rather than
@@ -40,6 +50,11 @@ export enum AppCapability {
   SCANNER_FEATURES = 'SCANNER_FEATURES',
   LARGER_MEDIA_STORAGE = 'LARGER_MEDIA_STORAGE',
   DEEPER_WEARABLE_INSIGHTS = 'DEEPER_WEARABLE_INSIGHTS',
+  // Founder Scenarios 11-20 addendum premium-future entries.
+  ACHIEVEMENT_COSMETICS = 'ACHIEVEMENT_COSMETICS',
+  SOCIAL_JOINT_SESSION_HOSTING = 'SOCIAL_JOINT_SESSION_HOSTING',
+  PROFILE_COSMETIC_CUSTOMIZATION = 'PROFILE_COSMETIC_CUSTOMIZATION',
+  DEEP_ADAPTIVE_SCHEDULING = 'DEEP_ADAPTIVE_SCHEDULING',
 }
 
 export interface Entitlement {
@@ -64,6 +79,12 @@ const FREE_CAPABILITIES: AppCapability[] = [
   AppCapability.SUPPORTED_ACCOUNT_AUTH,
   AppCapability.OFFLINE_USE,
   AppCapability.DATA_EXPORT,
+  AppCapability.ACHIEVEMENTS,
+  AppCapability.GPS_CARDIO_TRACKING,
+  AppCapability.RANKED_LEADERBOARD_OPT_IN,
+  AppCapability.PROFILE_PRIVACY_CONTROLS,
+  AppCapability.BLOCK_AND_REPORT,
+  AppCapability.ACCESSIBLE_SCHEDULING,
 ];
 
 const PREMIUM_CAPABILITIES: AppCapability[] = [
@@ -74,6 +95,10 @@ const PREMIUM_CAPABILITIES: AppCapability[] = [
   AppCapability.SCANNER_FEATURES,
   AppCapability.LARGER_MEDIA_STORAGE,
   AppCapability.DEEPER_WEARABLE_INSIGHTS,
+  AppCapability.ACHIEVEMENT_COSMETICS,
+  AppCapability.SOCIAL_JOINT_SESSION_HOSTING,
+  AppCapability.PROFILE_COSMETIC_CUSTOMIZATION,
+  AppCapability.DEEP_ADAPTIVE_SCHEDULING,
 ];
 
 export const ENTITLEMENTS: Entitlement[] = [

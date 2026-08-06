@@ -74,3 +74,38 @@ integration, and voice integration are intentionally deferred. Where a
 scenario requires their *existence* as a placeholder or extension point,
 build the honest placeholder — never a fabricated, fully-populated fake
 version of the feature.
+
+## Founder Scenarios 11–20 (addendum)
+
+Full detail lives in `user-scenario-bible.md`'s addendum section; the
+principles they add to this document are:
+
+12. **Reward consistency and varied healthy behavior, never raw volume or
+    danger.** Achievements, leaderboards, and any future ranking system
+    must never reward the pattern the deload logic (Scenario 10) exists to
+    discourage — e.g. an uninterrupted-streak-only ranking is exactly
+    wrong.
+13. **Location is coarse by default, everywhere.** GPS cardio,
+    leaderboards, and any location-adjacent feature show coarse regions,
+    never exact coordinates, to anyone but the user themselves.
+14. **Subscription presentation is honest, not persuasive-by-manipulation.**
+    Visible, comparable, dismissible, never interrupts core use, no
+    countdown/scarcity tricks, no guilt for staying free. Pricing is
+    configuration, never a hard-coded literal.
+15. **Ascend is not an adult-content platform, at any entitlement tier.**
+    No Premium-only NSFW network, no sexual-content feature, regardless of
+    age verification.
+16. **Accessibility and privacy controls are never premium.** Basic
+    schedule accessibility, profile privacy, and blocking/reporting stay
+    free at every tier, permanently — not just "for now."
+17. **A search engine is not an evidence source.** Any future
+    research-mode Assistant feature cites peer-reviewed research,
+    professional medical bodies, government health agencies, or
+    established universities — never "found via search" as if that were
+    itself a quality signal.
+18. **External integrations are additive, never load-bearing.** Google
+    Play Games Services / Apple Game Center sync (achievements) and any
+    similar third-party integration must never block or degrade the
+    Ascend-native version of a feature when unavailable.
+
+These sit alongside, and never override, principles 1–11 above.

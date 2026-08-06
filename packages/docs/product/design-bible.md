@@ -10,7 +10,11 @@ in product flows; it does not replace the design system itself.
 **Five primary tabs, in this exact order**: Workout, Meal Prep, Social,
 Assistant, Leaderboards. This is the authoritative order — do not
 reorder, rename, or add a sixth primary tab without a product-doc update
-here first.
+here first. **The camera (Founder Scenario 17) is explicitly not a sixth
+tab** — when built, it launches from an existing surface (Assistant,
+Workout, Meal Prep, a central scan action) or a navigation redesign the
+Founder explicitly approves. Do not silently restructure the five-tab
+shell to make room for it.
 
 **Profile is not a tab.** A profile icon appears in the upper-right of the
 primary app shell's app bar. Tapping it opens the Dashboard/Profile area as
@@ -74,6 +78,35 @@ definition — e.g. "3 of 5 planned sessions this week" behind a "workout
 completion percentage" ring. Never show an unexplained number that mixes
 unrelated metrics (e.g. don't blend workout completion and sleep quality
 into one unlabeled score).
+
+## Leaderboard and location UI (Founder Scenario 16a)
+
+Ranked mode is off by default and always user-toggleable. Any UI showing a
+region (local/city/region/national/global) shows a coarse, human-readable
+place name — never raw coordinates, never precise-enough-to-dox detail.
+Ranking criteria shown to the user must be genuinely transparent (what's
+being measured, not a black-box score). A private profile that opts into
+Ranked mode shows only the minimal public card it explicitly agreed to —
+never the full profile.
+
+## Subscription presentation (Founder Scenario 13)
+
+Subscription UI is visible but non-intrusive: it lives on the dashboard
+and in appropriate settings screens, never as an interstitial over an
+active workout or a blocker in front of core logging. It always shows a
+clear Free-vs-Premium comparison, current and renewal pricing, trial
+terms, and a dismiss action. No countdown timers, no fake scarcity, no
+copy implying a free user is less committed — see `wellness-ethics-bible.md`
+for the full manipulative-engagement rule this extends.
+
+## Achievement UI (Founder Scenario 11)
+
+An achievement card shows its icon/medal asset, title, description, and
+(for multi-step achievements) a progress indicator using the same
+`AscendProgressRing`/percentage-definition conventions as the rest of the
+app — never an unexplained fraction. Earned achievements show their
+earned date. Category/rarity is a visual grouping, not a paywall — every
+free user sees the complete core achievement set on their profile.
 
 ## Componentization
 

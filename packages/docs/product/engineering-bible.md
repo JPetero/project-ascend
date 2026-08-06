@@ -60,6 +60,38 @@ Every session's real, verified results go in a new
 of a previous session's entry. Don't fabricate a result that wasn't
 actually run.
 
+## New extension points from Founder Scenarios 11–20
+
+None of these are built this session — this section exists so a future
+session doesn't have to rediscover the shape from scratch. See
+`user-scenario-bible.md`'s Scenarios 11–20 addendum for full requirements.
+
+- **Achievements (Scenario 11)**: award logic must be idempotent —
+  evaluating the same trigger twice for a user awards it once. The
+  existing `AchievementRule<TContext>` abstraction in `common/progress/`
+  is the intended foundation; don't build a second achievement-evaluation
+  mechanism alongside it.
+- **GPS cardio (Scenario 12)**: route/location data is private by default
+  and encrypted at rest like any other sensitive user data; treat it with
+  the same care as health data, not as ordinary telemetry.
+- **Eligibility verification (Scenario 13)**: verification metadata is
+  encrypted and stored separately from public profile data; never joined
+  into a query path that could leak it into a public-facing response.
+  Prefer a trusted third-party verification service over building
+  in-house document scanning.
+- **Media (Scenario 14)**: any future media-upload feature needs
+  automated moderation and a reported-content review path *before* it
+  ships, not after — see the prohibited-content list in
+  `wellness-ethics-bible.md`.
+- **Chat (Scenario 15)**: if built, needs role-based access + audit
+  logging for any human moderation review from day one — this is a
+  security requirement, not a nice-to-have retrofit.
+- **Capability model growth (Scenarios 11–20)**: as each scenario's
+  free/premium boundary is actually implemented, add the specific
+  capability to `AppCapability` (both backend and Flutter) rather than
+  reusing an unrelated existing entry loosely — see
+  `free-premium-policy.md` for the current list.
+
 ## Product-doc precedence
 
 Before implementing product-facing behavior (copy, flow, what's shown

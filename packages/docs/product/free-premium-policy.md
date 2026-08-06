@@ -30,16 +30,74 @@ it stays free.
 - data export extension point (see `CapabilityService` —
   `EXPORT_DATA` is defined as a capability now so the UI has a stable
   hook, even though export isn't implemented yet)
+- **the complete core achievement system** (Founder Scenario 11) —
+  cosmetic medal frames/animations/historical analytics may be premium;
+  earning the achievements themselves never is
+- **GPS cardio tracking**, activity summary, private route history, and
+  manual privacy controls (Founder Scenario 12) — future social/joint
+  cardio hosting is separate and may be premium
+- **Ranked leaderboard opt-in** (Founder Scenario 16a) — off by default,
+  free to enable/disable at will
+- **profile privacy controls** and **block/report** (Founder Scenarios
+  14–15) — a user must never pay to make a profile private or to block/
+  report someone
+- **basic regional meal suggestions** that respect budget/ingredients/
+  restrictions (Founder Scenario 16b)
+- **basic Assistant safety guidance**, including the full concerning-
+  symptoms protocol (Founder Scenario 19) — never gated behind a
+  consumable AI-credit system
+- **accessible scheduling** — basic schedule customization and
+  accessibility accommodations (Founder Scenario 20)
 
 ## Premium (future capabilities — not built this session)
 
-- advanced AI conversations (live provider integration)
-- premium companion voices and additional avatar customization
+- advanced AI conversations / research mode with citations (live
+  provider integration, Founder Scenario 19)
+- premium companion voices, additional avatar customization, and richer
+  voice conversation (Founder Scenario 18)
 - advanced analytics (deeper trend analysis beyond the free dashboard)
 - advanced meal planning (AI-generated plans, saved multi-day plans)
-- scanner features (food/body scanning)
+- scanner features (food/body scanning, Founder Scenario 17)
 - larger media storage (photo/video gallery beyond a free tier limit)
 - deeper wearable insights
+- **achievement cosmetics** (medal frames, richer animations, historical
+  analytics — Founder Scenario 11) — never an exclusive health milestone
+- **social joint-session hosting** (a Premium host inviting a limited
+  number of Free friends to a joint cardio session — Founder Scenario 12)
+- **profile cosmetic customization** beyond the free basics (more avatar
+  styles/borders/cover layouts — Founder Scenario 14; privacy controls
+  themselves stay free, see above)
+- **deep adaptive scheduling** (advanced calendar automation, richer
+  recovery analytics, clinician/trainer collaboration — Founder Scenario
+  20; basic accessibility stays free, see above)
+
+## Pricing and eligibility architecture (Founder Scenario 13)
+
+No payment processing exists yet. When it ships, pricing must be
+**centrally configurable and localized** — never hard-coded as a literal
+scattered through the app. The configuration model needs to support (not
+necessarily implement yet): an introductory monthly price, a standard
+monthly renewal price, an annual price, a student discount, a
+disability-access discount, region-specific affordability programs, and
+promotional periods. The Founder's current pricing hypothesis (~USD 4.99
+intro, ~USD 9.99 regular, reduced pricing for verified-eligible users) is
+a configurable business assumption, not a value to hard-code as final.
+
+Eligibility verification (student / disability-access) is architecture
+only this session — no raw-ID scanning is built. When implemented: use
+the least intrusive method available, prefer a trusted third-party
+verification service over an in-house document-scanning pipeline, never
+retain full identity documents longer than necessary, encrypt
+verification metadata, keep eligibility status separate from public
+profile data (never publicly expose disability status), define an
+expiration/reverification policy (a six-month reverification concept is
+configurable, not mandatory), allow manual appeals, comply with
+applicable regional law, and ensure accessibility discounts don't create
+discriminatory treatment elsewhere in the product.
+
+Subscription UI presentation rules (visible-but-non-intrusive, never
+interrupts a workout, always dismissible, no manipulative urgency) live in
+`design-bible.md`'s "Subscription presentation" section.
 
 ## Implementation model
 

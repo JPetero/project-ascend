@@ -12,6 +12,12 @@ const FREE_CAPABILITIES: AppCapability[] = [
   AppCapability.SUPPORTED_ACCOUNT_AUTH,
   AppCapability.OFFLINE_USE,
   AppCapability.DATA_EXPORT,
+  AppCapability.ACHIEVEMENTS,
+  AppCapability.GPS_CARDIO_TRACKING,
+  AppCapability.RANKED_LEADERBOARD_OPT_IN,
+  AppCapability.PROFILE_PRIVACY_CONTROLS,
+  AppCapability.BLOCK_AND_REPORT,
+  AppCapability.ACCESSIBLE_SCHEDULING,
 ];
 
 const PREMIUM_CAPABILITIES: AppCapability[] = [
@@ -22,6 +28,10 @@ const PREMIUM_CAPABILITIES: AppCapability[] = [
   AppCapability.SCANNER_FEATURES,
   AppCapability.LARGER_MEDIA_STORAGE,
   AppCapability.DEEPER_WEARABLE_INSIGHTS,
+  AppCapability.ACHIEVEMENT_COSMETICS,
+  AppCapability.SOCIAL_JOINT_SESSION_HOSTING,
+  AppCapability.PROFILE_COSMETIC_CUSTOMIZATION,
+  AppCapability.DEEP_ADAPTIVE_SCHEDULING,
 ];
 
 describe('resolveHasCapability', () => {

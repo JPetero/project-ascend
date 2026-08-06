@@ -81,6 +81,29 @@ onboarding.
   every companion and every style responds with the same safety redirect,
   word-for-word core content, regardless of voice.
 
+## Achievement celebration (Founder Scenario 11)
+
+When a user earns an achievement (see `user-scenario-bible.md` Scenario
+11), both Atlas and Nova get a celebration moment, following the same
+dialogue content rules as everywhere else: only celebrate an achievement
+that was actually awarded (never a predicted or in-progress one framed as
+earned), no fabricated stat to make the moment feel bigger, and the same
+tone-appropriate phrasing per the user's chosen coaching style — a
+"Tough" style celebrates with more intensity, never with less warmth than
+is genuinely earned.
+
+## Voice interaction principles (Founder Scenario 18)
+
+Free companion interactions are text/deterministic-dialogue only — no
+consumable AI-credit system ever gates essential safety guidance (the
+Scenario 1 stop-and-redirect content, in particular, must always be free
+and unlimited). When richer voice conversation ships as a premium
+capability, it requires explicit user activation and microphone
+permission, a clear recording indicator, transcription privacy and
+deletion controls, and no always-listening behavior by default. Voice is
+a presentation layer on the same shared companion intelligence described
+above — it does not get its own, looser safety rules.
+
 ## Future: live AI
 
 When a live AI provider is integrated (out of scope for this build phase),

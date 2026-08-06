@@ -12,9 +12,13 @@ Prep, Social, Assistant, Leaderboards), a Dashboard rebuilt on real data only, a
 vertical slice (food search, custom foods, per-meal logging, water tracking) — see
 [build-session-3.md](build-session-3.md) and
 [packages/docs/product/parking-lot.md](product/parking-lot.md) for what's still open in each
-area. The product documents in [packages/docs/product/](product/) are now the authoritative
-source for what ships next and why — this file is kept for the pre-Session-3 modules that predate
-them.
+area. A Founder addendum then added Scenarios 11–20 (achievements, GPS cardio, fair subscription
+presentation, safe social/media policy, location-based leaderboards, global meal support, a
+premium camera roadmap, companion voice, Assistant research behavior, and accessible scheduling)
+to the product documents — see `user-scenario-bible.md`'s addendum section and
+`product/parking-lot.md` for the full deferred list; none of Scenarios 11–20 is implemented yet.
+The product documents in [packages/docs/product/](product/) are now the authoritative source for
+what ships next and why — this file is kept for the pre-Session-3 modules that predate them.
 
 ## 1. Nutrition tracking — foundation shipped in Build Session 3
 
@@ -56,14 +60,32 @@ same real-data-only treatment before it can replace its own honest coming-soon s
 Free-tier-first, as stated in the product identity: essential fitness/health tracking must stay
 free. This module adds the premium tier (advanced AI interactions, richer analysis,
 customization, cloud capacity) — billing integration, entitlement checks gating specific
-features, and restore-purchase flows on both platforms.
+features, and restore-purchase flows on both platforms. See
+`packages/docs/product/free-premium-policy.md`'s "Pricing and eligibility architecture" section
+(Founder Scenario 13) for the required configurable-pricing and eligibility-verification model —
+pricing must never be hard-coded, and eligibility verification should prefer a trusted
+third-party service over in-house document scanning.
 
 ## 6. Scanners
 
-Camera-based input (e.g., food/barcode scanning, form-check style body estimates). Must ship with
-the disclaimers already required in [security.md](security.md#known-gaps-before-production): no
-claims of clinical accuracy, no diagnosis, and honest framing of what a camera-based estimate can
-and can't tell the user.
+Camera-based input (e.g., food/barcode scanning, form-check style body estimates, exercise-form
+feedback). Must ship with the disclaimers already required in
+[security.md](security.md#known-gaps-before-production) and the fuller safety-rail list in
+`packages/docs/product/user-scenario-bible.md` Scenario 17 (Founder addendum): no claims of
+medical-grade accuracy, no diagnosis of injuries/conditions from an image, no fabricated
+body-composition percentages, explicit consent every use, on-device processing where practical,
+and a clear statement that it never replaces a human spotter or emergency services.
+
+## 7. Achievements and GPS cardio
+
+Founder Scenarios 11–12: a cross-platform achievement system (idempotent award logic, built on
+the existing `AchievementRule<TContext>` abstraction in `common/progress/`) and GPS-based cardio
+tracking (walk/run/ride, with schedule-conflict handling and private-by-default route data). Both
+ship free at the core; see `packages/docs/product/free-premium-policy.md` for exactly what stays
+free versus what premium cosmetics/social hosting may add later. Stranger-based proximity
+matching for joint cardio sessions is explicitly out of scope until the full restriction list in
+`user-scenario-bible.md` Scenario 12 is implemented — friend-only joint sessions are the intended
+first cut.
 
 ## Also planned, not yet scheduled
 
