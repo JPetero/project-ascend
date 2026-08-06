@@ -5,15 +5,21 @@ abstract final class RoutePaths {
   static const signIn = '/sign-in';
   static const onboarding = '/onboarding';
 
-  // Primary five-tab navigation (product order — see
-  // packages/docs/product/design-bible.md): Workout, Meal Prep, Social,
-  // Assistant, Leaderboards. Profile/Dashboard is intentionally not a tab
-  // — it's a pushed route reached via the profile icon (see [dashboard]).
+  // Primary six-destination navigation (product order — see
+  // packages/docs/product/design-bible.md): Train, Fuel, Community,
+  // Ascend AI, Rankings, and Vision (Premium). Route path segments below
+  // predate the Founder Scenario 21 rename and are kept unchanged
+  // (Workout/mealPrep/social/assistant/leaderboards) so existing deep
+  // links and tests keep working — only the visible nav label changed,
+  // per `design-bible.md`. Profile/Dashboard is intentionally not a
+  // destination — it's a pushed route reached via the profile icon (see
+  // [dashboard]).
   static const workout = '/workout';
   static const mealPrep = '/meal-prep';
   static const social = '/social';
   static const assistant = '/assistant';
   static const leaderboards = '/leaderboards';
+  static const vision = '/vision';
 
   static const dashboard = '/dashboard';
   static const achievements = '/achievements';

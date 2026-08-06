@@ -815,3 +815,293 @@ Reviewed against this addendum and found consistent, no conflicts:
   safety rule and Scenario 16a's ranking-integrity rule both explicitly
   reference and reinforce the deload logic rather than conflicting with
   it.
+
+---
+
+# Founder Scenarios 21–27 Addendum
+
+Added to the living documents on the Founder's instruction, at the start of
+the Major Product Expansion session. These refine product direction; they
+do not authorize unsafe, deceptive, illegal, or privacy-invasive behavior,
+and they do not override `wellness-ethics-bible.md` or
+`engineering-bible.md`. **Status**: unlike the Scenarios 11–20 addendum
+(which deferred every scenario), several of Scenarios 21–27 are actively
+built across this same session's later parts (see `roadmap.md` and
+`parking-lot.md` for exactly what shipped vs. what remains architecture-
+only, updated as each part lands) — this addendum itself is documentation
+and capability-model alignment, done first so every part that follows has
+an authoritative spec to build against.
+
+## Scenario 21 — Six-destination navigation and the Vision gate
+
+**User story**: My five core destinations are named Train, Fuel,
+Community, Ascend AI, and Rankings. As a Premium member I also get a sixth
+destination, Vision, for camera-based coaching tools. My profile stays one
+tap away from the icon in the corner, not a seventh destination.
+
+**Requirements**: the primary shell has five free destinations — Train
+(formerly Workout), Fuel (formerly Meal Prep), Community (formerly
+Social), Ascend AI (formerly Assistant), Rankings (formerly Leaderboards)
+— plus Vision as a sixth, Premium-gated destination. The profile/dashboard
+icon in the upper-right remains the entry point to Profile/Dashboard and
+is explicitly not one of the six destinations (unchanged from
+`design-bible.md`'s existing rule). Migrating the visible labels and
+adding the Vision slot must never remove or break the existing routes
+those tabs already serve — this is a rename and an addition, not a
+rebuild.
+
+**Free/Premium**: the five renamed destinations are free, unchanged from
+today's five-tab access. Vision is Premium-only (`AppCapability
+.visionAccess`); a Free user sees the destination exists (honest, not
+hidden) but its content is a locked/upgrade state, never a fabricated
+preview of camera features that don't run for them.
+
+**Tests (when built)**: navigation renders exactly six destinations for a
+Premium test user and five plus a locked Vision entry for a Free test
+user; every pre-existing route (Train/Fuel/Community/Ascend
+AI/Dashboard) still resolves after the rename.
+
+---
+
+## Scenario 22 — Community Reels
+
+**User story**: I can post and watch short fitness and wellness videos
+from people I follow and from creators I discover, react to what I see,
+and control who sees what I post.
+
+**Requirements**: reels (short video posts) with captions, likes,
+comments, saves, follows, reports, blocks, visibility controls (private/
+friends/followers/public, matching the profile privacy model), native
+external sharing to whatever apps the OS share sheet supports, a
+moderation pipeline, creator profiles, and trainer content as a
+recognized profile category. **Explicitly not promised**: automatic
+publishing to Instagram, Facebook, or TikTok — that requires each
+platform's own official API integration and app review, which doesn't
+exist yet. Sharing today, like every other share surface in this app
+(`AscendShareService`), hands content to the native OS share sheet; a
+user chooses where it goes next.
+
+**Free/Premium**: posting, viewing, and interacting with Reels is free —
+Community is a core product surface, not a premium add-on. Trainer/
+creator profile status is free to hold; paid distribution of a creator's
+content is a separate capability (Scenario 23, Ascend Promote).
+
+**Tests (when built)**: a blocked user's Reels never appear in the
+blocker's feed; a private-visibility Reel is never returned to a non-
+follower; report submission creates a moderation-queue entry.
+
+---
+
+## Scenario 23 — Ascend Promote
+
+**User story**: As a creator, I can pay to get my post or Reel in front of
+more people — and everyone who sees it can tell it's promoted, not
+organic.
+
+**Requirements**: promoted content is always labeled **Promoted**,
+visibly and unambiguously. Paid reach/engagement metrics are tracked and
+displayed separately from organic metrics — never blended into one
+number that overstates authentic interest. No guaranteed engagement is
+promised to the creator (a paid budget buys distribution/impressions, not
+a promised number of likes or follows). No fake followers or fake likes,
+ever, under any circumstance. Every promoted campaign passes moderation
+review before it goes live. Frequency limits cap how often the same user
+sees promoted content. Promoted reach and engagement have **zero**
+influence on fitness Rankings (Scenario 6 below) — a paid boost is a
+distribution mechanism, never a competitive advantage. Actual billing is
+future, store-compliant work (see Scenario 27's Pricing section and
+`free-premium-policy.md`) — this scenario is the transparent-promotion
+architecture, not a live payments feature.
+
+**Free/Premium**: creating a promoted campaign is a Premium/creator
+capability (`AppCapability.ascendPromote`) — viewing and interacting with
+promoted content (like any Community content) is free for everyone.
+
+**Tests (when built)**: a promoted post's paid impression/click counts
+never contribute to any Ranking calculation; every promoted post renders
+the Promoted label; a campaign in `PENDING_REVIEW` never serves
+impressions.
+
+---
+
+## Scenario 24 — Trainer groups
+
+**User story**: I can create a small group to train with friends or
+clients, share plans, and chat — free, with room to grow if I need more
+later.
+
+**Requirements — free tier**: one group owned per user, a centrally
+configurable small-member limit (three to five members, not hard-coded
+per-widget), text chat, safe image sharing (subject to the same media
+content policy as everywhere else in the app — see
+`wellness-ethics-bible.md`), shared workout plans, and invitations.
+
+**Requirements — Premium future**: more groups per owner, larger group
+sizes, scheduled announcements, scheduled sessions, assignments, and
+distinct trainer/moderator roles within a group.
+
+**Free/Premium**: the free tier above (`AppCapability
+.trainerGroupsBasic`) is real, not a crippled trial — genuinely usable
+for a small friend or client group. The expanded tier
+(`AppCapability.trainerGroupsExpanded`) adds scale and structure, never
+gates the basic ability to train together in a small group.
+
+**Tests (when built)**: a Free-tier owner cannot create a second owned
+group; the member-limit check reads from central configuration, not a
+literal in the UI or the service.
+
+---
+
+## Scenario 25 — Sports scoring (Vision-assisted, badminton first)
+
+**User story**: My friend and I can log the score of our badminton match
+together. If a camera-assisted feature suggests a score, it's only a
+suggestion — the two of us always confirm what actually happened.
+
+**Requirements**: both players join the match record. Both users must
+confirm the final score before it's final. If the two submitted scores
+conflict, the match becomes **disputed** rather than silently picking
+one side's number. No Ranked points are awarded until both players agree.
+Any camera-based score assistance (Vision, Scenario 8/Scenario 27's Part
+8) produces a suggestion only — manual score entry is always available
+and is never removed or downgraded once camera assistance exists. No
+gambling or wagering feature of any kind attaches to sports scoring.
+
+**Free/Premium**: manual match creation, confirmation, and dispute
+resolution are free (`AppCapability.sportsScoringManual`) — two friends
+can always score a match together without Premium. Camera-assisted score
+suggestion is a Vision/Premium capability
+(`AppCapability.sportsScoringAssisted`) layered on top, never a
+replacement for the free manual flow.
+
+**Tests (when built)**: a match with conflicting player-submitted scores
+transitions to `DISPUTED`, not to either submitted score; no Ranking
+points post until both confirmations match; a camera-suggested score
+alone (no human confirmation) never finalizes a match.
+
+---
+
+## Scenario 26 — Expanded cardio activities and the Nutrition Library
+
+**User story**: I can log the cardio activity that actually fits my body
+and my day — walking, jogging, running, sprint work, cycling, hiking, or
+wheelchair mobility — and in Fuel I can learn what a nutrient actually
+does without being told I'm deficient in it.
+
+**Expanded cardio requirements**: the free activity type list grows to
+include walking, jogging, running, sprint sessions, cycling, hiking,
+wheelchair mobility (where appropriate to the user), and a custom
+outdoor-cardio type for anything not in the preset list. Premium may add
+advanced analytics on top of these activities (deeper pace/effort
+trend analysis) — it never gates access to logging the activity types
+themselves.
+
+**Nutrition Library requirements**: a free educational nutrient
+encyclopedia (macronutrients, minerals, vitamins) that explains a
+nutrient's function, shows common food sources, and discusses deficiency
+and excess risk **cautiously** — describing general, well-established
+risk categories, never diagnosing a specific user's deficiency from their
+logged intake (same boundary `wellness-ethics-bible.md` already applies
+to nutrition guidance generally). It never prescribes a specific
+supplement or dose. It distinguishes dietary requirements (nutrients the
+body cannot make and must get from food) from substances the body can
+synthesize on its own. Where a future research/citation integration
+exists, sources follow the same evidence-quality rules as Scenario 19 —
+peer-reviewed research, professional medical bodies, government health
+agencies, established universities; a general web search is a discovery
+tool, never a cited source on its own.
+
+**Free/Premium**: expanded cardio activity types
+(`AppCapability.expandedCardioActivities`) and the Nutrition Library
+(`AppCapability.nutritionLibrary`) are both free — the free product stays
+genuinely complete. `AppCapability.cardioAdvancedAnalytics` is the
+Premium depth-add for cardio.
+
+**Tests (when built)**: every listed free activity type is loggable
+without a Premium check; Nutrition Library copy for any nutrient never
+contains a first-/second-person diagnostic claim ("you are deficient in
+X") — only general, sourced, third-person information.
+
+---
+
+## Scenario 27 — Support, companion tone evolution, and centralized pricing
+
+**User story**: I can always get help, my companion feels warm without
+ever feeling like it's trying to be my only relationship, and if pricing
+ever changes I see one honest number, not something hidden in code.
+
+**Support requirements**: every user, on every tier, has access to a help
+center, support ticket creation, bug reporting, a safety report path, an
+accessibility feedback channel, account recovery, billing help, and a
+moderation-appeal path. None of this is ever Premium-gated
+(`AppCapability.supportAccess`).
+
+**Atlas and Nova tone requirements**: both companions stay warm, upbeat,
+empathetic, and emotionally aware, honest about their own limitations,
+supportive of rest (never guilt for taking one), and capable of setting a
+boundary when a conversation asks for something outside safe scope. They
+must never: claim consciousness or sentience, manipulate a user into
+emotional dependence, present themselves as a replacement for therapy,
+diagnose a mental illness, act as though they are a user's only friend or
+family, or engage in sexual or NSFW roleplay of any kind, at any
+entitlement tier — this restates `wellness-ethics-bible.md`'s media policy
+in the dialogue domain, not a new exception to it. A future "Playful
+warmth" presentation layer may allow light charm and tasteful compliments
+within the existing coaching-style system, but explicit sexual behavior
+is never in scope, Free or Premium, present or future — see Founder
+Vision principle 15.
+
+**Pricing requirements**: pricing configuration must be centralized
+(never a literal hard-coded into individual widgets) and support the
+Founder's current hypotheses as configurable, non-final values:
+approximately USD 12.99 standard monthly, approximately USD 7.99 for
+verified-eligible users, approximately PHP 599 standard, approximately
+PHP 299 for verified-eligible users. These replace the earlier ~USD 4.99/
+~USD 9.99 hypothesis recorded in `free-premium-policy.md`'s original
+draft — both are explicitly non-final business assumptions, not store
+prices. The configuration model must support Student Access, Accessibility
+Access, Senior Access, and Regional Affordability as distinct eligibility
+programs (extending, not replacing, the student/disability-access model
+already documented in Scenario 13). Eligibility status is never exposed
+publicly on a profile or anywhere another user can see it — the existing
+Scenario 13 rule about keeping eligibility separate from public profile
+data applies identically to every program added here.
+
+**Tests (when built)**: no pricing literal appears directly in Flutter
+widget code (a config/provider lookup only); a support-ticket-creation
+capability check never returns false for any tier; dialogue-content tests
+assert no companion response includes consciousness claims, therapy-
+replacement framing, or sexual/NSFW content regardless of coaching style
+or "Playful warmth" state.
+
+---
+
+## Six-destination navigation clarification (supersedes the five-tab note above for Vision)
+
+The "Tab architecture clarification" section above (written for the
+Scenarios 11–20 addendum) said the camera is not a sixth tab. Scenario 21
+above supersedes that specific point: Vision **is** now the sixth,
+Premium-gated destination, per direct Founder instruction. Every other
+part of that clarification — five free destinations keep their relative
+order, no further silent restructuring beyond what Scenario 21
+authorizes — still holds.
+
+## Compatibility check against Scenarios 21–27
+
+Reviewed against this addendum and found consistent, no conflicts:
+- **Rankings integrity (Scenario 16a)**: Scenario 23's "Promoted reach
+  never influences Rankings" rule directly extends the existing
+  ranking-integrity principle rather than introducing a new one.
+- **Achievement safety (Scenario 11)**: Scenario 26's expanded cardio
+  activity list is exactly the kind of varied, non-dangerous activity set
+  Scenario 11's achievement-safety rule already anticipated ("cardio,
+  mobility, walking, and recovery activities may count differently than
+  heavy strength volume").
+- **Camera safety rails (Scenario 17)**: Scenario 25's "camera output is
+  a suggestion only" rule for sports scoring is a direct application of
+  Scenario 17's existing camera hard-safety-requirements list, not a new
+  policy.
+- **Media and content policy**: Scenario 22's Reels and Scenario 24's
+  group image sharing both explicitly point back to
+  `wellness-ethics-bible.md`'s existing media policy rather than defining
+  a separate one.

@@ -47,7 +47,7 @@ void main() {
     );
     await pumpForAsyncSettle(tester);
 
-    await tester.tap(find.text('Meal Prep'));
+    await tester.tap(find.text('Fuel'));
     await pumpForAsyncSettle(tester);
 
     expect(find.byType(MealPrepScreen), findsOneWidget);
@@ -101,7 +101,7 @@ void main() {
     );
     await pumpForAsyncSettle(tester);
 
-    await tester.tap(find.text('Meal Prep'));
+    await tester.tap(find.text('Fuel'));
     await pumpForAsyncSettle(tester);
 
     final emptyState = find.text('No saved meals yet');

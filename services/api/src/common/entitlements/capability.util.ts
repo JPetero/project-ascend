@@ -39,6 +39,17 @@ export enum AppCapability {
   PROFILE_PRIVACY_CONTROLS = 'PROFILE_PRIVACY_CONTROLS',
   BLOCK_AND_REPORT = 'BLOCK_AND_REPORT',
   ACCESSIBLE_SCHEDULING = 'ACCESSIBLE_SCHEDULING',
+  // Founder Scenarios 21-27 addendum — see
+  // packages/docs/product/user-scenario-bible.md. Community Reels,
+  // Trainer Groups (basic tier), expanded cardio activity types,
+  // manual sports scoring, the Nutrition Library, and Support access are
+  // all free at the core, per free-premium-policy.md.
+  EXPANDED_CARDIO_ACTIVITIES = 'EXPANDED_CARDIO_ACTIVITIES',
+  NUTRITION_LIBRARY = 'NUTRITION_LIBRARY',
+  SUPPORT_ACCESS = 'SUPPORT_ACCESS',
+  COMMUNITY_REELS = 'COMMUNITY_REELS',
+  TRAINER_GROUPS_BASIC = 'TRAINER_GROUPS_BASIC',
+  SPORTS_SCORING_MANUAL = 'SPORTS_SCORING_MANUAL',
 
   // Premium-future — see free-premium-policy.md's Premium list. Not
   // implemented yet; listed so the boundary is explicit rather than
@@ -55,6 +66,14 @@ export enum AppCapability {
   SOCIAL_JOINT_SESSION_HOSTING = 'SOCIAL_JOINT_SESSION_HOSTING',
   PROFILE_COSMETIC_CUSTOMIZATION = 'PROFILE_COSMETIC_CUSTOMIZATION',
   DEEP_ADAPTIVE_SCHEDULING = 'DEEP_ADAPTIVE_SCHEDULING',
+  // Founder Scenarios 21-27 addendum premium-future entries. Vision
+  // (the sixth nav destination) gates the whole camera-based feature
+  // set; the others are narrower depth-adds on top of a free core.
+  VISION_ACCESS = 'VISION_ACCESS',
+  CARDIO_ADVANCED_ANALYTICS = 'CARDIO_ADVANCED_ANALYTICS',
+  TRAINER_GROUPS_EXPANDED = 'TRAINER_GROUPS_EXPANDED',
+  ASCEND_PROMOTE = 'ASCEND_PROMOTE',
+  SPORTS_SCORING_ASSISTED = 'SPORTS_SCORING_ASSISTED',
 }
 
 export interface Entitlement {
@@ -85,6 +104,12 @@ const FREE_CAPABILITIES: AppCapability[] = [
   AppCapability.PROFILE_PRIVACY_CONTROLS,
   AppCapability.BLOCK_AND_REPORT,
   AppCapability.ACCESSIBLE_SCHEDULING,
+  AppCapability.EXPANDED_CARDIO_ACTIVITIES,
+  AppCapability.NUTRITION_LIBRARY,
+  AppCapability.SUPPORT_ACCESS,
+  AppCapability.COMMUNITY_REELS,
+  AppCapability.TRAINER_GROUPS_BASIC,
+  AppCapability.SPORTS_SCORING_MANUAL,
 ];
 
 const PREMIUM_CAPABILITIES: AppCapability[] = [
@@ -99,6 +124,11 @@ const PREMIUM_CAPABILITIES: AppCapability[] = [
   AppCapability.SOCIAL_JOINT_SESSION_HOSTING,
   AppCapability.PROFILE_COSMETIC_CUSTOMIZATION,
   AppCapability.DEEP_ADAPTIVE_SCHEDULING,
+  AppCapability.VISION_ACCESS,
+  AppCapability.CARDIO_ADVANCED_ANALYTICS,
+  AppCapability.TRAINER_GROUPS_EXPANDED,
+  AppCapability.ASCEND_PROMOTE,
+  AppCapability.SPORTS_SCORING_ASSISTED,
 ];
 
 export const ENTITLEMENTS: Entitlement[] = [

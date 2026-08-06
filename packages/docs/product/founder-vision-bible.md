@@ -68,12 +68,23 @@ When priorities conflict, resolve in this order:
 
 ## Non-goals for the current build phase
 
-Wearables depth, Community/Social features, Leaderboards, subscriptions/
-payment processing, food/body scanners, live third-party AI provider
-integration, and voice integration are intentionally deferred. Where a
-scenario requires their *existence* as a placeholder or extension point,
-build the honest placeholder — never a fabricated, fully-populated fake
-version of the feature.
+As of the Major Product Expansion session, several of these areas are now
+under active, real construction rather than fully deferred — see
+`roadmap.md` and `packages/docs/product/parking-lot.md` for exactly which
+parts of Community, Rankings, Trainer Groups, Vision, and subscription
+architecture have shipped real code versus remain honest placeholders as
+each part of that session lands. What stays a genuine non-goal regardless:
+**live payment processing** (no real store billing/receipt validation
+exists — Subscription/Entitlement architecture is real, a live charge is
+not), **live third-party AI provider calls** (Atlas/Nova stay
+deterministic; a provider-independent foundation may exist without a live
+key configured), and **real camera-based analysis** (Vision's shell and
+contracts may exist without a working on-device or server model behind
+them). Where a scenario requires a feature's *existence* as a placeholder,
+contract, or extension point ahead of a live credential/model/billing
+integration, build the honest placeholder — never a fabricated,
+fully-populated fake version of the feature, and never a claim of runtime
+capability that isn't actually there.
 
 ## Founder Scenarios 11–20 (addendum)
 
@@ -109,3 +120,43 @@ principles they add to this document are:
     Ascend-native version of a feature when unavailable.
 
 These sit alongside, and never override, principles 1–11 above.
+
+## Founder Scenarios 21–27 (addendum)
+
+Full detail lives in `user-scenario-bible.md`'s Scenarios 21–27 addendum;
+the principles they add to this document are:
+
+19. **Paid distribution never buys competitive advantage.** Ascend
+    Promote's promoted reach and engagement metrics carry zero weight in
+    Rankings — a creator paying for visibility must never translate into
+    an unfair Ranking edge over a creator who didn't.
+20. **A companion is a companion, never a substitute for human
+    connection.** Atlas and Nova stay warm and emotionally aware but must
+    never claim consciousness, cultivate dependence, replace therapy,
+    diagnose mental illness, present as a user's only relationship, or
+    engage in sexual/NSFW roleplay — at any tier, present or future,
+    including any future "Playful warmth" presentation layer.
+21. **A locked destination is still an honest one.** When Vision (the
+    sixth, Premium destination) is visible to a Free user, it must show
+    a genuine locked/upgrade state — never a faked preview of camera
+    output that doesn't actually run for them.
+22. **Manual confirmation always outranks an automated suggestion.**
+    Camera-assisted sports scoring (and any future Vision-assisted
+    scoring) produces suggestions only; a match result is only final once
+    the humans involved agree, and manual entry is never removed once
+    automation exists.
+23. **A small free group is a real group, not a funnel.** Trainer Groups'
+    free tier (one owned group, a real member limit, real chat, real
+    shared plans) must be genuinely usable, not a crippled trial designed
+    to force an upgrade.
+24. **Free breadth of activity and knowledge never shrinks.** Expanded
+    cardio activity types and the Nutrition Library are core free-product
+    breadth, not depth-based upsells — Premium may add analytics or
+    citations on top, never gate the activities or the base knowledge
+    itself.
+25. **Support is never a paid feature.** Every user, every tier, can
+    always reach help — a ticket, a bug report, a safety report, an
+    accessibility channel, billing help, account recovery, and a
+    moderation appeal.
+
+These sit alongside, and never override, principles 1–18 above.

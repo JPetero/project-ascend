@@ -99,6 +99,38 @@ extension points exist.
   clinician/trainer collaboration tools; basic accessible scheduling
   stays free and is a smaller, nearer-term item.
 
+## Founder Scenarios 21–27 (addendum) — Major Product Expansion session
+
+Full requirements for all of these live in `user-scenario-bible.md`'s
+Scenarios 21–27 addendum. Unlike the 11–20 addendum, most of these are
+being actively built across this same session's later parts — this list
+is updated as each part actually lands (see `build-session-7.md` for the
+authoritative, verified record of what shipped vs. what's still
+architecture-only below).
+
+- **Six-destination navigation and Vision (21)** — label/route rename
+  (Train/Fuel/Community/Ascend AI/Rankings) plus a sixth, Premium-gated
+  Vision destination.
+- **Community Reels (22)** — reels, captions, likes, comments, saves,
+  follows, reports, blocks, visibility, native external sharing,
+  moderation, creator profiles, trainer content.
+- **Ascend Promote (23)** — transparent paid distribution architecture;
+  no live billing.
+- **Trainer groups (24)** — free basic tier (one group, small configurable
+  limit, chat, safe images, shared plans, invitations); Premium expanded
+  tier is architecture-only until Premium billing exists.
+- **Sports scoring (25)** — manual match creation/confirmation/dispute
+  flow; camera-assisted suggestion depends on the Premium Vision Shell.
+- **Expanded cardio and Nutrition Library (26)** — new free activity
+  types on top of existing GPS cardio; a free educational nutrient
+  encyclopedia.
+- **Support, companion tone, and pricing (27)** — help center/ticket/
+  bug-report/safety-report/accessibility/billing-help/appeal surfaces;
+  Atlas/Nova tone-and-boundary rules (no consciousness claims, no NSFW,
+  no therapy replacement); centralized, configurable pricing model with
+  Student/Accessibility/Senior/Regional Affordability programs — no live
+  store billing.
+
 ## Ideas not yet scheduled
 
 - Data export (capability defined, not implemented).
