@@ -96,6 +96,31 @@ class _WorkoutSummaryScreenState extends ConsumerState<WorkoutSummaryScreen> {
                 ),
               ],
             ),
+            if (session.difficultyRating != null) ...[
+              const SizedBox(height: AscendSpacing.lg),
+              AscendMetricCard(
+                label: 'Session effort (RPE)',
+                value: '${session.difficultyRating}/10',
+                icon: Icons.speed_outlined,
+              ),
+            ],
+            if (session.substitutions.isNotEmpty) ...[
+              const SizedBox(height: AscendSpacing.lg),
+              Text(
+                'Substitutions',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              for (final substitution in session.substitutions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+                  child: AscendCard(
+                    child: Text(
+                      '${substitution.originalExerciseName} → ${substitution.substituteExerciseName}',
+                    ),
+                  ),
+                ),
+            ],
             if (_result.newPersonalRecords.isNotEmpty) ...[
               const SizedBox(height: AscendSpacing.lg),
               Text(

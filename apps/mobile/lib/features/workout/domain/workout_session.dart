@@ -1,3 +1,5 @@
+import 'exercise_substitution.dart';
+
 enum WorkoutSessionStatus { inProgress, paused, completed, abandoned }
 
 WorkoutSessionStatus workoutSessionStatusFromJson(String value) =>
@@ -36,6 +38,7 @@ class LoggedSet {
     this.durationSeconds,
     this.distanceMeters,
     this.isWarmup = false,
+    this.rpe,
   });
 
   final String localId;
@@ -49,6 +52,12 @@ class LoggedSet {
   final double? distanceMeters;
   final bool isWarmup;
   final DateTime completedAt;
+
+  /// Optional perceived-exertion rating for this set, 1–10 (half-point
+  /// increments allowed). Purely informational to the athlete and to
+  /// history — see `packages/docs/architecture.md`'s progression section
+  /// for why this is never fed into automatic load suggestions.
+  final double? rpe;
 
   bool get isSynced => serverId != null;
 
@@ -65,6 +74,7 @@ class LoggedSet {
       distanceMeters: distanceMeters,
       isWarmup: isWarmup,
       completedAt: completedAt,
+      rpe: rpe,
     );
   }
 
@@ -80,6 +90,7 @@ class LoggedSet {
     'distanceMeters': distanceMeters,
     'isWarmup': isWarmup,
     'completedAt': completedAt.toIso8601String(),
+    'rpe': rpe,
   };
 
   factory LoggedSet.fromCacheJson(Map<String, dynamic> json) {
@@ -95,6 +106,7 @@ class LoggedSet {
       distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
       isWarmup: json['isWarmup'] as bool? ?? false,
       completedAt: DateTime.parse(json['completedAt'] as String),
+      rpe: (json['rpe'] as num?)?.toDouble(),
     );
   }
 
@@ -112,6 +124,7 @@ class LoggedSet {
       distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
       isWarmup: json['isWarmup'] as bool? ?? false,
       completedAt: DateTime.parse(json['completedAt'] as String),
+      rpe: (json['rpe'] as num?)?.toDouble(),
     );
   }
 }
@@ -140,6 +153,8 @@ class WorkoutSessionState {
     this.completedAt,
     this.syncStatus = SessionSyncStatus.pending,
     this.syncError,
+    this.difficultyRating,
+    this.substitutions = const [],
   });
 
   final String localId;
@@ -156,10 +171,29 @@ class WorkoutSessionState {
   final List<LoggedSet> sets;
   final SessionSyncStatus syncStatus;
   final String? syncError;
+  final List<ExerciseSubstitution> substitutions;
+
+  /// Optional 1–10 "how hard did the whole session feel" rating, captured
+  /// once at finish time. Stored here (not just passed straight through to
+  /// the finish call) so a finish that happens offline still replays with
+  /// the rating attached once sync succeeds.
+  final int? difficultyRating;
 
   bool get isActive =>
       status == WorkoutSessionStatus.inProgress ||
       status == WorkoutSessionStatus.paused;
+
+  /// The exercise a *new* set for [exerciseId] should actually be logged
+  /// against — the active substitution's target if one exists, otherwise
+  /// [exerciseId] unchanged. Mirrors the backend's own redirect lookup in
+  /// `WorkoutSessionsService.logSet`, so the two stay in agreement even if
+  /// this substitution hasn't synced yet.
+  ExerciseSubstitution? activeSubstitutionFor(String exerciseId) {
+    for (final substitution in substitutions.reversed) {
+      if (substitution.originalExerciseId == exerciseId) return substitution;
+    }
+    return null;
+  }
 
   /// Live elapsed active seconds, accounting for time since the last
   /// resume when currently in progress.
@@ -180,6 +214,8 @@ class WorkoutSessionState {
     List<LoggedSet>? sets,
     SessionSyncStatus? syncStatus,
     Object? syncError = _unset,
+    Object? difficultyRating = _unset,
+    List<ExerciseSubstitution>? substitutions,
   }) {
     return WorkoutSessionState(
       localId: localId,
@@ -199,6 +235,10 @@ class WorkoutSessionState {
       sets: sets ?? this.sets,
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: syncError == _unset ? this.syncError : syncError as String?,
+      difficultyRating: difficultyRating == _unset
+          ? this.difficultyRating
+          : difficultyRating as int?,
+      substitutions: substitutions ?? this.substitutions,
     );
   }
 
@@ -217,6 +257,8 @@ class WorkoutSessionState {
     'sets': sets.map((s) => s.toCacheJson()).toList(),
     'syncStatus': syncStatus.name,
     'syncError': syncError,
+    'difficultyRating': difficultyRating,
+    'substitutions': substitutions.map((s) => s.toCacheJson()).toList(),
   };
 
   factory WorkoutSessionState.fromCacheJson(Map<String, dynamic> json) {
@@ -238,6 +280,12 @@ class WorkoutSessionState {
       activeDurationSeconds: json['activeDurationSeconds'] as int,
       sets: (json['sets'] as List<dynamic>? ?? [])
           .map((s) => LoggedSet.fromCacheJson(s as Map<String, dynamic>))
+          .toList(),
+      difficultyRating: json['difficultyRating'] as int?,
+      substitutions: (json['substitutions'] as List<dynamic>? ?? [])
+          .map(
+            (s) => ExerciseSubstitution.fromCacheJson(s as Map<String, dynamic>),
+          )
           .toList(),
       syncStatus: SessionSyncStatus.values.firstWhere(
         (s) => s.name == json['syncStatus'],

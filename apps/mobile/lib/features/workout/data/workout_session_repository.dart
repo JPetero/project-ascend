@@ -12,11 +12,17 @@ class WorkoutSessionRepository {
 
   final ApiClient _apiClient;
 
-  Future<Map<String, dynamic>> start({String? workoutPlanId}) async {
+  Future<Map<String, dynamic>> start({
+    String? workoutPlanId,
+    String? idempotencyKey,
+  }) async {
     final envelope = await _apiClient.post(
       '/workout-sessions',
       (data) => data as Map<String, dynamic>,
-      data: {'workoutPlanId': ?workoutPlanId},
+      data: {
+        'workoutPlanId': ?workoutPlanId,
+        'idempotencyKey': ?idempotencyKey,
+      },
     );
     return envelope.data!;
   }
@@ -46,10 +52,11 @@ class WorkoutSessionRepository {
   }
 
   Future<(Map<String, dynamic> session, List<PersonalRecord> newRecords)>
-  finish(String sessionId) async {
+  finish(String sessionId, {int? difficultyRating}) async {
     final envelope = await _apiClient.post(
       '/workout-sessions/$sessionId/finish',
       (data) => data as Map<String, dynamic>,
+      data: {'difficultyRating': ?difficultyRating},
     );
     final body = envelope.data!;
     final records = (body['newPersonalRecords'] as List<dynamic>? ?? [])
@@ -66,7 +73,11 @@ class WorkoutSessionRepository {
     return envelope.data!;
   }
 
-  Future<Map<String, dynamic>> logSet(String sessionId, LoggedSet set) async {
+  Future<Map<String, dynamic>> logSet(
+    String sessionId,
+    LoggedSet set, {
+    String? idempotencyKey,
+  }) async {
     final envelope = await _apiClient.post(
       '/workout-sessions/$sessionId/sets',
       (data) => data as Map<String, dynamic>,
@@ -77,6 +88,30 @@ class WorkoutSessionRepository {
         if (set.durationSeconds != null) 'durationSeconds': set.durationSeconds,
         if (set.distanceMeters != null) 'distanceMeters': set.distanceMeters,
         'isWarmup': set.isWarmup,
+        'rpe': ?set.rpe,
+        'idempotencyKey': ?idempotencyKey,
+      },
+    );
+    return envelope.data!;
+  }
+
+  /// Applies an exercise substitution for the remainder of an active or
+  /// paused session — already-completed sets under the original exercise
+  /// are untouched (enforced server-side, see
+  /// `WorkoutSessionsService.substituteExercise`).
+  Future<Map<String, dynamic>> substituteExercise(
+    String sessionId, {
+    required String originalExerciseId,
+    required String substituteExerciseId,
+    String? idempotencyKey,
+  }) async {
+    final envelope = await _apiClient.post(
+      '/workout-sessions/$sessionId/substitutions',
+      (data) => data as Map<String, dynamic>,
+      data: {
+        'originalExerciseId': originalExerciseId,
+        'substituteExerciseId': substituteExerciseId,
+        'idempotencyKey': ?idempotencyKey,
       },
     );
     return envelope.data!;

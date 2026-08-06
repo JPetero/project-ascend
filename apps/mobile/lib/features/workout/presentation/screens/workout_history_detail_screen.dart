@@ -71,6 +71,27 @@ class _DetailBody extends StatelessWidget {
             ),
           ],
         ),
+        if (detail.difficultyRating != null) ...[
+          const SizedBox(height: AscendSpacing.md),
+          AscendMetricCard(
+            label: 'Session effort (RPE)',
+            value: '${detail.difficultyRating}/10',
+            icon: Icons.speed_outlined,
+          ),
+        ],
+        if (detail.substitutions.isNotEmpty) ...[
+          const SizedBox(height: AscendSpacing.lg),
+          Text('Substitutions', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AscendSpacing.sm),
+          for (final substitution in detail.substitutions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AscendSpacing.xs),
+              child: Text(
+                '${substitution.originalExercise.name} → ${substitution.substituteExercise.name}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+        ],
         const SizedBox(height: AscendSpacing.lg),
         for (final exerciseName in byExercise.keys) ...[
           Text(exerciseName, style: theme.textTheme.titleMedium),
@@ -95,6 +116,7 @@ class _DetailBody extends StatelessWidget {
     if (set.reps != null) parts.add('${set.reps} reps');
     if (set.durationSeconds != null) parts.add('${set.durationSeconds}s');
     if (set.distanceMeters != null) parts.add('${set.distanceMeters}m');
+    if (set.rpe != null) parts.add('RPE ${set.rpe}');
     return parts.join(' × ');
   }
 

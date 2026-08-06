@@ -1,5 +1,43 @@
 enum ExerciseDifficulty { beginner, intermediate, advanced }
 
+enum MeasurementType { repsWeight, bodyweight, duration, repsOnly, distanceDuration }
+
+MeasurementType measurementTypeFromJson(String value) =>
+    MeasurementType.values.firstWhere(
+      (e) => _measurementTypeToJson(e) == value,
+      orElse: () => MeasurementType.repsWeight,
+    );
+
+String _measurementTypeToJson(MeasurementType type) {
+  switch (type) {
+    case MeasurementType.repsWeight:
+      return 'REPS_WEIGHT';
+    case MeasurementType.bodyweight:
+      return 'BODYWEIGHT';
+    case MeasurementType.duration:
+      return 'DURATION';
+    case MeasurementType.repsOnly:
+      return 'REPS_ONLY';
+    case MeasurementType.distanceDuration:
+      return 'DISTANCE_DURATION';
+  }
+}
+
+String measurementTypeLabel(MeasurementType type) {
+  switch (type) {
+    case MeasurementType.repsWeight:
+      return 'Reps & weight';
+    case MeasurementType.bodyweight:
+      return 'Bodyweight reps';
+    case MeasurementType.duration:
+      return 'Duration';
+    case MeasurementType.repsOnly:
+      return 'Reps';
+    case MeasurementType.distanceDuration:
+      return 'Distance & duration';
+  }
+}
+
 ExerciseDifficulty exerciseDifficultyFromJson(String value) =>
     ExerciseDifficulty.values.firstWhere(
       (e) => e.name.toUpperCase() == value,
@@ -121,6 +159,7 @@ class Exercise {
     required this.secondaryMuscles,
     required this.equipment,
     required this.alternatives,
+    required this.measurementType,
     this.imageUrl,
     this.videoUrl,
   });
@@ -140,6 +179,7 @@ class Exercise {
   final List<MuscleGroup> secondaryMuscles;
   final List<EquipmentType> equipment;
   final List<ExerciseSummary> alternatives;
+  final MeasurementType measurementType;
 
   factory Exercise.fromJson(Map<String, dynamic> json) {
     return Exercise(
@@ -151,6 +191,9 @@ class Exercise {
       instructions: json['instructions'] as String,
       safetyTips: json['safetyTips'] as String,
       commonMistakes: json['commonMistakes'] as String,
+      measurementType: measurementTypeFromJson(
+        json['measurementType'] as String? ?? 'REPS_WEIGHT',
+      ),
       imageUrl: json['imageUrl'] as String?,
       videoUrl: json['videoUrl'] as String?,
       category: ExerciseCategory.fromJson(

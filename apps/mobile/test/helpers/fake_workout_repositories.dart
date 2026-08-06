@@ -121,8 +121,13 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   final List<Map<String, dynamic>> loggedSets = [];
   List<PersonalRecord> nextPersonalRecords = const [];
 
+  final List<Map<String, dynamic>> appliedSubstitutions = [];
+
   @override
-  Future<Map<String, dynamic>> start({String? workoutPlanId}) async {
+  Future<Map<String, dynamic>> start({
+    String? workoutPlanId,
+    String? idempotencyKey,
+  }) async {
     if (failNetwork) throw AppException.network();
     final id = 'server-session-${_idCounter++}';
     startedSessionIds.add(id);
@@ -146,7 +151,7 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
 
   @override
   Future<(Map<String, dynamic> session, List<PersonalRecord> newRecords)>
-  finish(String sessionId) async {
+  finish(String sessionId, {int? difficultyRating}) async {
     if (failNetwork) throw AppException.network();
     return ({'id': sessionId}, nextPersonalRecords);
   }
@@ -158,13 +163,35 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> logSet(String sessionId, LoggedSet set) async {
+  Future<Map<String, dynamic>> logSet(
+    String sessionId,
+    LoggedSet set, {
+    String? idempotencyKey,
+  }) async {
     if (failNetwork) throw AppException.network();
     final id = 'server-set-${_idCounter++}';
     loggedSets.add({
       'id': id,
       'sessionId': sessionId,
       'exerciseId': set.exerciseId,
+    });
+    return {'id': id};
+  }
+
+  @override
+  Future<Map<String, dynamic>> substituteExercise(
+    String sessionId, {
+    required String originalExerciseId,
+    required String substituteExerciseId,
+    String? idempotencyKey,
+  }) async {
+    if (failNetwork) throw AppException.network();
+    final id = 'server-substitution-${_idCounter++}';
+    appliedSubstitutions.add({
+      'id': id,
+      'sessionId': sessionId,
+      'originalExerciseId': originalExerciseId,
+      'substituteExerciseId': substituteExerciseId,
     });
     return {'id': id};
   }

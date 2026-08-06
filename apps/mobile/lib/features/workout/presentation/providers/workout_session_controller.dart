@@ -1,19 +1,21 @@
-import 'dart:math';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/providers/core_providers.dart';
 import '../../../../core/storage/app_database.dart';
+import '../../../../core/sync/idempotency_key.dart';
+import '../../../../core/sync/sync_engine.dart';
+import '../../../../core/sync/sync_handler.dart';
+import '../../../../core/sync/sync_providers.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/workout_session_repository.dart';
+import '../../domain/exercise_substitution.dart';
 import '../../domain/personal_record.dart';
 import '../../domain/workout_session.dart';
 
-final _random = Random();
+String _generateLocalId() => generateIdempotencyKey('local');
 
-String _generateLocalId() =>
-    'local-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 32)}';
+const _substitutionEntityType = 'workout.substitution';
 
 class WorkoutFinishResult {
   const WorkoutFinishResult({
@@ -39,16 +41,34 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
   WorkoutSessionController({
     required WorkoutSessionRepository repository,
     required AppDatabase database,
+    required SyncEngine syncEngine,
     required String userId,
   }) : _repository = repository,
        _database = database,
+       _syncEngine = syncEngine,
        _userId = userId,
        super(null) {
+    _syncEngine.registerHandler(
+      _substitutionEntityType,
+      FunctionSyncHandler(({required payload, required idempotencyKey}) async {
+        final result = await _repository.substituteExercise(
+          payload['sessionId'] as String,
+          originalExerciseId: payload['originalExerciseId'] as String,
+          substituteExerciseId: payload['substituteExerciseId'] as String,
+          idempotencyKey: idempotencyKey,
+        );
+        return SyncHandlerResult(
+          entityId: result['id'] as String?,
+          response: result,
+        );
+      }),
+    );
     _restore();
   }
 
   final WorkoutSessionRepository _repository;
   final AppDatabase _database;
+  final SyncEngine _syncEngine;
   final String _userId;
 
   Future<void> _restore() async {
@@ -97,6 +117,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     try {
       final serverSession = await _repository.start(
         workoutPlanId: workoutPlanId,
+        idempotencyKey: session.localId,
       );
       session = session.copyWith(
         serverId: serverSession['id'] as String,
@@ -110,6 +131,51 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     await _persist(session);
   }
 
+  /// Applies an exercise substitution for the remainder of the session.
+  /// Already-logged sets under [originalExerciseId] are untouched — only
+  /// [logSet] calls made *after* this resolve to [substituteExerciseId].
+  /// Local-first like every other mutation here: the swap is visible in the
+  /// player immediately, and syncs via the generic [SyncEngine] (when the
+  /// session already has a server id) or the next full [_sync] pass
+  /// (when it doesn't yet — e.g. a session started fully offline).
+  Future<void> substituteExercise({
+    required String originalExerciseId,
+    required String originalExerciseName,
+    required String substituteExerciseId,
+    required String substituteExerciseName,
+  }) async {
+    final current = state;
+    if (current == null || !current.isActive) {
+      throw AppException(message: 'There is no active workout to modify.');
+    }
+
+    final substitution = ExerciseSubstitution(
+      localId: generateIdempotencyKey('sub'),
+      originalExerciseId: originalExerciseId,
+      originalExerciseName: originalExerciseName,
+      substituteExerciseId: substituteExerciseId,
+      substituteExerciseName: substituteExerciseName,
+    );
+
+    final session = current.copyWith(
+      substitutions: [...current.substitutions, substitution],
+    );
+    await _persist(session);
+
+    if (session.serverId == null) return;
+
+    await _syncEngine.enqueue(
+      idempotencyKey: substitution.localId,
+      entityType: _substitutionEntityType,
+      operationType: 'CREATE',
+      payload: {
+        'sessionId': session.serverId,
+        'originalExerciseId': originalExerciseId,
+        'substituteExerciseId': substituteExerciseId,
+      },
+    );
+  }
+
   Future<void> logSet({
     required String exerciseId,
     required String exerciseName,
@@ -118,18 +184,25 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     int? durationSeconds,
     double? distanceMeters,
     bool isWarmup = false,
+    double? rpe,
   }) async {
     final current = state;
     if (current == null || current.status != WorkoutSessionStatus.inProgress) {
       throw AppException(message: 'Resume your workout before logging a set.');
     }
 
+    final substitution = current.activeSubstitutionFor(exerciseId);
+    final effectiveExerciseId = substitution?.substituteExerciseId ?? exerciseId;
+    final effectiveExerciseName =
+        substitution?.substituteExerciseName ?? exerciseName;
+
     final setNumber =
-        current.sets.where((s) => s.exerciseId == exerciseId).length + 1;
+        current.sets.where((s) => s.exerciseId == effectiveExerciseId).length +
+        1;
     var set = LoggedSet(
       localId: _generateLocalId(),
-      exerciseId: exerciseId,
-      exerciseName: exerciseName,
+      exerciseId: effectiveExerciseId,
+      exerciseName: effectiveExerciseName,
       setNumber: setNumber,
       reps: reps,
       weightKg: weightKg,
@@ -137,6 +210,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       distanceMeters: distanceMeters,
       isWarmup: isWarmup,
       completedAt: DateTime.now(),
+      rpe: rpe,
     );
 
     var session = current.copyWith(sets: [...current.sets, set]);
@@ -145,7 +219,11 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     if (session.serverId == null) return;
 
     try {
-      final serverSet = await _repository.logSet(session.serverId!, set);
+      final serverSet = await _repository.logSet(
+        session.serverId!,
+        set,
+        idempotencyKey: set.localId,
+      );
       set = set.copyWith(serverId: serverSet['id'] as String);
       session = session.copyWith(
         sets: session.sets
@@ -205,7 +283,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     }
   }
 
-  Future<WorkoutFinishResult> finish() async {
+  Future<WorkoutFinishResult> finish({int? difficultyRating}) async {
     final current = state;
     if (current == null || !current.isActive) {
       throw AppException(message: 'There is no active workout to finish.');
@@ -220,6 +298,7 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       completedAt: now,
       activeDurationSeconds:
           current.activeDurationSeconds + (additional < 0 ? 0 : additional),
+      difficultyRating: difficultyRating,
     );
     await _persist(finished);
 
@@ -262,9 +341,36 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
       if (working.serverId == null) {
         final serverSession = await _repository.start(
           workoutPlanId: working.workoutPlanId,
+          idempotencyKey: working.localId,
         );
         working = working.copyWith(serverId: serverSession['id'] as String);
       }
+
+      // Substitutions before sets: cosmetically keeps the history record's
+      // ordering matching what actually happened, though correctness
+      // doesn't depend on it — each set already carries its own resolved
+      // exercise id from the moment it was logged (see `logSet`).
+      final syncedSubstitutions = <ExerciseSubstitution>[];
+      for (final substitution in working.substitutions) {
+        if (substitution.isSynced) {
+          syncedSubstitutions.add(substitution);
+          continue;
+        }
+        // Reuses the same idempotency key regardless of whether the
+        // generic SyncEngine already delivered this substitution
+        // successfully elsewhere — the backend just replays the same
+        // result, so a redundant call here is safe, not a duplicate.
+        final serverSubstitution = await _repository.substituteExercise(
+          working.serverId!,
+          originalExerciseId: substitution.originalExerciseId,
+          substituteExerciseId: substitution.substituteExerciseId,
+          idempotencyKey: substitution.localId,
+        );
+        syncedSubstitutions.add(
+          substitution.copyWith(serverId: serverSubstitution['id'] as String),
+        );
+      }
+      working = working.copyWith(substitutions: syncedSubstitutions);
 
       final syncedSets = <LoggedSet>[];
       for (final set in working.sets) {
@@ -272,14 +378,21 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
           syncedSets.add(set);
           continue;
         }
-        final serverSet = await _repository.logSet(working.serverId!, set);
+        final serverSet = await _repository.logSet(
+          working.serverId!,
+          set,
+          idempotencyKey: set.localId,
+        );
         syncedSets.add(set.copyWith(serverId: serverSet['id'] as String));
       }
       working = working.copyWith(sets: syncedSets);
 
       List<PersonalRecord> newRecords = const [];
       if (andFinish) {
-        final (_, records) = await _repository.finish(working.serverId!);
+        final (_, records) = await _repository.finish(
+          working.serverId!,
+          difficultyRating: working.difficultyRating,
+        );
         newRecords = records;
       }
 
@@ -325,6 +438,7 @@ final workoutSessionControllerProvider =
       return WorkoutSessionController(
         repository: ref.watch(workoutSessionRepositoryProvider),
         database: ref.watch(appDatabaseProvider),
+        syncEngine: ref.watch(syncEngineProvider),
         userId: userId ?? '',
       );
     });
