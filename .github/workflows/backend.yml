@@ -70,6 +70,9 @@ jobs:
       - name: Apply migrations against Postgres
         run: pnpm --filter @project-ascend/api prisma:deploy
 
+      - name: Seed the exercise/workout catalog
+        run: pnpm --filter @project-ascend/api prisma:seed
+
       - name: Lint
         run: pnpm --filter @project-ascend/api lint
 
