@@ -7,15 +7,21 @@ catalog, workout browsing, user-owned workout plans, a full session lifecycle (s
 resume/finish/abandon) with offline-first set logging, deterministic progression suggestions, and
 automatic personal-record detection — see [architecture.md](architecture.md#workout-engine-sprint-2)
 for how it's built and [synchronization strategy](architecture.md#offline-and-synchronization-strategy)
-for how offline logging syncs. The modules below are the next layers to build on top of that
-foundation, roughly in the order they unlock the most further work.
+for how offline logging syncs. Build Session 3 delivered the five-tab navigation (Workout, Meal
+Prep, Social, Assistant, Leaderboards), a Dashboard rebuilt on real data only, and a Meal Prep
+vertical slice (food search, custom foods, per-meal logging, water tracking) — see
+[build-session-3.md](build-session-3.md) and
+[packages/docs/product/parking-lot.md](product/parking-lot.md) for what's still open in each
+area. The product documents in [packages/docs/product/](product/) are now the authoritative
+source for what ships next and why — this file is kept for the pre-Session-3 modules that predate
+them.
 
-## 1. Nutrition tracking
+## 1. Nutrition tracking — foundation shipped in Build Session 3
 
-Meal logging (the "Log a meal" quick action already exists as a companion entry point, routing to
-Home today) backed by a real food/nutrition data source, macro targets tied to the user's
-`primaryGoal`, and the protein/hydration progress rings on the dashboard switching from sample
-data to real logged data.
+Meal logging, custom foods, and water tracking are live (see `build-session-3.md`). Still open,
+tracked in `packages/docs/product/parking-lot.md`: offline queueing for nutrition writes (online-
+first today; the Workout Engine's outbox is the template), saved meals/meal plans, and
+deterministic (not AI-generated) meal recommendation cards.
 
 ## 2. Real wearable adapters
 
@@ -34,12 +40,16 @@ client — that would leak API keys), conversation memory tied to the `aiMemoryE
 that already exists, and the same safety/no-diagnosis constraints from the product identity
 section enforced server-side, not just in prompt copy.
 
-## 4. Community
+## 4. Social
 
-Replace the sample-data-only `CommunityScreen` with real posting, following, and a moderation
-story. Privacy-by-default (already the stated principle) needs to extend to: who can see a post,
-whether workout data attached to a post is shareable-safe (reusing the hide-weight/measurements/
-location pattern from `AscendShareService`), and a reporting/moderation queue.
+`SocialScreen` (the fifth tab set now renamed from Community, per
+`packages/docs/product/design-bible.md`) is an honest coming-soon state — no simulated posts or
+activity, replacing the old `CommunityScreen`'s sample-data content. This module replaces it with
+real posting, following, and a moderation story. Privacy-by-default (already the stated
+principle) needs to extend to: who can see a post, whether workout data attached to a post is
+shareable-safe (reusing the hide-weight/measurements/location pattern from
+`AscendShareService`), and a reporting/moderation queue. Leaderboards (a separate tab) needs the
+same real-data-only treatment before it can replace its own honest coming-soon state.
 
 ## 5. Subscription
 

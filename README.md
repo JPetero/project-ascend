@@ -422,3 +422,42 @@ section).
 **Docker**: same unavailable-in-this-sandbox situation as P0 and the prior audits; no new Docker
 verification was needed for P1 since `infrastructure/docker/api.Dockerfile` and
 `docker-compose.yml` weren't touched this pass.
+
+## Build Session 3 (Product Alignment and Nutrition) — Verified Build Results
+
+Five-tab navigation migration (Workout, Meal Prep, Social, Assistant, Leaderboards) with a
+pushed (non-tab) Dashboard, a Dashboard rebuilt on real data only (no more fabricated steps/
+sleep/recovery), backend architecture for Terms acceptance / multi-provider auth identities /
+coaching style / deload recommendations, a centralized free-premium capability model, and a
+Meal Prep vertical slice (food search, custom foods, per-meal logging, water tracking) on top of
+the existing Nutrition backend. Full log, including the honest "not done this session" list, in
+[`packages/docs/build-session-3.md`](packages/docs/build-session-3.md).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Install | `pnpm install --frozen-lockfile` | PASSED |
+| Schema format/validate | `npx prisma format` / `npx prisma validate` | PASSED |
+| Migration created and applied | `20260806113251_product_alignment_scenarios` (adds `Preference.coachingStyle`/`toneIntensity`, `AuthIdentity`, `LegalDocument`/`LegalAcceptance`, `DeloadRecommendation`, plus a backfill of every existing user to an `EMAIL` `AuthIdentity` row) | PASSED — verified against both a fresh database and a throwaway database seeded with legacy-shaped rows (see `build-session-3.md`) |
+| Seed idempotency | `pnpm prisma:seed` run twice | PASSED — `26 foods`, `2 legal documents`, identical both runs |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 115/115 tests** (up from 78; new `auth-identities`, `legal`, `deload`, `entitlements` suites plus a `calculateConsecutiveActiveWeeks` addition to `progress.util`) |
+| Build | `pnpm api:build` | PASSED |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 49/49 tests** (unchanged — no e2e regressions from this session's additive-only changes) |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Dependencies | `flutter pub get` | PASSED |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 104/104 tests** (up from 57; new `bmi_test`, `progress_util_test`, `workout_calendar_test`, `workout_summary_screen_test`, `capability_test`, and the `features/nutrition/` suite; `home_dashboard_test.dart` removed along with the screen it tested) |
+
+**What changed**: see `build-session-3.md` for the full breakdown — navigation/dashboard
+rebuild, Scenario 1/3/6/10 backend architecture, the free/premium capability model, and the Meal
+Prep tab.
+
+**Docker**: unavailable in this sandbox (`docker ps` — no daemon). Not exercised this session;
+`docker-compose.yml` was not modified.
