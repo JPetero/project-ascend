@@ -277,3 +277,18 @@ Flutter feature" for Nutrition). Since no Flutter work happened this session, us
 message here would overstate what's actually done. This session's backend work is committed under
 an accurate, descriptive message instead; the two milestone messages are deferred to whichever
 session actually completes the corresponding Flutter work, so they mean what they say when used.
+
+## Git commits and push results
+
+- Commit `470499d` on `claude/p1-p2-autonomous`: "Complete Workout Engine P1 backend gaps and
+  add Nutrition Tracking backend foundation" (49 files changed, 3983 insertions, 81 deletions).
+- No divergence found between local and remote `main` at merge time
+  (`git log origin/main..main` and `git log main..origin/main` both empty) -- nothing else to
+  integrate.
+- Merged `claude/p1-p2-autonomous` into local `main` with a normal non-destructive merge commit
+  `e168666`. Full lint/unit/e2e suite re-run against the merged `main` and confirmed green before
+  pushing (30/30 unit, 49/49 e2e).
+- Pushed `claude/p1-p2-autonomous` -> `origin/claude/p1-p2-autonomous` (new branch).
+- Pushed `main` -> `origin/main` (fast-forward, `0e45e27..e168666`).
+
+No PR opened -- not requested this session.
