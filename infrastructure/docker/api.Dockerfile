@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile
 COPY services/api services/api
 RUN pnpm --filter @project-ascend/api prisma:generate
 RUN pnpm --filter @project-ascend/api build
-RUN pnpm --filter @project-ascend/api deploy --prod --legacy /workspace/out
+RUN pnpm --filter @project-ascend/api deploy --prod /workspace/out
 
 # `pnpm deploy` re-resolves node_modules from scratch in the target
 # directory, which drops the already-generated Prisma client (`.prisma/client`
