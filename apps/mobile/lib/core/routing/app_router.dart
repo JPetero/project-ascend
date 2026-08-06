@@ -10,6 +10,9 @@ import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
+import '../../features/nutrition/domain/meal_type.dart';
+import '../../features/nutrition/presentation/screens/custom_food_editor_screen.dart';
+import '../../features/nutrition/presentation/screens/food_search_screen.dart';
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
@@ -119,6 +122,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.dashboard,
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.foodSearch,
+        builder: (context, state) =>
+            FoodSearchScreen(mealType: state.extra! as MealType),
+      ),
+      GoRoute(
+        path: RoutePaths.customFoodEditorNew,
+        builder: (context, state) => const CustomFoodEditorScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

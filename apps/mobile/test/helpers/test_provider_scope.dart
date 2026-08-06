@@ -5,7 +5,10 @@ import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
+import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
+import 'package:mobile/features/nutrition/presentation/providers/meal_entry_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/nutrition_summary_controller.dart';
+import 'package:mobile/features/nutrition/presentation/providers/water_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
@@ -38,6 +41,9 @@ Future<ProviderContainer> createTestContainer({
   FakeWorkoutSessionRepository? workoutSessionRepository,
   FakeWorkoutHistoryRepository? workoutHistoryRepository,
   FakeNutritionSummaryRepository? nutritionSummaryRepository,
+  FakeFoodRepository? foodRepository,
+  FakeMealEntryRepository? mealEntryRepository,
+  FakeWaterRepository? waterRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -95,6 +101,15 @@ Future<ProviderContainer> createTestContainer({
       ),
       authIdentityRepositoryProvider.overrideWithValue(
         FakeAuthIdentityRepository(),
+      ),
+      foodRepositoryProvider.overrideWithValue(
+        foodRepository ?? FakeFoodRepository(),
+      ),
+      mealEntryRepositoryProvider.overrideWithValue(
+        mealEntryRepository ?? FakeMealEntryRepository(),
+      ),
+      waterRepositoryProvider.overrideWithValue(
+        waterRepository ?? FakeWaterRepository(),
       ),
     ],
   );

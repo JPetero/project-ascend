@@ -131,6 +131,14 @@ class ApiClient {
     return _request(() => _dio.patch(path, data: data), fromData);
   }
 
+  Future<ResponseEnvelope<T>> put<T>(
+    String path,
+    T Function(dynamic) fromData, {
+    Object? data,
+  }) {
+    return _request(() => _dio.put(path, data: data), fromData);
+  }
+
   Future<ResponseEnvelope<T>> delete<T>(
     String path,
     T Function(dynamic) fromData,
