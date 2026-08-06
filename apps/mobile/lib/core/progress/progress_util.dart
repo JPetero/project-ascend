@@ -16,3 +16,16 @@ double calculateCompletionPercentage(num completed, num target) {
   final clamped = percentage.clamp(0, 100);
   return (clamped * 10).round() / 10;
 }
+
+/// True when [date] falls in the same Sunday-start week as [now] (defaults
+/// to the current time) — the shared definition behind "this week's planned
+/// sessions completed" wherever that's shown (dashboard, workout summary).
+bool isThisWeek(DateTime date, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  final startOfWeek = DateTime(
+    today.year,
+    today.month,
+    today.day,
+  ).subtract(Duration(days: today.weekday % 7));
+  return !date.isBefore(startOfWeek);
+}

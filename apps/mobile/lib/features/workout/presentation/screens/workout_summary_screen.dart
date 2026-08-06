@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/progress/progress_util.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../profile/presentation/providers/profile_controller.dart';
 import '../../domain/personal_record.dart';
+import '../providers/workout_history_controller.dart';
 import '../providers/workout_session_controller.dart';
 
 class WorkoutSummaryScreen extends ConsumerStatefulWidget {
@@ -62,6 +65,8 @@ class _WorkoutSummaryScreenState extends ConsumerState<WorkoutSummaryScreen> {
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: AscendSpacing.lg),
+            const _WeeklyProgressRing(),
             const SizedBox(height: AscendSpacing.lg),
             if (!_result.synced)
               _SyncBanner(isRetrying: _isRetrying, onRetry: _retry),
@@ -135,6 +140,34 @@ class _WorkoutSummaryScreenState extends ConsumerState<WorkoutSummaryScreen> {
                 ),
             ],
             const SizedBox(height: AscendSpacing.lg),
+            AscendCard(
+              onTap: () => context.go(RoutePaths.mealPrep),
+              child: const Row(
+                children: [
+                  Icon(Icons.restaurant_outlined),
+                  SizedBox(width: AscendSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Keep going in Meal Prep'),
+                        Text(
+                          'Log today\'s meals to see your full daily picture.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded),
+                ],
+              ),
+            ),
+            const SizedBox(height: AscendSpacing.md),
+            AscendSecondaryButton(
+              label: 'View my progress',
+              onPressed: () => context.push(RoutePaths.dashboard),
+            ),
+            const SizedBox(height: AscendSpacing.sm),
             AscendPrimaryButton(
               label: 'Done',
               onPressed: () => context.go(RoutePaths.workout),
@@ -149,6 +182,58 @@ class _WorkoutSummaryScreenState extends ConsumerState<WorkoutSummaryScreen> {
     final minutes = totalSeconds ~/ 60;
     final seconds = totalSeconds % 60;
     return minutes > 0 ? '${minutes}m ${seconds}s' : '${seconds}s';
+  }
+}
+
+/// Weekly planned-session completion — the same definition and data source
+/// as the Dashboard's progress ring (see packages/docs/product/
+/// user-scenario-bible.md Scenario 9: never a vague or blended percentage).
+class _WeeklyProgressRing extends ConsumerWidget {
+  const _WeeklyProgressRing();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(workoutHistoryListProvider);
+    final workoutSchedule = ref.watch(
+      profileControllerProvider.select((s) => s.asData?.value?.workoutSchedule),
+    );
+
+    return historyAsync.when(
+      data: (entries) {
+        final completedDates = entries
+            .map((e) => e.completedAt)
+            .whereType<DateTime>()
+            .toList();
+        final plannedThisWeek = workoutSchedule?.daysOfWeek.length ?? 0;
+        final completedThisWeek = completedDates.where(isThisWeek).length;
+        final weeklyPercentage = calculateCompletionPercentage(
+          completedThisWeek,
+          plannedThisWeek,
+        );
+
+        return Center(
+          child: Column(
+            children: [
+              AscendProgressRing(
+                progress: weeklyPercentage / 100,
+                label: 'this week',
+                semanticLabel:
+                    'This week: $completedThisWeek of $plannedThisWeek planned sessions completed',
+              ),
+              const SizedBox(height: AscendSpacing.xs),
+              Text(
+                plannedThisWeek > 0
+                    ? '$completedThisWeek of $plannedThisWeek planned sessions this week'
+                    : 'Set a training schedule to track weekly completion.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+    );
   }
 }
 

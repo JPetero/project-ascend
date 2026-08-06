@@ -411,7 +411,7 @@ class _ProgressSection extends StatelessWidget {
         .toList();
     final streakDays = computeWorkoutStreak(completedDates);
     final plannedThisWeek = workoutSchedule?.daysOfWeek.length ?? 0;
-    final completedThisWeek = completedDates.where(_isThisWeek).length;
+    final completedThisWeek = completedDates.where(isThisWeek).length;
     final weeklyPercentage = calculateCompletionPercentage(
       completedThisWeek,
       plannedThisWeek,
@@ -427,7 +427,7 @@ class _ProgressSection extends StatelessWidget {
             children: [
               AscendProgressRing(
                 progress: weeklyPercentage / 100,
-                label: '${weeklyPercentage.round()}%',
+                label: 'this week',
                 size: 72,
               ),
               const SizedBox(width: AscendSpacing.md),
@@ -481,16 +481,6 @@ class _ProgressSection extends StatelessWidget {
         _WorkoutCalendar(workoutDays: workoutDaysFrom(completedDates)),
       ],
     );
-  }
-
-  bool _isThisWeek(DateTime date) {
-    final now = DateTime.now();
-    final startOfWeek = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: now.weekday % 7));
-    return !date.isBefore(startOfWeek);
   }
 }
 
