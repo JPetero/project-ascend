@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Project Ascend monorepo root",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "api:dev": "pnpm --filter @project-ascend/api start:dev",
     "api:build": "pnpm --filter @project-ascend/api build",
