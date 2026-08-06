@@ -12,6 +12,8 @@ import '../../../profile/presentation/providers/profile_controller.dart';
 import '../../../workout/domain/personal_record.dart';
 import '../../../workout/domain/workout_history_entry.dart';
 import '../../../workout/domain/workout_session.dart';
+import '../../../nutrition/domain/nutrition_dashboard_summary.dart';
+import '../../../nutrition/presentation/providers/nutrition_summary_controller.dart';
 import '../../../workout/presentation/providers/personal_record_controller.dart';
 import '../../../workout/presentation/providers/workout_history_controller.dart';
 import '../../../workout/presentation/providers/workout_session_controller.dart';
@@ -48,6 +50,7 @@ class HomeDashboardScreen extends ConsumerWidget {
     final activeSession = ref.watch(workoutSessionControllerProvider);
     final historyAsync = ref.watch(workoutHistoryListProvider);
     final recordsAsync = ref.watch(personalRecordsProvider);
+    final nutritionAsync = ref.watch(nutritionDashboardSummaryProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -56,6 +59,7 @@ class HomeDashboardScreen extends ConsumerWidget {
             ref.refresh(dashboardFutureProvider.future),
             ref.refresh(workoutHistoryListProvider.future),
             ref.refresh(personalRecordsProvider.future),
+            ref.refresh(nutritionDashboardSummaryProvider.future),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
@@ -102,6 +106,7 @@ class HomeDashboardScreen extends ConsumerWidget {
                           .toList(),
                     ),
                     recentRecord: _mostRecentRecord(recordsAsync.value),
+                    nutritionAsync: nutritionAsync,
                   );
                 },
                 loading: () => const Padding(
@@ -260,11 +265,13 @@ class _DashboardContent extends StatelessWidget {
     required this.fixture,
     required this.streakDays,
     required this.recentRecord,
+    required this.nutritionAsync,
   });
 
   final DashboardFixture fixture;
   final int streakDays;
   final PersonalRecord? recentRecord;
+  final AsyncValue<NutritionDashboardSummary> nutritionAsync;
 
   @override
   Widget build(BuildContext context) {
@@ -319,7 +326,7 @@ class _DashboardContent extends StatelessWidget {
               ),
               const SizedBox(width: AscendSpacing.xs),
               Text(
-                'Nutrition, sleep & recovery — sample data',
+                'Sleep & recovery — sample data',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: AscendColors.premiumGold,
                 ),
@@ -359,11 +366,24 @@ class _DashboardContent extends StatelessWidget {
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                     const SizedBox(height: AscendSpacing.sm),
-                    AscendProgressRing(
-                      progress:
-                          fixture.proteinGrams / fixture.proteinTargetGrams,
-                      label: '${fixture.proteinGrams}g',
-                      size: 76,
+                    nutritionAsync.when(
+                      data: (nutrition) => AscendProgressRing(
+                        progress:
+                            nutrition.proteinGrams /
+                            nutrition.proteinTargetGrams,
+                        label: '${nutrition.proteinGrams.round()}g',
+                        size: 76,
+                      ),
+                      loading: () => const AscendProgressRing(
+                        progress: 0,
+                        label: '—',
+                        size: 76,
+                      ),
+                      error: (error, stackTrace) => const AscendProgressRing(
+                        progress: 0,
+                        label: 'No data',
+                        size: 76,
+                      ),
                     ),
                   ],
                 ),
@@ -379,12 +399,27 @@ class _DashboardContent extends StatelessWidget {
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                     const SizedBox(height: AscendSpacing.sm),
-                    AscendProgressRing(
-                      progress: fixture.hydrationMl / fixture.hydrationTargetMl,
-                      label:
-                          '${(fixture.hydrationMl / 1000).toStringAsFixed(1)}L',
-                      color: AscendColors.primaryCyan,
-                      size: 76,
+                    nutritionAsync.when(
+                      data: (nutrition) => AscendProgressRing(
+                        progress:
+                            nutrition.hydrationMl / nutrition.hydrationTargetMl,
+                        label:
+                            '${(nutrition.hydrationMl / 1000).toStringAsFixed(1)}L',
+                        color: AscendColors.primaryCyan,
+                        size: 76,
+                      ),
+                      loading: () => const AscendProgressRing(
+                        progress: 0,
+                        label: '—',
+                        color: AscendColors.primaryCyan,
+                        size: 76,
+                      ),
+                      error: (error, stackTrace) => const AscendProgressRing(
+                        progress: 0,
+                        label: 'No data',
+                        color: AscendColors.primaryCyan,
+                        size: 76,
+                      ),
                     ),
                   ],
                 ),

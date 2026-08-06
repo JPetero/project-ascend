@@ -427,6 +427,12 @@ describe('Workout Engine (e2e)', () => {
         .expect(200);
       expect(historyDetail.body.data.sets).toHaveLength(3);
 
+      const streak = await request(app.getHttpServer())
+        .get('/workout-history/streak')
+        .set(auth())
+        .expect(200);
+      expect(streak.body.data.currentStreakDays).toBeGreaterThanOrEqual(1);
+
       const progression = await request(app.getHttpServer())
         .get(`/exercises/${squatExercise.id}/progression`)
         .set(auth())

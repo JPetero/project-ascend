@@ -11,6 +11,7 @@ import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
 import 'tables/cached_workout_session_table.dart';
 import 'tables/onboarding_draft_table.dart';
+import 'tables/outbox_entries_table.dart';
 import 'tables/sync_status_table.dart';
 
 part 'app_database.g.dart';
@@ -38,13 +39,14 @@ const _workoutSessionRowId = 'singleton';
     OnboardingDrafts,
     SyncStatusRows,
     CachedWorkoutSessionRows,
+    OutboxEntryRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +54,9 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.createTable(cachedWorkoutSessionRows);
+      }
+      if (from < 3) {
+        await m.createTable(outboxEntryRows);
       }
     },
   );
@@ -200,6 +205,7 @@ class AppDatabase extends _$AppDatabase {
       delete(onboardingDrafts).go(),
       delete(syncStatusRows).go(),
       delete(cachedWorkoutSessionRows).go(),
+      delete(outboxEntryRows).go(),
     ]);
   }
 }

@@ -14,7 +14,9 @@ import '../../domain/workout_session.dart';
 import '../providers/exercise_controller.dart';
 import '../providers/workout_plan_controller.dart';
 import '../providers/workout_session_controller.dart';
+import '../widgets/exercise_substitution_sheet.dart';
 import '../widgets/rest_timer.dart';
+import '../widgets/rpe_selector.dart';
 
 class WorkoutPlayerScreen extends ConsumerStatefulWidget {
   const WorkoutPlayerScreen({super.key});
@@ -34,6 +36,7 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
   final _durationController = TextEditingController();
+  double? _selectedRpe;
 
   @override
   void initState() {
@@ -68,13 +71,15 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
         durationSeconds: entry.targetDurationSeconds == null
             ? null
             : int.tryParse(_durationController.text),
+        rpe: _selectedRpe,
       );
       if (!mounted) return;
-      setState(
-        () => _restSecondsRemaining = entry.restSeconds > 0
+      setState(() {
+        _restSecondsRemaining = entry.restSeconds > 0
             ? entry.restSeconds
-            : null,
-      );
+            : null;
+        _selectedRpe = null;
+      });
     } on AppException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -95,21 +100,38 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
   }
 
   Future<void> _finish() async {
+    int? difficultyRating;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Finish workout?'),
-        content: const Text("You'll see a summary of what you logged."),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(false),
-            child: const Text('Cancel'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Finish workout?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("You'll see a summary of what you logged."),
+              const SizedBox(height: AscendSpacing.md),
+              RpeSelector(
+                label: 'How was the whole session?',
+                helperText: 'Optional — rate the session overall, 1–10.',
+                value: difficultyRating,
+                onChanged: (value) =>
+                    setDialogState(() => difficultyRating = value),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => context.pop(true),
-            child: const Text('Finish'),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => context.pop(true),
+              child: const Text('Finish'),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed != true) return;
@@ -117,9 +139,34 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
     setState(() => _isBusy = true);
     final result = await ref
         .read(workoutSessionControllerProvider.notifier)
-        .finish();
+        .finish(difficultyRating: difficultyRating);
     if (!mounted) return;
     context.pushReplacement(RoutePaths.workoutSummary, extra: result);
+  }
+
+  Future<void> _substitute(PrescribedExercise entry) async {
+    final chosen = await showExerciseSubstitutionSheet(
+      context: context,
+      currentExerciseId: entry.exercise.id,
+      currentExerciseName: entry.exercise.name,
+    );
+    if (chosen == null || !mounted) return;
+
+    try {
+      await ref
+          .read(workoutSessionControllerProvider.notifier)
+          .substituteExercise(
+            originalExerciseId: entry.exercise.id,
+            originalExerciseName: entry.exercise.name,
+            substituteExerciseId: chosen.id,
+            substituteExerciseName: chosen.name,
+          );
+    } on AppException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _abandon() async {
@@ -228,8 +275,13 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
 
     final index = _exerciseIndex.clamp(0, plan.exercises.length - 1);
     final entry = plan.exercises[index];
+    final activeSubstitution = session.activeSubstitutionFor(entry.exercise.id);
+    final effectiveExerciseId =
+        activeSubstitution?.substituteExerciseId ?? entry.exercise.id;
+    final effectiveExerciseName =
+        activeSubstitution?.substituteExerciseName ?? entry.exercise.name;
     final loggedForExercise = session.sets
-        .where((s) => s.exerciseId == entry.exercise.id)
+        .where((s) => s.exerciseId == effectiveExerciseId)
         .toList();
 
     return Column(
@@ -250,14 +302,38 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
             children: [
-              Text(
-                'Exercise ${index + 1} of ${plan.exercises.length}',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-              const SizedBox(height: AscendSpacing.xs),
-              Text(
-                entry.exercise.name,
-                style: Theme.of(context).textTheme.headlineSmall,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Exercise ${index + 1} of ${plan.exercises.length}',
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: AscendSpacing.xs),
+                        Text(
+                          effectiveExerciseName,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        if (activeSubstitution != null)
+                          Text(
+                            'Substituted for ${entry.exercise.name}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (activeSubstitution == null &&
+                      session.status == WorkoutSessionStatus.inProgress)
+                    IconButton(
+                      icon: const Icon(Icons.swap_horiz_outlined),
+                      tooltip: 'Substitute exercise',
+                      onPressed: () => _substitute(entry),
+                    ),
+                ],
               ),
               const SizedBox(height: AscendSpacing.xs),
               Text(
@@ -268,7 +344,7 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
               Consumer(
                 builder: (context, ref, _) {
                   final suggestionAsync = ref.watch(
-                    exerciseProgressionProvider(entry.exercise.id),
+                    exerciseProgressionProvider(effectiveExerciseId),
                   );
                   return suggestionAsync.maybeWhen(
                     data: (suggestion) =>
@@ -296,6 +372,12 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
                 repsController: _repsController,
                 weightController: _weightController,
                 durationController: _durationController,
+              ),
+              const SizedBox(height: AscendSpacing.md),
+              RpeSelector(
+                value: _selectedRpe?.round(),
+                onChanged: (value) =>
+                    setState(() => _selectedRpe = value?.toDouble()),
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendPrimaryButton(
@@ -404,6 +486,7 @@ class _LoggedSetRow extends StatelessWidget {
     if (set.weightKg != null) parts.add('${set.weightKg} kg');
     if (set.reps != null) parts.add('${set.reps} reps');
     if (set.durationSeconds != null) parts.add('${set.durationSeconds}s');
+    if (set.rpe != null) parts.add('RPE ${set.rpe}');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AscendSpacing.xs),

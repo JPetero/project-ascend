@@ -61,7 +61,9 @@ class FakeWorkoutPlanRepository extends WorkoutPlanRepository {
   final List<WorkoutPlan> created = [];
 
   @override
-  Future<List<WorkoutPlan>> list() async => [sampleWorkoutPlan];
+  Future<List<WorkoutPlan>> list({bool includeArchived = false}) async => [
+    sampleWorkoutPlan,
+  ];
 
   @override
   Future<WorkoutPlan> getById(String id) async => sampleWorkoutPlan;
@@ -74,6 +76,33 @@ class FakeWorkoutPlanRepository extends WorkoutPlanRepository {
     created.add(sampleWorkoutPlan);
     return sampleWorkoutPlan;
   }
+
+  @override
+  Future<Map<String, dynamic>> create({
+    required String name,
+    String? description,
+    required List<Map<String, dynamic>> exercises,
+    String? idempotencyKey,
+  }) async {
+    created.add(sampleWorkoutPlan);
+    return {'id': sampleWorkoutPlan.id, 'name': name};
+  }
+
+  @override
+  Future<Map<String, dynamic>> update(
+    String id, {
+    String? name,
+    String? description,
+    List<Map<String, dynamic>>? exercises,
+  }) async {
+    return {'id': id, 'name': name ?? sampleWorkoutPlan.name};
+  }
+
+  @override
+  Future<void> archive(String id) async {}
+
+  @override
+  Future<void> unarchive(String id) async {}
 
   @override
   Future<void> delete(String id) async {}
@@ -121,8 +150,13 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   final List<Map<String, dynamic>> loggedSets = [];
   List<PersonalRecord> nextPersonalRecords = const [];
 
+  final List<Map<String, dynamic>> appliedSubstitutions = [];
+
   @override
-  Future<Map<String, dynamic>> start({String? workoutPlanId}) async {
+  Future<Map<String, dynamic>> start({
+    String? workoutPlanId,
+    String? idempotencyKey,
+  }) async {
     if (failNetwork) throw AppException.network();
     final id = 'server-session-${_idCounter++}';
     startedSessionIds.add(id);
@@ -146,7 +180,7 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
 
   @override
   Future<(Map<String, dynamic> session, List<PersonalRecord> newRecords)>
-  finish(String sessionId) async {
+  finish(String sessionId, {int? difficultyRating}) async {
     if (failNetwork) throw AppException.network();
     return ({'id': sessionId}, nextPersonalRecords);
   }
@@ -158,13 +192,35 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> logSet(String sessionId, LoggedSet set) async {
+  Future<Map<String, dynamic>> logSet(
+    String sessionId,
+    LoggedSet set, {
+    String? idempotencyKey,
+  }) async {
     if (failNetwork) throw AppException.network();
     final id = 'server-set-${_idCounter++}';
     loggedSets.add({
       'id': id,
       'sessionId': sessionId,
       'exerciseId': set.exerciseId,
+    });
+    return {'id': id};
+  }
+
+  @override
+  Future<Map<String, dynamic>> substituteExercise(
+    String sessionId, {
+    required String originalExerciseId,
+    required String substituteExerciseId,
+    String? idempotencyKey,
+  }) async {
+    if (failNetwork) throw AppException.network();
+    final id = 'server-substitution-${_idCounter++}';
+    appliedSubstitutions.add({
+      'id': id,
+      'sessionId': sessionId,
+      'originalExerciseId': originalExerciseId,
+      'substituteExerciseId': substituteExerciseId,
     });
     return {'id': id};
   }

@@ -44,6 +44,7 @@ final benchPress = Exercise(
   primaryMuscles: const [chest],
   secondaryMuscles: const [triceps],
   equipment: const [barbell],
+  measurementType: MeasurementType.repsWeight,
   alternatives: [
     ExerciseSummary(
       id: 'exercise-pushup',

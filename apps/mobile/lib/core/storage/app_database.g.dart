@@ -1685,6 +1685,752 @@ class CachedWorkoutSessionRowsCompanion
   }
 }
 
+class $OutboxEntryRowsTable extends OutboxEntryRows
+    with TableInfo<$OutboxEntryRowsTable, OutboxEntryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OutboxEntryRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _entityTypeMeta = const VerificationMeta(
+    'entityType',
+  );
+  @override
+  late final GeneratedColumn<String> entityType = GeneratedColumn<String>(
+    'entity_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _operationTypeMeta = const VerificationMeta(
+    'operationType',
+  );
+  @override
+  late final GeneratedColumn<String> operationType = GeneratedColumn<String>(
+    'operation_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadJsonMeta = const VerificationMeta(
+    'payloadJson',
+  );
+  @override
+  late final GeneratedColumn<String> payloadJson = GeneratedColumn<String>(
+    'payload_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _retryCountMeta = const VerificationMeta(
+    'retryCount',
+  );
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+    'retry_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMessageMeta = const VerificationMeta(
+    'lastErrorMessage',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorMessage = GeneratedColumn<String>(
+    'last_error_message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastErrorCodeMeta = const VerificationMeta(
+    'lastErrorCode',
+  );
+  @override
+  late final GeneratedColumn<String> lastErrorCode = GeneratedColumn<String>(
+    'last_error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resultEntityIdMeta = const VerificationMeta(
+    'resultEntityId',
+  );
+  @override
+  late final GeneratedColumn<String> resultEntityId = GeneratedColumn<String>(
+    'result_entity_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nextAttemptAtMeta = const VerificationMeta(
+    'nextAttemptAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextAttemptAt =
+      GeneratedColumn<DateTime>(
+        'next_attempt_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    entityType,
+    operationType,
+    payloadJson,
+    status,
+    retryCount,
+    lastErrorMessage,
+    lastErrorCode,
+    resultEntityId,
+    createdAt,
+    nextAttemptAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'outbox_entry_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OutboxEntryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('entity_type')) {
+      context.handle(
+        _entityTypeMeta,
+        entityType.isAcceptableOrUnknown(data['entity_type']!, _entityTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_entityTypeMeta);
+    }
+    if (data.containsKey('operation_type')) {
+      context.handle(
+        _operationTypeMeta,
+        operationType.isAcceptableOrUnknown(
+          data['operation_type']!,
+          _operationTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_operationTypeMeta);
+    }
+    if (data.containsKey('payload_json')) {
+      context.handle(
+        _payloadJsonMeta,
+        payloadJson.isAcceptableOrUnknown(
+          data['payload_json']!,
+          _payloadJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadJsonMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+        _retryCountMeta,
+        retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
+      );
+    }
+    if (data.containsKey('last_error_message')) {
+      context.handle(
+        _lastErrorMessageMeta,
+        lastErrorMessage.isAcceptableOrUnknown(
+          data['last_error_message']!,
+          _lastErrorMessageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_error_code')) {
+      context.handle(
+        _lastErrorCodeMeta,
+        lastErrorCode.isAcceptableOrUnknown(
+          data['last_error_code']!,
+          _lastErrorCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('result_entity_id')) {
+      context.handle(
+        _resultEntityIdMeta,
+        resultEntityId.isAcceptableOrUnknown(
+          data['result_entity_id']!,
+          _resultEntityIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('next_attempt_at')) {
+      context.handle(
+        _nextAttemptAtMeta,
+        nextAttemptAt.isAcceptableOrUnknown(
+          data['next_attempt_at']!,
+          _nextAttemptAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nextAttemptAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  OutboxEntryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OutboxEntryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      entityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}entity_type'],
+      )!,
+      operationType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}operation_type'],
+      )!,
+      payloadJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload_json'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      retryCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retry_count'],
+      )!,
+      lastErrorMessage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_message'],
+      ),
+      lastErrorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error_code'],
+      ),
+      resultEntityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}result_entity_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      nextAttemptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_attempt_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $OutboxEntryRowsTable createAlias(String alias) {
+    return $OutboxEntryRowsTable(attachedDatabase, alias);
+  }
+}
+
+class OutboxEntryRow extends DataClass implements Insertable<OutboxEntryRow> {
+  /// The idempotency key itself — also the primary key, so enqueueing twice
+  /// with the same key (e.g. a UI double-submit) can never create two rows.
+  final String id;
+  final String entityType;
+  final String operationType;
+  final String payloadJson;
+  final String status;
+  final int retryCount;
+  final String? lastErrorMessage;
+  final String? lastErrorCode;
+  final String? resultEntityId;
+  final DateTime createdAt;
+  final DateTime nextAttemptAt;
+  final DateTime updatedAt;
+  const OutboxEntryRow({
+    required this.id,
+    required this.entityType,
+    required this.operationType,
+    required this.payloadJson,
+    required this.status,
+    required this.retryCount,
+    this.lastErrorMessage,
+    this.lastErrorCode,
+    this.resultEntityId,
+    required this.createdAt,
+    required this.nextAttemptAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['entity_type'] = Variable<String>(entityType);
+    map['operation_type'] = Variable<String>(operationType);
+    map['payload_json'] = Variable<String>(payloadJson);
+    map['status'] = Variable<String>(status);
+    map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || lastErrorMessage != null) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage);
+    }
+    if (!nullToAbsent || lastErrorCode != null) {
+      map['last_error_code'] = Variable<String>(lastErrorCode);
+    }
+    if (!nullToAbsent || resultEntityId != null) {
+      map['result_entity_id'] = Variable<String>(resultEntityId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  OutboxEntryRowsCompanion toCompanion(bool nullToAbsent) {
+    return OutboxEntryRowsCompanion(
+      id: Value(id),
+      entityType: Value(entityType),
+      operationType: Value(operationType),
+      payloadJson: Value(payloadJson),
+      status: Value(status),
+      retryCount: Value(retryCount),
+      lastErrorMessage: lastErrorMessage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastErrorMessage),
+      lastErrorCode: lastErrorCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastErrorCode),
+      resultEntityId: resultEntityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(resultEntityId),
+      createdAt: Value(createdAt),
+      nextAttemptAt: Value(nextAttemptAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory OutboxEntryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OutboxEntryRow(
+      id: serializer.fromJson<String>(json['id']),
+      entityType: serializer.fromJson<String>(json['entityType']),
+      operationType: serializer.fromJson<String>(json['operationType']),
+      payloadJson: serializer.fromJson<String>(json['payloadJson']),
+      status: serializer.fromJson<String>(json['status']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
+      lastErrorMessage: serializer.fromJson<String?>(json['lastErrorMessage']),
+      lastErrorCode: serializer.fromJson<String?>(json['lastErrorCode']),
+      resultEntityId: serializer.fromJson<String?>(json['resultEntityId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      nextAttemptAt: serializer.fromJson<DateTime>(json['nextAttemptAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'entityType': serializer.toJson<String>(entityType),
+      'operationType': serializer.toJson<String>(operationType),
+      'payloadJson': serializer.toJson<String>(payloadJson),
+      'status': serializer.toJson<String>(status),
+      'retryCount': serializer.toJson<int>(retryCount),
+      'lastErrorMessage': serializer.toJson<String?>(lastErrorMessage),
+      'lastErrorCode': serializer.toJson<String?>(lastErrorCode),
+      'resultEntityId': serializer.toJson<String?>(resultEntityId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'nextAttemptAt': serializer.toJson<DateTime>(nextAttemptAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  OutboxEntryRow copyWith({
+    String? id,
+    String? entityType,
+    String? operationType,
+    String? payloadJson,
+    String? status,
+    int? retryCount,
+    Value<String?> lastErrorMessage = const Value.absent(),
+    Value<String?> lastErrorCode = const Value.absent(),
+    Value<String?> resultEntityId = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? nextAttemptAt,
+    DateTime? updatedAt,
+  }) => OutboxEntryRow(
+    id: id ?? this.id,
+    entityType: entityType ?? this.entityType,
+    operationType: operationType ?? this.operationType,
+    payloadJson: payloadJson ?? this.payloadJson,
+    status: status ?? this.status,
+    retryCount: retryCount ?? this.retryCount,
+    lastErrorMessage: lastErrorMessage.present
+        ? lastErrorMessage.value
+        : this.lastErrorMessage,
+    lastErrorCode: lastErrorCode.present
+        ? lastErrorCode.value
+        : this.lastErrorCode,
+    resultEntityId: resultEntityId.present
+        ? resultEntityId.value
+        : this.resultEntityId,
+    createdAt: createdAt ?? this.createdAt,
+    nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  OutboxEntryRow copyWithCompanion(OutboxEntryRowsCompanion data) {
+    return OutboxEntryRow(
+      id: data.id.present ? data.id.value : this.id,
+      entityType: data.entityType.present
+          ? data.entityType.value
+          : this.entityType,
+      operationType: data.operationType.present
+          ? data.operationType.value
+          : this.operationType,
+      payloadJson: data.payloadJson.present
+          ? data.payloadJson.value
+          : this.payloadJson,
+      status: data.status.present ? data.status.value : this.status,
+      retryCount: data.retryCount.present
+          ? data.retryCount.value
+          : this.retryCount,
+      lastErrorMessage: data.lastErrorMessage.present
+          ? data.lastErrorMessage.value
+          : this.lastErrorMessage,
+      lastErrorCode: data.lastErrorCode.present
+          ? data.lastErrorCode.value
+          : this.lastErrorCode,
+      resultEntityId: data.resultEntityId.present
+          ? data.resultEntityId.value
+          : this.resultEntityId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      nextAttemptAt: data.nextAttemptAt.present
+          ? data.nextAttemptAt.value
+          : this.nextAttemptAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxEntryRow(')
+          ..write('id: $id, ')
+          ..write('entityType: $entityType, ')
+          ..write('operationType: $operationType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('resultEntityId: $resultEntityId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    entityType,
+    operationType,
+    payloadJson,
+    status,
+    retryCount,
+    lastErrorMessage,
+    lastErrorCode,
+    resultEntityId,
+    createdAt,
+    nextAttemptAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OutboxEntryRow &&
+          other.id == this.id &&
+          other.entityType == this.entityType &&
+          other.operationType == this.operationType &&
+          other.payloadJson == this.payloadJson &&
+          other.status == this.status &&
+          other.retryCount == this.retryCount &&
+          other.lastErrorMessage == this.lastErrorMessage &&
+          other.lastErrorCode == this.lastErrorCode &&
+          other.resultEntityId == this.resultEntityId &&
+          other.createdAt == this.createdAt &&
+          other.nextAttemptAt == this.nextAttemptAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class OutboxEntryRowsCompanion extends UpdateCompanion<OutboxEntryRow> {
+  final Value<String> id;
+  final Value<String> entityType;
+  final Value<String> operationType;
+  final Value<String> payloadJson;
+  final Value<String> status;
+  final Value<int> retryCount;
+  final Value<String?> lastErrorMessage;
+  final Value<String?> lastErrorCode;
+  final Value<String?> resultEntityId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> nextAttemptAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const OutboxEntryRowsCompanion({
+    this.id = const Value.absent(),
+    this.entityType = const Value.absent(),
+    this.operationType = const Value.absent(),
+    this.payloadJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.resultEntityId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.nextAttemptAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OutboxEntryRowsCompanion.insert({
+    required String id,
+    required String entityType,
+    required String operationType,
+    required String payloadJson,
+    required String status,
+    this.retryCount = const Value.absent(),
+    this.lastErrorMessage = const Value.absent(),
+    this.lastErrorCode = const Value.absent(),
+    this.resultEntityId = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime nextAttemptAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       entityType = Value(entityType),
+       operationType = Value(operationType),
+       payloadJson = Value(payloadJson),
+       status = Value(status),
+       createdAt = Value(createdAt),
+       nextAttemptAt = Value(nextAttemptAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<OutboxEntryRow> custom({
+    Expression<String>? id,
+    Expression<String>? entityType,
+    Expression<String>? operationType,
+    Expression<String>? payloadJson,
+    Expression<String>? status,
+    Expression<int>? retryCount,
+    Expression<String>? lastErrorMessage,
+    Expression<String>? lastErrorCode,
+    Expression<String>? resultEntityId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? nextAttemptAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (entityType != null) 'entity_type': entityType,
+      if (operationType != null) 'operation_type': operationType,
+      if (payloadJson != null) 'payload_json': payloadJson,
+      if (status != null) 'status': status,
+      if (retryCount != null) 'retry_count': retryCount,
+      if (lastErrorMessage != null) 'last_error_message': lastErrorMessage,
+      if (lastErrorCode != null) 'last_error_code': lastErrorCode,
+      if (resultEntityId != null) 'result_entity_id': resultEntityId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (nextAttemptAt != null) 'next_attempt_at': nextAttemptAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OutboxEntryRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? entityType,
+    Value<String>? operationType,
+    Value<String>? payloadJson,
+    Value<String>? status,
+    Value<int>? retryCount,
+    Value<String?>? lastErrorMessage,
+    Value<String?>? lastErrorCode,
+    Value<String?>? resultEntityId,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? nextAttemptAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return OutboxEntryRowsCompanion(
+      id: id ?? this.id,
+      entityType: entityType ?? this.entityType,
+      operationType: operationType ?? this.operationType,
+      payloadJson: payloadJson ?? this.payloadJson,
+      status: status ?? this.status,
+      retryCount: retryCount ?? this.retryCount,
+      lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
+      lastErrorCode: lastErrorCode ?? this.lastErrorCode,
+      resultEntityId: resultEntityId ?? this.resultEntityId,
+      createdAt: createdAt ?? this.createdAt,
+      nextAttemptAt: nextAttemptAt ?? this.nextAttemptAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (entityType.present) {
+      map['entity_type'] = Variable<String>(entityType.value);
+    }
+    if (operationType.present) {
+      map['operation_type'] = Variable<String>(operationType.value);
+    }
+    if (payloadJson.present) {
+      map['payload_json'] = Variable<String>(payloadJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
+    if (lastErrorMessage.present) {
+      map['last_error_message'] = Variable<String>(lastErrorMessage.value);
+    }
+    if (lastErrorCode.present) {
+      map['last_error_code'] = Variable<String>(lastErrorCode.value);
+    }
+    if (resultEntityId.present) {
+      map['result_entity_id'] = Variable<String>(resultEntityId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (nextAttemptAt.present) {
+      map['next_attempt_at'] = Variable<DateTime>(nextAttemptAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxEntryRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('entityType: $entityType, ')
+          ..write('operationType: $operationType, ')
+          ..write('payloadJson: $payloadJson, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastErrorMessage: $lastErrorMessage, ')
+          ..write('lastErrorCode: $lastErrorCode, ')
+          ..write('resultEntityId: $resultEntityId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('nextAttemptAt: $nextAttemptAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1699,6 +2445,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncStatusRowsTable syncStatusRows = $SyncStatusRowsTable(this);
   late final $CachedWorkoutSessionRowsTable cachedWorkoutSessionRows =
       $CachedWorkoutSessionRowsTable(this);
+  late final $OutboxEntryRowsTable outboxEntryRows = $OutboxEntryRowsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1710,6 +2459,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     onboardingDrafts,
     syncStatusRows,
     cachedWorkoutSessionRows,
+    outboxEntryRows,
   ];
 }
 
@@ -2781,6 +3531,361 @@ typedef $$CachedWorkoutSessionRowsTableProcessedTableManager =
       CachedWorkoutSessionRow,
       PrefetchHooks Function()
     >;
+typedef $$OutboxEntryRowsTableCreateCompanionBuilder =
+    OutboxEntryRowsCompanion Function({
+      required String id,
+      required String entityType,
+      required String operationType,
+      required String payloadJson,
+      required String status,
+      Value<int> retryCount,
+      Value<String?> lastErrorMessage,
+      Value<String?> lastErrorCode,
+      Value<String?> resultEntityId,
+      required DateTime createdAt,
+      required DateTime nextAttemptAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$OutboxEntryRowsTableUpdateCompanionBuilder =
+    OutboxEntryRowsCompanion Function({
+      Value<String> id,
+      Value<String> entityType,
+      Value<String> operationType,
+      Value<String> payloadJson,
+      Value<String> status,
+      Value<int> retryCount,
+      Value<String?> lastErrorMessage,
+      Value<String?> lastErrorCode,
+      Value<String?> resultEntityId,
+      Value<DateTime> createdAt,
+      Value<DateTime> nextAttemptAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$OutboxEntryRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $OutboxEntryRowsTable> {
+  $$OutboxEntryRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get resultEntityId => $composableBuilder(
+    column: $table.resultEntityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$OutboxEntryRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $OutboxEntryRowsTable> {
+  $$OutboxEntryRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get resultEntityId => $composableBuilder(
+    column: $table.resultEntityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$OutboxEntryRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OutboxEntryRowsTable> {
+  $$OutboxEntryRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get entityType => $composableBuilder(
+    column: $table.entityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get operationType => $composableBuilder(
+    column: $table.operationType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payloadJson => $composableBuilder(
+    column: $table.payloadJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastErrorMessage => $composableBuilder(
+    column: $table.lastErrorMessage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastErrorCode => $composableBuilder(
+    column: $table.lastErrorCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get resultEntityId => $composableBuilder(
+    column: $table.resultEntityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextAttemptAt => $composableBuilder(
+    column: $table.nextAttemptAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$OutboxEntryRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $OutboxEntryRowsTable,
+          OutboxEntryRow,
+          $$OutboxEntryRowsTableFilterComposer,
+          $$OutboxEntryRowsTableOrderingComposer,
+          $$OutboxEntryRowsTableAnnotationComposer,
+          $$OutboxEntryRowsTableCreateCompanionBuilder,
+          $$OutboxEntryRowsTableUpdateCompanionBuilder,
+          (
+            OutboxEntryRow,
+            BaseReferences<
+              _$AppDatabase,
+              $OutboxEntryRowsTable,
+              OutboxEntryRow
+            >,
+          ),
+          OutboxEntryRow,
+          PrefetchHooks Function()
+        > {
+  $$OutboxEntryRowsTableTableManager(
+    _$AppDatabase db,
+    $OutboxEntryRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OutboxEntryRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OutboxEntryRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OutboxEntryRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> entityType = const Value.absent(),
+                Value<String> operationType = const Value.absent(),
+                Value<String> payloadJson = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> resultEntityId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> nextAttemptAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OutboxEntryRowsCompanion(
+                id: id,
+                entityType: entityType,
+                operationType: operationType,
+                payloadJson: payloadJson,
+                status: status,
+                retryCount: retryCount,
+                lastErrorMessage: lastErrorMessage,
+                lastErrorCode: lastErrorCode,
+                resultEntityId: resultEntityId,
+                createdAt: createdAt,
+                nextAttemptAt: nextAttemptAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String entityType,
+                required String operationType,
+                required String payloadJson,
+                required String status,
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastErrorMessage = const Value.absent(),
+                Value<String?> lastErrorCode = const Value.absent(),
+                Value<String?> resultEntityId = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime nextAttemptAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => OutboxEntryRowsCompanion.insert(
+                id: id,
+                entityType: entityType,
+                operationType: operationType,
+                payloadJson: payloadJson,
+                status: status,
+                retryCount: retryCount,
+                lastErrorMessage: lastErrorMessage,
+                lastErrorCode: lastErrorCode,
+                resultEntityId: resultEntityId,
+                createdAt: createdAt,
+                nextAttemptAt: nextAttemptAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OutboxEntryRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $OutboxEntryRowsTable,
+      OutboxEntryRow,
+      $$OutboxEntryRowsTableFilterComposer,
+      $$OutboxEntryRowsTableOrderingComposer,
+      $$OutboxEntryRowsTableAnnotationComposer,
+      $$OutboxEntryRowsTableCreateCompanionBuilder,
+      $$OutboxEntryRowsTableUpdateCompanionBuilder,
+      (
+        OutboxEntryRow,
+        BaseReferences<_$AppDatabase, $OutboxEntryRowsTable, OutboxEntryRow>,
+      ),
+      OutboxEntryRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2806,4 +3911,6 @@ class $AppDatabaseManager {
         _db,
         _db.cachedWorkoutSessionRows,
       );
+  $$OutboxEntryRowsTableTableManager get outboxEntryRows =>
+      $$OutboxEntryRowsTableTableManager(_db, _db.outboxEntryRows);
 }

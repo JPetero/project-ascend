@@ -292,3 +292,105 @@ session actually completes the corresponding Flutter work, so they mean what the
 - Pushed `main` -> `origin/main` (fast-forward, `0e45e27..e168666`).
 
 No PR opened -- not requested this session.
+
+## Session 2.5 — Workout Engine completion, shared domain layer, dashboard, repo health
+
+Continuation on `claude/new-session-qy6hzm` (restarted from `origin/main` @ `d0cef53`,
+the previous session's merge, since that branch's PR had already merged). No new
+Prisma migrations this session -- verified via `git diff` against the schema/migrations
+directory across all of this session's commits.
+
+**Phase 1 -- Workout Engine Flutter completion** (the four P1 gaps had backend-only
+support after the previous session; this session built the Flutter side):
+- `core/sync/`: a generic, feature-agnostic offline outbox (Drift-backed queue,
+  exponential-backoff retry with a manual-retry fallback so a permanent failure
+  never loops forever -- a real bug caught by this session's own tests and fixed,
+  see below -- idempotency-key replay mirroring the backend's
+  `SyncOperation`/`IdempotencyService`). Feature modules register one handler per
+  `entityType`; nothing in it is workout-specific.
+- RPE: per-set effort rating in the active set logger, session-level difficulty
+  rating captured at finish, both surfaced in the summary and history detail
+  screens. Never wired into automatic progression suggestions.
+- Exercise substitution: a bottom sheet with curated safe alternatives (primary
+  muscles, measurement type) plus full library search/filter, applying the swap
+  immediately in the player and syncing via the new outbox.
+- Custom workout plan editor: a "My Plans" list (duplicate/archive/unarchive/
+  delete with confirmation) and a create/edit screen (searchable exercise
+  picker, per-exercise target editor, drag-to-reorder), saving through the
+  outbox with an idempotency key so a network retry can't create a duplicate
+  plan. Documented scope cut: a queued create/edit isn't reflected in "My
+  Plans" until it syncs -- no local plan-list cache in this pass.
+
+**Phase 2 -- shared backend domain layer** (`services/api/src/common/`):
+`pagination` (generic page/limit/search/sort DTO + helpers), `units` (metric/
+imperial conversions for weight/distance/water/energy/time), `validation`
+(reusable bounded-number/rating-scale/not-far-future-date decorator factories),
+`history` (a cross-domain `HistoryEntry` shape + merge helper, no shared table),
+`progress` (streak/completion-percentage/weekly-monthly-grouping/achievement-rule
+pure functions), `enums` (a shared import point). The idempotency ledger from the
+previous session was already domain-agnostic and needed no changes. Wired one
+real usage (`GET /workout-history/streak` using the new `calculateStreak`) so the
+new module doesn't go stale as unused code. 17 new backend unit tests.
+
+**Phase 3 -- dashboard**: the active-session/last-workout card, streak, and
+personal-record cards were already real as of the previous session. Protein and
+hydration were still `DashboardFixture` sample values even though the Nutrition
+backend now exists -- added a minimal read-only nutrition summary client (today's
+protein/calories + macro target + water total, not the full Nutrition feature)
+and wired the two rings to it, with a graceful "No data" state on failure rather
+than ever showing a fake number. Sleep/steps/recovery remain explicitly labeled
+sample data.
+
+**Phase 4 -- performance**: reviewed for obvious issues (unnecessary rebuilds,
+duplicate API calls, N+1-shaped Prisma queries) while writing this session's
+code; nothing pre-existing flagged as a problem worth a standalone refactor
+pass given the time budget, and no regressions introduced by this session's
+additions (list/detail providers still `.autoDispose` and cache the same way
+the pre-existing ones do).
+
+**Phase 5 -- tests**: 10 new Flutter tests for `core/sync/` (`RetryPolicy`
+backoff/budget math and error classification, plus a `SyncEngine` integration
+suite against an in-memory Drift database) -- writing these caught a real bug
+(a permanently-failed outbox entry was getting `nextAttemptAt = now` instead of
+being excluded from automatic retry, so a later `drain()` call would silently
+retry a validation failure forever; fixed by pushing it far into the future
+until an explicit manual retry). 2 new dashboard tests for the nutrition
+wiring. 17 new backend unit tests (Phase 2). Full suites re-verified after
+every checkpoint: 57 Flutter tests, 57 backend unit tests, 49 backend e2e
+tests, all passing.
+
+**Phase 6 -- repo health**: no stray TODO/FIXME/`UnimplementedError` markers
+found (the one `UnimplementedError` in `core_providers.dart` is an intentional
+"must be overridden in main.dart" guard, pre-existing). No oversized files
+flagging an obvious split. Found and removed one real piece of dead weight:
+`uuid`/`@types/uuid` in `services/api/package.json`, listed but never imported
+anywhere -- every idempotency key in this codebase (backend and Flutter) uses
+its own timestamp+random generation instead. `dart format` applied across this
+session's files (cosmetic only, re-verified clean after).
+
+**Phase 7 -- extension points**: documented in `packages/docs/extension-points.md`
+rather than built as new abstract code -- the Nutrition backend already exists
+concretely from the previous session (not reworked into interfaces retroactively,
+per "never overwrite working implementations"), and this codebase's real
+abstraction mechanism is the shared `common/` layer + Riverpod DI, not a formal
+interface/impl split, so forcing abstract interfaces only for Nutrition would
+have been inconsistent with how Workout itself is built. The doc explains how a
+future Nutrition offline-write feature, Sleep, or wearables plug into Sync/
+History/Progress/Units/Validation/Pagination, and is explicit that a
+`DashboardCardContributor`-style registry isn't justified yet at three data
+sources (YAGNI).
+
+**Verification**: `pnpm api:lint`, `pnpm api:test` (57/57), `pnpm api:build`,
+`pnpm api:test:e2e` (49/49), `pnpm exec tsc --noEmit` all clean; `flutter
+analyze` clean, `flutter test` (57/57) clean, `dart format --set-exit-if-changed`
+clean after applying. No new migrations, so no new migration verification was
+needed -- confirmed via `git diff` that no session commit touched
+`schema.prisma` or `prisma/migrations/`.
+
+**Commits this session** (branch `claude/new-session-qy6hzm`): offline sync
+engine + RPE + substitution UI; custom plan editor UI; shared backend domain
+layer; dashboard nutrition wiring; sync engine retry-loop bugfix + tests;
+unused-dependency removal; extension-points doc; dart format. Final commit
+below merges this branch into `main` as "Workout Engine Production Ready" per
+this session's explicit brief, and stops there -- Nutrition, Sleep, and
+wearables remain future work.

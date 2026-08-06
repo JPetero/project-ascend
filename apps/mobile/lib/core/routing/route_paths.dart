@@ -21,8 +21,13 @@ abstract final class RoutePaths {
   static const workoutHistory = '/workout-history';
   static const workoutHistoryDetail = '/workout-history/:id';
   static const personalRecords = '/personal-records';
+  static const myWorkoutPlans = '/my-workout-plans';
+  static const workoutPlanEditorNew = '/my-workout-plans/new';
+  static const workoutPlanEditorEdit = '/my-workout-plans/:id/edit';
 
   static String exerciseDetailPath(String id) => '/exercise-library/$id';
   static String workoutDetailPath(String id) => '/workout-catalog/$id';
   static String workoutHistoryDetailPath(String id) => '/workout-history/$id';
+  static String workoutPlanEditorEditPath(String id) =>
+      '/my-workout-plans/$id/edit';
 }

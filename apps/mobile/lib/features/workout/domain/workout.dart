@@ -12,6 +12,7 @@ class PrescribedExercise {
     this.targetReps,
     this.targetDurationSeconds,
     this.targetWeightKg,
+    this.targetDistanceMeters,
     this.restSeconds = 60,
     this.notes,
   });
@@ -22,6 +23,7 @@ class PrescribedExercise {
   final int? targetReps;
   final int? targetDurationSeconds;
   final double? targetWeightKg;
+  final double? targetDistanceMeters;
   final int restSeconds;
   final String? notes;
   final ExerciseSummary exercise;
@@ -34,6 +36,7 @@ class PrescribedExercise {
       targetReps: json['targetReps'] as int?,
       targetDurationSeconds: json['targetDurationSeconds'] as int?,
       targetWeightKg: (json['targetWeightKg'] as num?)?.toDouble(),
+      targetDistanceMeters: (json['targetDistanceMeters'] as num?)?.toDouble(),
       restSeconds: json['restSeconds'] as int? ?? 60,
       notes: json['notes'] as String?,
       exercise: ExerciseSummary.fromJson(

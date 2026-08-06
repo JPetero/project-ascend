@@ -23,6 +23,11 @@ class WorkoutScreen extends ConsumerWidget {
         title: const Text('Workout'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.playlist_add_check_outlined),
+            tooltip: 'My plans',
+            onPressed: () => context.push(RoutePaths.myWorkoutPlans),
+          ),
+          IconButton(
             icon: const Icon(Icons.emoji_events_outlined),
             tooltip: 'Personal records',
             onPressed: () => context.push(RoutePaths.personalRecords),

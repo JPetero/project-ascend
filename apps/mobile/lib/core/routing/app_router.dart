@@ -16,10 +16,12 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
 import '../../features/workout/presentation/screens/exercise_detail_screen.dart';
 import '../../features/workout/presentation/screens/exercise_library_screen.dart';
+import '../../features/workout/presentation/screens/my_workout_plans_screen.dart';
 import '../../features/workout/presentation/screens/personal_records_screen.dart';
 import '../../features/workout/presentation/screens/workout_detail_screen.dart';
 import '../../features/workout/presentation/screens/workout_history_detail_screen.dart';
 import '../../features/workout/presentation/screens/workout_history_screen.dart';
+import '../../features/workout/presentation/screens/workout_plan_editor_screen.dart';
 import '../../features/workout/presentation/screens/workout_player_screen.dart';
 import '../../features/workout/presentation/screens/workout_screen.dart';
 import '../../features/workout/presentation/screens/workout_summary_screen.dart';
@@ -99,6 +101,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.personalRecords,
         builder: (context, state) => const PersonalRecordsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.myWorkoutPlans,
+        builder: (context, state) => const MyWorkoutPlansScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutPlanEditorNew,
+        builder: (context, state) => const WorkoutPlanEditorScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutPlanEditorEdit,
+        builder: (context, state) =>
+            WorkoutPlanEditorScreen(planId: state.pathParameters['id']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
