@@ -13,7 +13,16 @@ import '../../features/dashboard/presentation/screens/home_dashboard_screen.dart
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/workout/presentation/providers/workout_session_controller.dart';
+import '../../features/workout/presentation/screens/exercise_detail_screen.dart';
+import '../../features/workout/presentation/screens/exercise_library_screen.dart';
+import '../../features/workout/presentation/screens/personal_records_screen.dart';
+import '../../features/workout/presentation/screens/workout_detail_screen.dart';
+import '../../features/workout/presentation/screens/workout_history_detail_screen.dart';
+import '../../features/workout/presentation/screens/workout_history_screen.dart';
+import '../../features/workout/presentation/screens/workout_player_screen.dart';
 import '../../features/workout/presentation/screens/workout_screen.dart';
+import '../../features/workout/presentation/screens/workout_summary_screen.dart';
 import '../design_system/design_system.dart';
 import 'app_shell.dart';
 import 'route_paths.dart';
@@ -54,6 +63,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.onboarding,
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.exerciseLibrary,
+        builder: (context, state) => const ExerciseLibraryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.exerciseDetail,
+        builder: (context, state) =>
+            ExerciseDetailScreen(exerciseId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutDetail,
+        builder: (context, state) =>
+            WorkoutDetailScreen(workoutId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutPlayer,
+        builder: (context, state) => const WorkoutPlayerScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutSummary,
+        builder: (context, state) =>
+            WorkoutSummaryScreen(result: state.extra! as WorkoutFinishResult),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutHistory,
+        builder: (context, state) => const WorkoutHistoryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.workoutHistoryDetail,
+        builder: (context, state) =>
+            WorkoutHistoryDetailScreen(sessionId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.personalRecords,
+        builder: (context, state) => const PersonalRecordsScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

@@ -1,9 +1,17 @@
 # Project Ascend
 
-An AI-first fitness, nutrition, progress, social, and wellness app. This repository is the
-**Sprint 0 + Sprint 1 foundation**: a real, runnable monorepo containing a NestJS backend and a
-Flutter mobile client, covering the first vertical slice — register, onboard, pick a companion
-(Atlas or Nova), land on a personalized dashboard, and navigate the main app shell.
+An AI-first fitness, nutrition, progress, social, and wellness app. This repository contains a
+real, runnable monorepo with a NestJS backend and a Flutter mobile client.
+
+- **Sprint 0 + Sprint 1** delivered the foundation and first vertical slice: register, onboard,
+  pick a companion (Atlas or Nova), land on a personalized dashboard, and navigate the main app
+  shell.
+- **Sprint 2** delivered the **Workout Engine**: browse a seeded exercise library and curated
+  workouts, start a workout plan, log sets (reps/weight/duration) with a rest timer, pause/resume/
+  finish, all working fully offline with best-effort background sync, deterministic
+  progressive-overload suggestions, automatic personal-record detection, and workout history. See
+  [Workout Engine (Sprint 2)](packages/docs/architecture.md#workout-engine-sprint-2) for how it's
+  built.
 
 See [`packages/docs/architecture.md`](packages/docs/architecture.md) for how the system fits
 together, [`packages/docs/security.md`](packages/docs/security.md) for current controls and
@@ -88,6 +96,18 @@ cd ../..
 This applies the committed migration in `services/api/prisma/migrations/` and regenerates the
 Prisma client. Use `pnpm prisma:deploy` instead in CI/production (applies migrations without
 prompting to create a new one).
+
+Then seed the exercise/workout catalog (exercises, categories, muscle groups, equipment, and a
+handful of curated workouts) — required for the Workout Engine's "Browse workouts" and exercise
+library to show anything:
+
+```bash
+cd services/api
+pnpm prisma:seed
+cd ../..
+```
+
+This is idempotent (safe to re-run) and runs automatically in CI right after migrations.
 
 ## 7. Start the API
 
@@ -253,3 +273,33 @@ an actual container in this sandbox.
 - No account lockout / exponential backoff exists beyond the per-route rate limit (see
   [`packages/docs/security.md`](packages/docs/security.md#known-gaps-before-production) for the
   full list of known gaps before a real production launch).
+
+## Sprint 2 (Workout Engine) — Verified Build Results
+
+Run for real in the same sandboxed Linux container immediately before the Sprint 2 commit, against
+a locally-running PostgreSQL 16 instance (Docker's daemon was unavailable in this pass, same
+restriction as the Sprint 0/1 audit above — see that section's "Docker" note).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Prisma schema validation/format | `prisma validate`, `prisma format` + `git diff --exit-code` | PASSED |
+| Migrations applied | `pnpm --filter @project-ascend/api prisma:deploy` | PASSED |
+| Catalog seed | `pnpm --filter @project-ascend/api prisma:seed` | PASSED — 5 categories, 8 muscle groups, 5 equipment types, 22 exercises, 4 workouts |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 20/20 tests** (up from 8; Sprint 2 added exercise-progression and personal-record-detection specs) |
+| E2E tests (real Postgres, real HTTP via Supertest) | `pnpm api:test:e2e` | **PASSED — 31/31 tests** (up from 19; Sprint 2 added `workout-engine.e2e-spec.ts`, covering the catalog, workout plans, and the full session lifecycle including pause/resume, set logging, and personal records) |
+| Build | `pnpm api:build` | PASSED — `dist/main.js` at the correct path (re-verified after adding `prisma/seed.ts`, which shifted TypeScript's inferred `rootDir` until `tsconfig.build.json` excluded it) |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 30/30 tests** (up from 19; Sprint 2 added the workout session controller's online/offline/retry-sync flow, the rest timer, Workout-tab navigation, and workout history rendering) |
+
+Docker itself was not re-verified as a container build in this pass, for the same environment
+reason as the Sprint 0/1 audit; `docker-build` in `.github/workflows/backend.yml` covers that on
+every push/PR.
