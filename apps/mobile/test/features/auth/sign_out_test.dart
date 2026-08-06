@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
+import 'package:mobile/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
-import 'package:mobile/features/profile/presentation/screens/profile_screen.dart';
 
 import '../../helpers/test_provider_scope.dart';
 
@@ -28,7 +28,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: ProfileScreen()),
+        child: const MaterialApp(home: DashboardScreen()),
       ),
     );
     await tester.pumpAndSettle();

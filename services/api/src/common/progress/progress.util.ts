@@ -37,6 +37,44 @@ export function calculateStreak(activityDates: Date[], now: Date = new Date()): 
   return streak;
 }
 
+function toWeekKey(date: Date): string {
+  const weekStart = new Date(date);
+  weekStart.setUTCHours(0, 0, 0, 0);
+  weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  return toDayKey(weekStart);
+}
+
+/**
+ * Counts consecutive calendar weeks (Sunday-start UTC, ending this week or
+ * last week — same "still alive until a full week is missed" rule as
+ * {@link calculateStreak}) with at least one activity. Used by the deload
+ * recommendation service to read "how many weeks in a row has this person
+ * trained" off real `WorkoutSession.completedAt` values.
+ */
+export function calculateConsecutiveActiveWeeks(
+  activityDates: Date[],
+  now: Date = new Date(),
+): number {
+  const uniqueWeeks = new Set(activityDates.map(toWeekKey));
+  if (uniqueWeeks.size === 0) return 0;
+
+  const cursor = new Date(now);
+  cursor.setUTCHours(0, 0, 0, 0);
+  cursor.setUTCDate(cursor.getUTCDate() - cursor.getUTCDay());
+
+  if (!uniqueWeeks.has(toDayKey(cursor))) {
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+    if (!uniqueWeeks.has(toDayKey(cursor))) return 0;
+  }
+
+  let weeks = 0;
+  while (uniqueWeeks.has(toDayKey(cursor))) {
+    weeks += 1;
+    cursor.setUTCDate(cursor.getUTCDate() - 7);
+  }
+  return weeks;
+}
+
 /** Rounded to one decimal place, clamped to [0, 100] — never returns a
  * value that would render a progress ring past full or negative even if
  * `completed` exceeds `target`. */

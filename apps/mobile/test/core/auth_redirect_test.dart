@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/app.dart';
 import 'package:mobile/features/auth/presentation/screens/welcome_screen.dart';
-import 'package:mobile/features/dashboard/presentation/screens/home_dashboard_screen.dart';
 import 'package:mobile/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:mobile/features/workout/presentation/screens/workout_screen.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 
 import '../helpers/pump_helpers.dart';
@@ -65,7 +65,7 @@ void main() {
   );
 
   testWidgets(
-    'authenticated users who completed onboarding land on the dashboard',
+    'authenticated users who completed onboarding land on the Workout tab',
     (tester) async {
       final container = await createTestContainer(
         signedIn: true,
@@ -80,7 +80,7 @@ void main() {
       );
       await pumpForAsyncSettle(tester);
 
-      expect(find.byType(HomeDashboardScreen), findsOneWidget);
+      expect(find.byType(WorkoutScreen), findsOneWidget);
       expect(find.byType(OnboardingScreen), findsNothing);
     },
   );

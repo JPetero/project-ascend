@@ -6,7 +6,6 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'tables/cached_dashboard_table.dart';
 import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
 import 'tables/cached_workout_session_table.dart';
@@ -22,20 +21,13 @@ const _workoutSessionRowId = 'singleton';
 
 /// Project Ascend's offline foundation.
 ///
-/// Sprint 1 scope: cache the profile, preferences, and dashboard fixture,
-/// preserve in-progress onboarding form state, and expose a simple sync
-/// status the UI can surface (e.g. "synced 2 minutes ago").
-///
-/// Deliberately out of scope for this sprint (see
-/// packages/docs/architecture.md for the planned strategy): local-first
-/// writes for workout/meal logs, an outbox table for queued mutations,
-/// idempotency keys, and server-side reconciliation. Those require a
-/// conflict-resolution design that a single-cache scaffold doesn't need yet.
+/// Caches the profile and preferences, preserves in-progress onboarding
+/// form state, and exposes a simple sync status the UI can surface (e.g.
+/// "synced 2 minutes ago"), plus an outbox for queued offline mutations.
 @DriftDatabase(
   tables: [
     CachedProfiles,
     CachedPreferencesTable,
-    CachedDashboardFixtures,
     OnboardingDrafts,
     SyncStatusRows,
     CachedWorkoutSessionRows,
@@ -46,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -57,6 +49,16 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await m.createTable(outboxEntryRows);
+      }
+      if (from < 4) {
+        // The dashboard fixture table only ever served fabricated
+        // sample steps/sleep/recovery data — see
+        // packages/docs/product/design-bible.md's "never show
+        // fabricated ... values in production mode" rule. Dropped
+        // rather than left dead, since nothing reads from it anymore.
+        await m.database.customStatement(
+          'DROP TABLE IF EXISTS cached_dashboard_fixtures',
+        );
       }
     },
   );
@@ -108,28 +110,6 @@ class AppDatabase extends _$AppDatabase {
     return jsonDecode(row.preferencesJson) as Map<String, dynamic>;
   }
 
-  Future<void> cacheDashboard(
-    String userId,
-    Map<String, dynamic> dashboard,
-  ) async {
-    await into(cachedDashboardFixtures).insertOnConflictUpdate(
-      CachedDashboardFixturesCompanion.insert(
-        userId: userId,
-        dashboardJson: jsonEncode(dashboard),
-        updatedAt: DateTime.now(),
-      ),
-    );
-    await _touchSyncStatus();
-  }
-
-  Future<Map<String, dynamic>?> readCachedDashboard(String userId) async {
-    final row = await (select(
-      cachedDashboardFixtures,
-    )..where((t) => t.userId.equals(userId))).getSingleOrNull();
-    if (row == null) return null;
-    return jsonDecode(row.dashboardJson) as Map<String, dynamic>;
-  }
-
   Future<void> saveOnboardingDraft(int step, Map<String, dynamic> draft) async {
     await into(onboardingDrafts).insertOnConflictUpdate(
       OnboardingDraftsCompanion.insert(
@@ -161,7 +141,7 @@ class AppDatabase extends _$AppDatabase {
     )..where((t) => t.id.equals(_syncStatusRowId))).watchSingleOrNull();
   }
 
-  Future<void> _touchSyncStatus() async {
+  Future<void> touchSyncStatus() async {
     await into(syncStatusRows).insertOnConflictUpdate(
       SyncStatusRowsCompanion.insert(
         id: _syncStatusRowId,
@@ -179,6 +159,7 @@ class AppDatabase extends _$AppDatabase {
         updatedAt: DateTime.now(),
       ),
     );
+    await touchSyncStatus();
   }
 
   Future<Map<String, dynamic>?> readCachedWorkoutSession() async {
@@ -201,7 +182,6 @@ class AppDatabase extends _$AppDatabase {
     await Future.wait([
       delete(cachedProfiles).go(),
       delete(cachedPreferencesTable).go(),
-      delete(cachedDashboardFixtures).go(),
       delete(onboardingDrafts).go(),
       delete(syncStatusRows).go(),
       delete(cachedWorkoutSessionRows).go(),

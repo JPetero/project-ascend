@@ -8,11 +8,12 @@ import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
-import '../../features/community/presentation/screens/community_screen.dart';
-import '../../features/dashboard/presentation/screens/home_dashboard_screen.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
+import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
-import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/social/presentation/screens/social_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
 import '../../features/workout/presentation/screens/exercise_detail_screen.dart';
 import '../../features/workout/presentation/screens/exercise_library_screen.dart';
@@ -115,18 +116,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             WorkoutPlanEditorScreen(planId: state.pathParameters['id']!),
       ),
+      GoRoute(
+        path: RoutePaths.dashboard,
+        builder: (context, state) => const DashboardScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
         branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RoutePaths.home,
-                builder: (context, state) => const HomeDashboardScreen(),
-              ),
-            ],
-          ),
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -138,7 +135,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.ascend,
+                path: RoutePaths.mealPrep,
+                builder: (context, state) => const MealPrepScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.social,
+                builder: (context, state) => const SocialScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.assistant,
                 builder: (context, state) => const AscendCommandCenterScreen(),
               ),
             ],
@@ -146,16 +159,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: RoutePaths.community,
-                builder: (context, state) => const CommunityScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: RoutePaths.profile,
-                builder: (context, state) => const ProfileScreen(),
+                path: RoutePaths.leaderboards,
+                builder: (context, state) => const LeaderboardsScreen(),
               ),
             ],
           ),
@@ -195,11 +200,11 @@ const _unauthenticatedPaths = {
   RoutePaths.signIn,
 };
 const _shellPaths = {
-  RoutePaths.home,
   RoutePaths.workout,
-  RoutePaths.ascend,
-  RoutePaths.community,
-  RoutePaths.profile,
+  RoutePaths.mealPrep,
+  RoutePaths.social,
+  RoutePaths.assistant,
+  RoutePaths.leaderboards,
 };
 
 String? _redirect(Ref ref, GoRouterState state) {
@@ -237,7 +242,7 @@ String? _redirect(Ref ref, GoRouterState state) {
             currentPath == RoutePaths.register ||
             currentPath == RoutePaths.signIn ||
             currentPath == RoutePaths.onboarding
-        ? RoutePaths.home
+        ? RoutePaths.workout
         : null;
   }
 

@@ -5,15 +5,18 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './common/audit/audit.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AuthIdentitiesModule } from './modules/auth-identities/auth-identities.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
+import { DeloadModule } from './modules/deload/deload.module';
 import { DevicesModule } from './modules/devices/devices.module';
 import { EquipmentTypesModule } from './modules/equipment-types/equipment-types.module';
 import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise-categories.module';
 import { ExercisesModule } from './modules/exercises/exercises.module';
 import { FoodsModule } from './modules/foods/foods.module';
 import { HealthModule } from './modules/health/health.module';
+import { LegalModule } from './modules/legal/legal.module';
 import { MacroTargetsModule } from './modules/macro-targets/macro-targets.module';
 import { MuscleGroupsModule } from './modules/muscle-groups/muscle-groups.module';
 import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module';
@@ -45,6 +48,9 @@ import { PrismaModule } from './prisma/prisma.module';
     AuditModule,
     IdempotencyModule,
     AuthModule,
+    AuthIdentitiesModule,
+    LegalModule,
+    DeloadModule,
     UsersModule,
     ProfilesModule,
     PreferencesModule,

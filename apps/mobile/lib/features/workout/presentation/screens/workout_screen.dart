@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../domain/exercise.dart';
 import '../../domain/workout.dart';
@@ -37,6 +38,7 @@ class WorkoutScreen extends ConsumerWidget {
             tooltip: 'History',
             onPressed: () => context.push(RoutePaths.workoutHistory),
           ),
+          const ProfileIconAction(),
         ],
       ),
       body: SafeArea(

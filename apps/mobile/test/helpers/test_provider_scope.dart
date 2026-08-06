@@ -4,6 +4,7 @@ import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
+import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/nutrition_summary_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
@@ -91,6 +92,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       nutritionSummaryRepositoryProvider.overrideWithValue(
         nutritionSummaryRepository ?? FakeNutritionSummaryRepository(),
+      ),
+      authIdentityRepositoryProvider.overrideWithValue(
+        FakeAuthIdentityRepository(),
       ),
     ],
   );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/app_shell.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../providers/companion_chat_controller.dart';
@@ -69,6 +70,7 @@ class _AscendCommandCenterScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(companion == Companion.atlas ? 'Atlas' : 'Nova'),
+        actions: const [ProfileIconAction()],
       ),
       body: SafeArea(
         child: Column(

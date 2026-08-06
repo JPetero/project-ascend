@@ -37,8 +37,8 @@ void main() {
       );
       await pumpForAsyncSettle(tester);
 
-      await tester.tap(find.text('Workout'));
-      await pumpForAsyncSettle(tester);
+      // Workout is the first tab and the post-onboarding landing screen —
+      // no tap needed to reach it.
       expect(find.byType(WorkoutScreen), findsOneWidget);
       expect(find.text('Full Body Strength'), findsOneWidget);
 
@@ -64,9 +64,6 @@ void main() {
     );
     await pumpForAsyncSettle(tester);
 
-    await tester.tap(find.text('Workout'));
-    await pumpForAsyncSettle(tester);
-
     await tester.tap(find.text('Exercises'));
     await pumpForAsyncSettle(tester);
 
@@ -83,9 +80,6 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const AscendApp()),
     );
-    await pumpForAsyncSettle(tester);
-
-    await tester.tap(find.text('Workout'));
     await pumpForAsyncSettle(tester);
 
     await tester.tap(find.byTooltip('History'));

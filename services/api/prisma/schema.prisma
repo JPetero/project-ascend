@@ -32,6 +32,18 @@ enum Companion {
   NOVA
 }
 
+// Coaching style is independent of companion choice (Atlas/Nova) — see
+// packages/docs/product/atlas-nova-bible.md. TOUGH must never insult, shame,
+// or override safety rules; it's intensity of delivery, not permission to
+// be unsafe.
+enum CoachingStyle {
+  GENTLE
+  BALANCED
+  DIRECT
+  TOUGH
+  ATHLETE
+}
+
 enum CompanionMode {
   STANDARD
   CHIBI
@@ -46,6 +58,17 @@ enum ThemeMode {
 enum UnitSystem {
   METRIC
   IMPERIAL
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
+enum LegalDocumentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
 }
 
 enum DeviceConnectionStatus {
@@ -63,21 +86,24 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens   RefreshToken[]
-  profile         Profile?
-  preference      Preference?
-  equipment       Equipment[]
-  workoutSchedule WorkoutSchedule?
-  devices         DeviceConnection[]
-  auditEvents     AuditEvent[]
-  workoutPlans    WorkoutPlan[]
-  workoutSessions WorkoutSession[]
-  personalRecords PersonalRecord[]
-  syncOperations  SyncOperation[]
-  ownedFoods      Food[]
-  mealEntries     MealEntry[]
-  macroTarget     MacroTarget?
-  waterEntries    WaterEntry[]
+  refreshTokens         RefreshToken[]
+  profile               Profile?
+  preference            Preference?
+  equipment             Equipment[]
+  workoutSchedule       WorkoutSchedule?
+  devices               DeviceConnection[]
+  auditEvents           AuditEvent[]
+  workoutPlans          WorkoutPlan[]
+  workoutSessions       WorkoutSession[]
+  personalRecords       PersonalRecord[]
+  syncOperations        SyncOperation[]
+  ownedFoods            Food[]
+  mealEntries           MealEntry[]
+  macroTarget           MacroTarget?
+  waterEntries          WaterEntry[]
+  authIdentities        AuthIdentity[]
+  legalAcceptances      LegalAcceptance[]
+  deloadRecommendations DeloadRecommendation[]
 
   @@index([status])
   @@map("users")
@@ -140,6 +166,13 @@ model Preference {
   userId               String        @unique
   companion            Companion     @default(ATLAS)
   companionMode        CompanionMode @default(STANDARD)
+  // Independent of `companion` by design — see
+  // packages/docs/product/atlas-nova-bible.md. Neither Atlas nor Nova is
+  // "for" a given coaching style.
+  coachingStyle        CoachingStyle @default(BALANCED)
+  // 1 (softest) - 5 (most intense) delivery of the selected coachingStyle.
+  // Never changes what's safe to recommend, only how it's phrased.
+  toneIntensity        Int           @default(3)
   themeMode            ThemeMode     @default(SYSTEM)
   reducedMotion        Boolean       @default(false)
   notificationsEnabled Boolean       @default(true)
@@ -787,4 +820,87 @@ model WaterEntry {
 
   @@index([userId, date])
   @@map("water_entries")
+}
+
+// --- Scenario 1/2/3: sign-in identities and legal acceptance -------------
+// See packages/docs/product/user-scenario-bible.md.
+
+// One row per external identity linked to an Ascend account. Every existing
+// user is backfilled with an EMAIL row (providerSubject = their user id) so
+// email/password login keeps working through the same lookup path once
+// Google/Apple linking (Scenario 2/3) goes live. Live Google/Apple OAuth
+// itself is NOT implemented this session — no credentials configured — this
+// is the durable architecture only.
+model AuthIdentity {
+  id              String       @id @default(uuid())
+  userId          String
+  provider        AuthProvider
+  // The provider's stable subject identifier for this identity (Google/Apple
+  // `sub`, or the user's own id for the EMAIL backfill row). Never the raw
+  // provider access token.
+  providerSubject String
+  providerEmail   String?
+  createdAt       DateTime     @default(now())
+  lastUsedAt      DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Prevents one external identity (e.g. one Google account) from ever being
+  // linked to two different Ascend users.
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@map("auth_identities")
+}
+
+// A specific published version of a legal document. Content is a
+// product-safe draft requiring professional legal review before
+// jurisdiction-specific release — see
+// packages/docs/product/wellness-ethics-bible.md.
+model LegalDocument {
+  id          String            @id @default(uuid())
+  type        LegalDocumentType
+  version     String
+  publishedAt DateTime          @default(now())
+  content     String
+
+  acceptances LegalAcceptance[]
+
+  @@unique([type, version])
+  @@map("legal_documents")
+}
+
+model LegalAcceptance {
+  id              String   @id @default(uuid())
+  userId          String
+  legalDocumentId String
+  acceptedAt      DateTime @default(now())
+  regionCode      String?
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalDocument LegalDocument @relation(fields: [legalDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([legalDocumentId])
+  @@map("legal_acceptances")
+}
+
+// --- Scenario 10: deload recommendation -----------------------------------
+
+// A single deload suggestion surfaced to the user. Never auto-applied —
+// always optional, dismissible, and postponable. See
+// packages/docs/product/user-scenario-bible.md Scenario 10 for the
+// deterministic signals allowed to produce one (no fabricated
+// sleep/recovery data).
+model DeloadRecommendation {
+  id             String    @id @default(uuid())
+  userId         String
+  suggestedAt    DateTime  @default(now())
+  reason         String
+  dismissedAt    DateTime?
+  postponedUntil DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("deload_recommendations")
 }

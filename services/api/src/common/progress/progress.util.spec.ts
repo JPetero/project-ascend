@@ -1,5 +1,6 @@
 import {
   calculateCompletionPercentage,
+  calculateConsecutiveActiveWeeks,
   calculateStreak,
   evaluateAchievements,
   groupByMonth,
@@ -38,6 +39,34 @@ describe('progress.util', () => {
       const now = new Date('2026-08-06T12:00:00Z');
       const dates = [new Date('2026-08-01T09:00:00Z')];
       expect(calculateStreak(dates, now)).toBe(0);
+    });
+  });
+
+  describe('calculateConsecutiveActiveWeeks', () => {
+    function daysAgo(now: Date, days: number): Date {
+      return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+
+    it('counts consecutive weeks with at least one activity, ending this week', () => {
+      const now = new Date('2026-08-06T12:00:00Z');
+      const dates = [daysAgo(now, 0), daysAgo(now, 7), daysAgo(now, 14), daysAgo(now, 21)];
+      expect(calculateConsecutiveActiveWeeks(dates, now)).toBe(4);
+    });
+
+    it('still counts a streak whose most recent activity was last week', () => {
+      const now = new Date('2026-08-06T12:00:00Z');
+      const dates = [daysAgo(now, 7), daysAgo(now, 14)];
+      expect(calculateConsecutiveActiveWeeks(dates, now)).toBe(2);
+    });
+
+    it('breaks on a skipped week', () => {
+      const now = new Date('2026-08-06T12:00:00Z');
+      const dates = [daysAgo(now, 0), daysAgo(now, 21)];
+      expect(calculateConsecutiveActiveWeeks(dates, now)).toBe(1);
+    });
+
+    it('returns 0 for no activity', () => {
+      expect(calculateConsecutiveActiveWeeks([], new Date())).toBe(0);
     });
   });
 

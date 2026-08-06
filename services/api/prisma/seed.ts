@@ -4,6 +4,7 @@ import {
   MeasurementType,
   MuscleRole,
   FoodSourceType,
+  LegalDocumentType,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -1413,6 +1414,116 @@ async function seedNutrition() {
   console.log(`Seeded ${NUTRITION_FOODS.length} foods.`);
 }
 
+// --- Scenario 1: Terms and safety (see packages/docs/product/user-scenario-bible.md) ---
+//
+// PRODUCT-SAFE DRAFT — NOT FINAL LEGAL COPY. This content is written to
+// satisfy the founder's required safety points (educational-only scope,
+// professional-care guidance, stop-on-symptoms warning, user responsibility,
+// no blanket harm-disclaimer language) so the acceptance flow has something
+// real to show and record against. It has NOT been reviewed by a lawyer and
+// is NOT jurisdiction-specific. It must go through professional legal
+// review before any production release — see
+// packages/docs/product/wellness-ethics-bible.md.
+const TERMS_OF_SERVICE_V1 = `# Project Ascend — Terms of Service (Draft v1)
+
+**This is a product-safe draft pending professional legal review. Do not
+treat this as final legal copy.**
+
+## What Ascend is
+
+Project Ascend provides educational fitness and wellness support — workout
+planning and logging, nutrition tracking, and guidance from the Atlas/Nova
+companion. It is **not a replacement for a doctor, physiotherapist,
+dietitian, or other licensed professional**. Where a question or situation
+falls outside general fitness guidance, Ascend will say so and recommend you
+consult a qualified professional rather than guess.
+
+## When Ascend will warn you
+
+Ascend may show a warning when a planned or logged activity appears
+inconsistent with your stated profile, recent training history, or any
+limitations you've told us about. These warnings are a prompt to pause and
+think, not a medical judgment.
+
+## Stop if something feels wrong
+
+Stop the activity and seek appropriate care if you experience pain,
+dizziness, difficulty breathing, chest pain, or any other concerning
+symptom during exercise. Do not continue "through" these signals because an
+app suggested a target — no target in Ascend overrides how your body
+actually feels.
+
+## Your responsibility
+
+You remain responsible for the exercise and nutrition decisions you make
+while using Ascend, including deciding whether a given workout, weight, or
+recommendation is appropriate for you on a given day. Ascend's guidance is
+support for that decision-making, not a substitute for your own judgment or
+a professional's.
+
+## Liability
+
+This section requires professional legal drafting for your jurisdiction
+before release. It will describe the company's responsibilities and any
+limitations on liability in specific, accurate terms — it will not use
+sweeping language like "we are not responsible for any harm," since that
+kind of blanket disclaimer does not remove a company's actual legal
+obligations and misrepresents them to users.
+
+## Changes to these terms
+
+If we materially change these terms, you'll be asked to review and accept
+the new version before continuing to use Ascend. We keep a record of which
+version you accepted and when.`;
+
+const PRIVACY_POLICY_V1 = `# Project Ascend — Privacy Policy (Draft v1)
+
+**This is a product-safe draft pending professional legal review. Do not
+treat this as final legal copy.**
+
+## What we store
+
+Your profile (name, date of birth, height, weight, and similar fields you
+provide), your workout and nutrition logs, your companion and preference
+settings, and account/authentication records (including which sign-in
+providers are linked to your account).
+
+## Why
+
+To run the app you're using — plan and log workouts, track nutrition,
+personalize the Atlas/Nova companion, and keep your data in sync across
+your devices.
+
+## Your control
+
+You can review and update your profile at any time from your dashboard. A
+full data-export and deletion flow is planned; see
+packages/docs/product/parking-lot.md for its current status.
+
+## Changes to this policy
+
+If we materially change this policy, you'll be asked to review and accept
+the new version before continuing to use Ascend, the same as Terms of
+Service changes.`;
+
+const LEGAL_DOCUMENTS = [
+  { type: LegalDocumentType.TERMS_OF_SERVICE, version: 'v1', content: TERMS_OF_SERVICE_V1 },
+  { type: LegalDocumentType.PRIVACY_POLICY, version: 'v1', content: PRIVACY_POLICY_V1 },
+] as const;
+
+async function seedLegalDocuments() {
+  for (const doc of LEGAL_DOCUMENTS) {
+    await prisma.legalDocument.upsert({
+      where: { type_version: { type: doc.type, version: doc.version } },
+      create: { type: doc.type, version: doc.version, content: doc.content },
+      update: { content: doc.content },
+    });
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`Seeded ${LEGAL_DOCUMENTS.length} legal documents.`);
+}
+
 async function main() {
   const categoryIds = new Map<string, string>();
   for (const category of CATEGORIES) {
@@ -1561,6 +1672,7 @@ async function main() {
   );
 
   await seedNutrition();
+  await seedLegalDocuments();
 }
 
 main()

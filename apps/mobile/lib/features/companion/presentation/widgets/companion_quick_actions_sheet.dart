@@ -20,7 +20,7 @@ const _quickActions = [
   _QuickAction(
     icon: Icons.chat_bubble_outline,
     label: 'Ask me anything',
-    path: RoutePaths.ascend,
+    path: RoutePaths.assistant,
   ),
   _QuickAction(
     icon: Icons.fitness_center_outlined,
@@ -30,12 +30,12 @@ const _quickActions = [
   _QuickAction(
     icon: Icons.restaurant_outlined,
     label: 'Log a meal',
-    path: RoutePaths.home,
+    path: RoutePaths.mealPrep,
   ),
   _QuickAction(
     icon: Icons.insights_outlined,
     label: 'Check my progress',
-    path: RoutePaths.home,
+    path: RoutePaths.dashboard,
   ),
 ];
 
@@ -72,7 +72,14 @@ class CompanionQuickActionsSheet extends StatelessWidget {
             title: Text(action.label),
             onTap: () {
               Navigator.of(context).pop();
-              context.go(action.path);
+              // Dashboard is a pushed route on top of the shell (see
+              // AppShell's [ProfileIconAction] doc comment), not a tab —
+              // push it rather than replacing the current tab location.
+              if (action.path == RoutePaths.dashboard) {
+                context.push(action.path);
+              } else {
+                context.go(action.path);
+              }
             },
           ),
         const SizedBox(height: AscendSpacing.sm),

@@ -6,7 +6,9 @@ import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/core/networking/api_client.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
+import 'package:mobile/features/auth/data/auth_identity_repository.dart';
 import 'package:mobile/features/auth/data/auth_repository.dart';
+import 'package:mobile/features/auth/domain/auth_identity.dart';
 import 'package:mobile/features/auth/domain/auth_user.dart';
 import 'package:mobile/features/profile/data/preferences_repository.dart';
 import 'package:mobile/features/profile/data/profile_repository.dart';
@@ -218,6 +220,19 @@ class FakeDeviceRepository extends DeviceRepository {
   Future<void> disconnect(String id) async {
     _devices.removeWhere((d) => d.id == id);
   }
+}
+
+class FakeAuthIdentityRepository extends AuthIdentityRepository {
+  FakeAuthIdentityRepository() : super(apiClient: _unusedApiClient());
+
+  @override
+  Future<List<AuthIdentity>> listMine() async => [
+    AuthIdentity(
+      provider: 'EMAIL',
+      providerEmail: 'test@example.com',
+      createdAt: DateTime(2026, 1, 1),
+    ),
+  ];
 }
 
 ApiClient _unusedApiClient() {
