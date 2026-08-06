@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 /**
  * `setNumber` is deliberately not client-supplied — the server assigns the
@@ -44,4 +53,28 @@ export class LogSetDto {
   @IsOptional()
   @IsBoolean()
   isWarmup?: boolean;
+
+  /**
+   * Rate of Perceived Exertion — a subjective 1-10 self-rating of how hard
+   * the set felt, half-point increments allowed (e.g. 7.5). Optional and
+   * never treated as a medical measurement; see ProgressionService for how
+   * it's used (to temper, never block, a load increase).
+   */
+  @ApiPropertyOptional({
+    description: 'Optional Rate of Perceived Exertion, 1-10 (half-point increments allowed).',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(10)
+  rpe?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Client-generated key identifying this exact set-logging attempt, so a network retry never creates a duplicate set.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey?: string;
 }

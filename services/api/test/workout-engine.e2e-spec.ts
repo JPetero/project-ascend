@@ -159,6 +159,97 @@ describe('Workout Engine (e2e)', () => {
       expect(created.body.data.exercises[0].exercise.slug).toBe('push-up');
     });
 
+    it('creates a plan with a description, archives and unarchives it, and rejects starting a session from an empty plan', async () => {
+      const exercises = await request(app.getHttpServer())
+        .get('/exercises')
+        .set(auth())
+        .expect(200);
+      const easyRun = exercises.body.data.find((e: { slug: string }) => e.slug === 'easy-run');
+
+      const created = await request(app.getHttpServer())
+        .post('/workout-plans')
+        .set(auth())
+        .send({
+          name: 'Draft Plan',
+          description: 'A short note about this plan.',
+          exercises: [
+            {
+              exerciseId: easyRun.id,
+              order: 1,
+              targetSets: 1,
+              targetDurationSeconds: 900,
+              targetDistanceMeters: 1500,
+            },
+          ],
+        })
+        .expect(201);
+      expect(created.body.data.description).toBe('A short note about this plan.');
+      expect(created.body.data.exercises[0].targetDistanceMeters).toBe(1500);
+      expect(created.body.data.archivedAt).toBeNull();
+      const planId = created.body.data.id;
+
+      // Emptying a plan via PATCH must still succeed (that's how a draft is
+      // built up incrementally) — the "no empty plans" rule is enforced at
+      // the point of *use* (starting a session), not at every edit.
+      const emptied = await request(app.getHttpServer())
+        .patch(`/workout-plans/${planId}`)
+        .set(auth())
+        .send({ exercises: [] })
+        .expect(200);
+      expect(emptied.body.data.exercises).toHaveLength(0);
+
+      await request(app.getHttpServer())
+        .post('/workout-sessions')
+        .set(auth())
+        .send({ workoutPlanId: planId })
+        .expect(409);
+
+      const archived = await request(app.getHttpServer())
+        .post(`/workout-plans/${planId}/archive`)
+        .set(auth())
+        .expect(200);
+      expect(archived.body.data.archivedAt).not.toBeNull();
+
+      const defaultList = await request(app.getHttpServer())
+        .get('/workout-plans')
+        .set(auth())
+        .expect(200);
+      expect(defaultList.body.data.some((p: { id: string }) => p.id === planId)).toBe(false);
+
+      const withArchived = await request(app.getHttpServer())
+        .get('/workout-plans?includeArchived=true')
+        .set(auth())
+        .expect(200);
+      expect(withArchived.body.data.some((p: { id: string }) => p.id === planId)).toBe(true);
+
+      const unarchived = await request(app.getHttpServer())
+        .post(`/workout-plans/${planId}/unarchive`)
+        .set(auth())
+        .expect(200);
+      expect(unarchived.body.data.archivedAt).toBeNull();
+    });
+
+    it('creating a plan twice with the same idempotency key never creates a duplicate', async () => {
+      const idempotencyKey = 'plan-create-key-1';
+      const first = await request(app.getHttpServer())
+        .post('/workout-plans')
+        .set(auth())
+        .send({ name: 'Idempotent Plan', idempotencyKey })
+        .expect(201);
+
+      const retry = await request(app.getHttpServer())
+        .post('/workout-plans')
+        .set(auth())
+        .send({ name: 'Idempotent Plan', idempotencyKey })
+        .expect(201);
+      expect(retry.body.data.id).toBe(first.body.data.id);
+
+      const list = await request(app.getHttpServer()).get('/workout-plans').set(auth()).expect(200);
+      expect(
+        list.body.data.filter((p: { name: string }) => p.name === 'Idempotent Plan'),
+      ).toHaveLength(1);
+    });
+
     it('lists, updates, and deletes a plan, all scoped to the owning user', async () => {
       const exercises = await request(app.getHttpServer())
         .get('/exercises')
@@ -380,6 +471,167 @@ describe('Workout Engine (e2e)', () => {
       );
       expect(curlRecords).toHaveLength(1);
       expect(curlRecords[0].value).toBe(12);
+    });
+
+    it('substituting an exercise redirects future sets while preserving already-logged history, and RPE is stored', async () => {
+      const exercises = await request(app.getHttpServer())
+        .get('/exercises')
+        .set(auth())
+        .expect(200);
+      const pushUp = exercises.body.data.find((e: { slug: string }) => e.slug === 'push-up');
+      const inclinePushUp = exercises.body.data.find(
+        (e: { slug: string }) => e.slug === 'incline-push-up',
+      );
+
+      const session = await request(app.getHttpServer())
+        .post('/workout-sessions')
+        .set(auth())
+        .send({})
+        .expect(201);
+      const sessionId = session.body.data.id;
+
+      // One set logged against the original exercise, with an RPE rating,
+      // before any substitution happens.
+      const firstSet = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/sets`)
+        .set(auth())
+        .send({ exerciseId: pushUp.id, reps: 12, rpe: 7.5 })
+        .expect(201);
+      expect(firstSet.body.data.rpe).toBe(7.5);
+
+      const substitution = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/substitutions`)
+        .set(auth())
+        .send({ originalExerciseId: pushUp.id, substituteExerciseId: inclinePushUp.id })
+        .expect(200);
+      expect(substitution.body.data.originalExercise.id).toBe(pushUp.id);
+      expect(substitution.body.data.substituteExercise.id).toBe(inclinePushUp.id);
+
+      // A client that still sends the *original* exercise id after
+      // substituting must land on the substitute, not the original —
+      // "apply only to uncompleted work."
+      const secondSet = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/sets`)
+        .set(auth())
+        .send({ exerciseId: pushUp.id, reps: 10, rpe: 6 })
+        .expect(201);
+      expect(secondSet.body.data.exercise.id).toBe(inclinePushUp.id);
+
+      const detail = await request(app.getHttpServer())
+        .get(`/workout-sessions/${sessionId}`)
+        .set(auth())
+        .expect(200);
+      const setExerciseIds = detail.body.data.sets.map(
+        (s: { exercise: { id: string } }) => s.exercise.id,
+      );
+      // The first (already-completed) set still references the original
+      // exercise — its history was never rewritten.
+      expect(setExerciseIds).toEqual([pushUp.id, inclinePushUp.id]);
+      expect(detail.body.data.substitutions).toHaveLength(1);
+
+      const finished = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/finish`)
+        .set(auth())
+        .send({ difficultyRating: 8 })
+        .expect(200);
+      expect(finished.body.data.session.difficultyRating).toBe(8);
+
+      const historyDetail = await request(app.getHttpServer())
+        .get(`/workout-history/${sessionId}`)
+        .set(auth())
+        .expect(200);
+      expect(historyDetail.body.data.substitutions).toHaveLength(1);
+      expect(historyDetail.body.data.substitutions[0].substituteExercise.id).toBe(inclinePushUp.id);
+      expect(historyDetail.body.data.difficultyRating).toBe(8);
+    });
+
+    it("rejects substituting on another user's session, and on a session that has already ended", async () => {
+      const exercises = await request(app.getHttpServer())
+        .get('/exercises')
+        .set(auth())
+        .expect(200);
+      const squat = exercises.body.data.find(
+        (e: { slug: string }) => e.slug === 'bodyweight-squat',
+      );
+      const chairSquat = exercises.body.data.find(
+        (e: { slug: string }) => e.slug === 'chair-squat',
+      );
+
+      const session = await request(app.getHttpServer())
+        .post('/workout-sessions')
+        .set(auth())
+        .send({})
+        .expect(201);
+      const sessionId = session.body.data.id;
+
+      const otherUser = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Other',
+          email: 'other-substitution-user@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const otherToken = otherUser.body.data.tokens.accessToken;
+
+      await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/substitutions`)
+        .set({ Authorization: `Bearer ${otherToken}` })
+        .send({ originalExerciseId: squat.id, substituteExerciseId: chairSquat.id })
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/abandon`)
+        .set(auth())
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/substitutions`)
+        .set(auth())
+        .send({ originalExerciseId: squat.id, substituteExerciseId: chairSquat.id })
+        .expect(409);
+    });
+
+    it('logging a set twice with the same idempotency key never creates a duplicate set', async () => {
+      const exercises = await request(app.getHttpServer())
+        .get('/exercises')
+        .set(auth())
+        .expect(200);
+      const plank = exercises.body.data.find((e: { slug: string }) => e.slug === 'plank');
+
+      const session = await request(app.getHttpServer())
+        .post('/workout-sessions')
+        .set(auth())
+        .send({})
+        .expect(201);
+      const sessionId = session.body.data.id;
+
+      const idempotencyKey = `set-${sessionId}-1`;
+      const first = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/sets`)
+        .set(auth())
+        .send({ exerciseId: plank.id, durationSeconds: 45, idempotencyKey })
+        .expect(201);
+
+      const retry = await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/sets`)
+        .set(auth())
+        .send({ exerciseId: plank.id, durationSeconds: 45, idempotencyKey })
+        .expect(201);
+      expect(retry.body.data.id).toBe(first.body.data.id);
+
+      const detail = await request(app.getHttpServer())
+        .get(`/workout-sessions/${sessionId}`)
+        .set(auth())
+        .expect(200);
+      expect(detail.body.data.sets).toHaveLength(1);
+
+      await request(app.getHttpServer())
+        .post(`/workout-sessions/${sessionId}/abandon`)
+        .set(auth())
+        .expect(200);
     });
 
     it('abandoning a session ends it without generating personal records', async () => {
