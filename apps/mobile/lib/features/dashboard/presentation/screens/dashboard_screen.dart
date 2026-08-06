@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/entitlements/capability.dart';
+import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/progress/progress_util.dart';
 import '../../../auth/domain/auth_identity.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
@@ -215,14 +217,17 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-/// Free/premium plan status. Entitlements aren't billed yet this session
-/// (see packages/docs/product/free-premium-policy.md) — every account is
-/// on the Free plan, shown honestly rather than upsold.
-class _SubscriptionStatusCard extends StatelessWidget {
+/// Free/premium plan status, sourced from the same [planTierProvider] every
+/// capability check uses — see
+/// packages/docs/product/free-premium-policy.md. No billing exists yet
+/// this session, so every account is on the Free plan, shown honestly
+/// rather than upsold.
+class _SubscriptionStatusCard extends ConsumerWidget {
   const _SubscriptionStatusCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tier = ref.watch(planTierProvider);
     return AscendCard(
       child: Row(
         children: [
@@ -231,12 +236,12 @@ class _SubscriptionStatusCard extends StatelessWidget {
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(width: AscendSpacing.sm),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Free plan'),
-                Text(
+                Text(tier == PlanTier.premium ? 'Premium plan' : 'Free plan'),
+                const Text(
                   'All core workout and nutrition tracking is included.',
                   style: TextStyle(fontSize: 12),
                 ),

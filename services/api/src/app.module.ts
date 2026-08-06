@@ -11,6 +11,7 @@ import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { DeloadModule } from './modules/deload/deload.module';
 import { DevicesModule } from './modules/devices/devices.module';
+import { EntitlementsModule } from './common/entitlements/entitlements.module';
 import { EquipmentTypesModule } from './modules/equipment-types/equipment-types.module';
 import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise-categories.module';
 import { ExercisesModule } from './modules/exercises/exercises.module';
@@ -47,6 +48,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     AuditModule,
     IdempotencyModule,
+    EntitlementsModule,
     AuthModule,
     AuthIdentitiesModule,
     LegalModule,
