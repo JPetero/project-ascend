@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CardioSession, Prisma } from '@prisma/client';
+import { CardioSession, Prisma, CardioSessionSource } from '@prisma/client';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { encodePolyline, trimEndpoints } from '../../common/geo/polyline.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AchievementsService } from '../achievements/achievements.service';
 import { CreateCardioSessionDto } from './dto/create-cardio-session.dto';
@@ -8,10 +9,11 @@ import { QueryCardioSessionsDto } from './dto/query-cardio-sessions.dto';
 import { UpdateCardioSessionDto } from './dto/update-cardio-session.dto';
 
 /**
- * Manual/summary GPS Cardio logging — see schema.prisma's CardioSession
- * comment and packages/docs/product/user-scenario-bible.md Scenario 12.
- * Route recording, live tracking, and wearable ingestion are future work;
- * this is the record-keeping and privacy-flag foundation they'll build on.
+ * Manual/summary and LIVE_GPS cardio logging — see schema.prisma's
+ * CardioSession comment and
+ * packages/docs/product/user-scenario-bible.md Scenario 12. Wearable
+ * ingestion (source: WEARABLE) is future work (see the Health Connect/
+ * HealthKit foundation); this module already has the field ready for it.
  */
 @Injectable()
 export class CardioService {
@@ -29,19 +31,41 @@ export class CardioService {
    */
   async create(userId: string, dto: CreateCardioSessionDto) {
     const run = async () => {
+      const hideRoute = dto.hideRoute ?? true;
+      // Route points are only ever persisted for a session whose owner
+      // did not ask to hide the route — trimmed/discarded points never
+      // reach storage in the first place (see trimEndpoints and its own
+      // doc comment), which is a stronger privacy guarantee than merely
+      // filtering them out of API responses after the fact.
+      let encodedRoute: string | null = null;
+      let routePointCount: number | null = null;
+      if (!hideRoute && dto.routePoints && dto.routePoints.length > 0) {
+        const trimmed = trimEndpoints(dto.routePoints, {
+          trimStart: dto.hideStartLocation ?? true,
+          trimEnd: dto.hideEndLocation ?? true,
+        });
+        if (trimmed.length > 0) {
+          encodedRoute = encodePolyline(trimmed);
+          routePointCount = trimmed.length;
+        }
+      }
+
       const created = await this.prisma.cardioSession.create({
         data: {
           userId,
           activityType: dto.activityType,
+          source: dto.source ?? CardioSessionSource.MANUAL,
           startedAt: new Date(dto.startedAt),
           durationSeconds: dto.durationSeconds,
           distanceMeters: dto.distanceMeters,
           elevationGainMeters: dto.elevationGainMeters,
           estimatedCalories: dto.estimatedCalories,
           regionLabel: dto.regionLabel,
-          hideRoute: dto.hideRoute ?? true,
+          hideRoute,
           hideStartLocation: dto.hideStartLocation ?? true,
           hideEndLocation: dto.hideEndLocation ?? true,
+          encodedRoute,
+          routePointCount,
           notes: dto.notes,
         },
       });
@@ -102,6 +126,12 @@ export class CardioService {
           ? { hideStartLocation: dto.hideStartLocation }
           : {}),
         ...(dto.hideEndLocation !== undefined ? { hideEndLocation: dto.hideEndLocation } : {}),
+        // Opting into hideRoute after the fact permanently discards the
+        // stored route rather than merely hiding it — there is no
+        // "un-hide" that brings the coordinates back, which is the
+        // stronger, more honest privacy guarantee (see
+        // wellness-ethics-bible.md's location-privacy rule).
+        ...(dto.hideRoute === true ? { encodedRoute: null, routePointCount: null } : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
     });
@@ -125,6 +155,7 @@ export class CardioService {
     return {
       id: session.id,
       activityType: session.activityType,
+      source: session.source,
       startedAt: session.startedAt,
       durationSeconds: session.durationSeconds,
       distanceMeters: session.distanceMeters,
@@ -134,6 +165,17 @@ export class CardioService {
       hideRoute: session.hideRoute,
       hideStartLocation: session.hideStartLocation,
       hideEndLocation: session.hideEndLocation,
+      // hasRoute tells the client whether a route exists at all, without
+      // ever exposing coordinates when hideRoute is set — the encoded
+      // route itself is only ever included in the response below when
+      // the owner hasn't asked to hide it.
+      hasRoute: session.encodedRoute != null,
+      ...(session.hideRoute
+        ? {}
+        : {
+            encodedRoute: session.encodedRoute,
+            routePointCount: session.routePointCount,
+          }),
       notes: session.notes,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,

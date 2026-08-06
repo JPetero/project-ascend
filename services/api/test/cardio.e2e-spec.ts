@@ -223,4 +223,87 @@ describe('GPS Cardio (e2e)', () => {
       ),
     ).toBe(true);
   });
+
+  it('stores an endpoint-trimmed route for a LIVE_GPS session and returns it only when hideRoute is false', async () => {
+    const routePoints = Array.from({ length: 30 }, (_, i) => ({
+      lat: 14.6 + i * 0.0001,
+      lng: 121.0 + i * 0.0001,
+      t: i * 5,
+    }));
+
+    const created = await request(app.getHttpServer())
+      .post('/cardio-sessions')
+      .set(authA())
+      .send({
+        activityType: 'HIKE',
+        source: 'LIVE_GPS',
+        startedAt: '2026-08-06T12:00:00.000Z',
+        durationSeconds: 2400,
+        distanceMeters: 6000,
+        hideRoute: false,
+        hideStartLocation: true,
+        hideEndLocation: true,
+        routePoints,
+      })
+      .expect(201);
+
+    expect(created.body.data.source).toBe('LIVE_GPS');
+    expect(created.body.data.hasRoute).toBe(true);
+    expect(created.body.data.encodedRoute).toEqual(expect.any(String));
+    // Trimmed 5 points off each end (default trim count).
+    expect(created.body.data.routePointCount).toBe(20);
+
+    // Hiding the route afterward permanently discards it from future reads.
+    const hidden = await request(app.getHttpServer())
+      .patch(`/cardio-sessions/${created.body.data.id}`)
+      .set(authA())
+      .send({ hideRoute: true })
+      .expect(200);
+
+    expect(hidden.body.data).not.toHaveProperty('encodedRoute');
+    expect(hidden.body.data).not.toHaveProperty('routePointCount');
+    expect(hidden.body.data.hasRoute).toBe(false);
+  });
+
+  it('never persists route points for a session logged with the default hidden route', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/cardio-sessions')
+      .set(authA())
+      .send({
+        activityType: 'SPRINT',
+        source: 'LIVE_GPS',
+        startedAt: '2026-08-06T13:00:00.000Z',
+        durationSeconds: 300,
+        routePoints: [
+          { lat: 14.6, lng: 121.0, t: 0 },
+          { lat: 14.601, lng: 121.001, t: 30 },
+        ],
+      })
+      .expect(201);
+
+    expect(created.body.data.hideRoute).toBe(true);
+    expect(created.body.data.hasRoute).toBe(false);
+    expect(created.body.data).not.toHaveProperty('encodedRoute');
+  });
+
+  it('rejects a route payload over the point-count limit', async () => {
+    const tooManyPoints = Array.from({ length: 2001 }, (_, i) => ({
+      lat: 14.6,
+      lng: 121.0,
+      t: i,
+    }));
+
+    await request(app.getHttpServer())
+      .post('/cardio-sessions')
+      .set(authA())
+      .send({
+        activityType: 'RUN',
+        source: 'LIVE_GPS',
+        startedAt: '2026-08-06T14:00:00.000Z',
+        durationSeconds: 600,
+        hideRoute: false,
+        routePoints: tooManyPoints,
+      })
+      .expect(400);
+  });
 });

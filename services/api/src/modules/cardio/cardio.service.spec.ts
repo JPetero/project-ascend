@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { CardioActivityType } from '@prisma/client';
+import { CardioActivityType, CardioSessionSource } from '@prisma/client';
 import { IdempotencyService } from '../../common/idempotency/idempotency.service';
+import { encodePolyline } from '../../common/geo/polyline.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AchievementsService } from '../achievements/achievements.service';
 import { CardioService } from './cardio.service';
@@ -11,6 +12,7 @@ function cardioSession(overrides: Partial<Record<string, unknown>> = {}) {
     id: 'cardio-1',
     userId: 'user-1',
     activityType: CardioActivityType.RUN,
+    source: CardioSessionSource.MANUAL,
     startedAt: new Date('2026-08-06T08:00:00.000Z'),
     durationSeconds: 1800,
     distanceMeters: 5000,
@@ -20,11 +22,21 @@ function cardioSession(overrides: Partial<Record<string, unknown>> = {}) {
     hideRoute: true,
     hideStartLocation: true,
     hideEndLocation: true,
+    encodedRoute: null,
+    routePointCount: null,
     notes: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
   };
+}
+
+function routePoints(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    lat: 14.6 + i * 0.0001,
+    lng: 121.0 + i * 0.0001,
+    t: i * 5,
+  }));
 }
 
 describe('CardioService', () => {
@@ -169,5 +181,92 @@ describe('CardioService', () => {
       where: { id: 'cardio-1' },
       data: { hideRoute: false, notes: 'Felt great' },
     });
+  });
+
+  it('stores an encoded, endpoint-trimmed route for a LIVE_GPS session when hideRoute is false', async () => {
+    prisma.cardioSession.create.mockResolvedValue(cardioSession());
+    const points = routePoints(20);
+
+    await service.create('user-1', {
+      activityType: CardioActivityType.RUN,
+      source: CardioSessionSource.LIVE_GPS,
+      startedAt: '2026-08-06T08:00:00.000Z',
+      durationSeconds: 1800,
+      distanceMeters: 5000,
+      hideRoute: false,
+      hideStartLocation: true,
+      hideEndLocation: true,
+      routePoints: points,
+    });
+
+    const trimmed = points.slice(5, 15); // default trim count is 5 each end
+    expect(prisma.cardioSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          source: CardioSessionSource.LIVE_GPS,
+          encodedRoute: encodePolyline(trimmed),
+          routePointCount: 10,
+        }),
+      }),
+    );
+  });
+
+  it('never persists route points when hideRoute is true (the default)', async () => {
+    prisma.cardioSession.create.mockResolvedValue(cardioSession());
+
+    await service.create('user-1', {
+      activityType: CardioActivityType.RUN,
+      source: CardioSessionSource.LIVE_GPS,
+      startedAt: '2026-08-06T08:00:00.000Z',
+      durationSeconds: 1800,
+      routePoints: routePoints(20),
+      // hideRoute omitted — defaults to true.
+    });
+
+    expect(prisma.cardioSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ encodedRoute: null, routePointCount: null }),
+      }),
+    );
+  });
+
+  it('wipes a previously stored route permanently once hideRoute flips to true', async () => {
+    prisma.cardioSession.findUnique.mockResolvedValue(
+      cardioSession({ hideRoute: false, encodedRoute: 'abc123', routePointCount: 10 }),
+    );
+    prisma.cardioSession.update.mockResolvedValue(
+      cardioSession({ hideRoute: true, encodedRoute: null, routePointCount: null }),
+    );
+
+    await service.update('user-1', 'cardio-1', { hideRoute: true });
+
+    expect(prisma.cardioSession.update).toHaveBeenCalledWith({
+      where: { id: 'cardio-1' },
+      data: { hideRoute: true, encodedRoute: null, routePointCount: null },
+    });
+  });
+
+  it('never includes route data in a response when hideRoute is true, even if a route exists internally', async () => {
+    prisma.cardioSession.findUnique.mockResolvedValue(
+      cardioSession({ hideRoute: true, encodedRoute: 'shouldNeverLeak', routePointCount: 10 }),
+    );
+
+    const result = await service.getById('user-1', 'cardio-1');
+
+    expect(result).not.toHaveProperty('encodedRoute');
+    expect(result).not.toHaveProperty('routePointCount');
+    expect(result.hasRoute).toBe(true);
+  });
+
+  it('includes route data in a response when hideRoute is false', async () => {
+    prisma.cardioSession.findUnique.mockResolvedValue(
+      cardioSession({ hideRoute: false, encodedRoute: 'abc123', routePointCount: 10 }),
+    );
+
+    const result = await service.getById('user-1', 'cardio-1');
+
+    expect(result.encodedRoute).toBe('abc123');
+    expect(result.routePointCount).toBe(10);
+    expect(result.hasRoute).toBe(true);
   });
 });

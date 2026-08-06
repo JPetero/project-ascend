@@ -5,12 +5,14 @@ import 'package:mobile/features/cardio/domain/cardio_session.dart';
 final sampleCardioSession = CardioSession(
   id: 'cardio-1',
   activityType: CardioActivityType.run,
+  source: CardioSessionSource.manual,
   startedAt: DateTime.utc(2026, 8, 6, 8),
   durationSeconds: 1800,
   distanceMeters: 5000,
   hideRoute: true,
   hideStartLocation: true,
   hideEndLocation: true,
+  hasRoute: false,
 );
 
 /// In-memory stand-in for cardio session logging.
@@ -35,9 +37,14 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
   Future<({CardioSession session, List<Achievement> newAchievements})> create(
     CardioSessionInput input,
   ) async {
+    final hasRoute =
+        !(input.hideRoute ?? true) &&
+        input.routePoints != null &&
+        input.routePoints!.isNotEmpty;
     final session = CardioSession(
       id: 'cardio-${_idCounter++}',
       activityType: input.activityType,
+      source: input.source ?? CardioSessionSource.manual,
       startedAt: input.startedAt,
       durationSeconds: input.durationSeconds,
       distanceMeters: input.distanceMeters,
@@ -47,6 +54,7 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
       hideRoute: input.hideRoute ?? true,
       hideStartLocation: input.hideStartLocation ?? true,
       hideEndLocation: input.hideEndLocation ?? true,
+      hasRoute: hasRoute,
       notes: input.notes,
     );
     _sessions.add(session);
@@ -66,6 +74,7 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
     final updated = CardioSession(
       id: existing.id,
       activityType: existing.activityType,
+      source: existing.source,
       startedAt: existing.startedAt,
       durationSeconds: existing.durationSeconds,
       distanceMeters: existing.distanceMeters,
@@ -75,6 +84,7 @@ class FakeCardioSessionRepository implements CardioSessionRepository {
       hideRoute: hideRoute ?? existing.hideRoute,
       hideStartLocation: hideStartLocation ?? existing.hideStartLocation,
       hideEndLocation: hideEndLocation ?? existing.hideEndLocation,
+      hasRoute: (hideRoute ?? existing.hideRoute) ? false : existing.hasRoute,
       notes: notes ?? existing.notes,
     );
     _sessions[index] = updated;

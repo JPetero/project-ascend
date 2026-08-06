@@ -1012,15 +1012,31 @@ model AchievementAward {
 
 enum CardioActivityType {
   WALK
+  JOG
   RUN
+  SPRINT
   CYCLE
+  HIKE
+  WHEELCHAIR
   OTHER
 }
 
+// Distinguishes how a session's summary numbers were produced — matters
+// for privacy (only LIVE_GPS ever has route points to store) and, later,
+// for Rankings anti-cheat (a manual entry must never be silently treated
+// as GPS-verified). See packages/docs/product/user-scenario-bible.md
+// Scenario 12/25's manual-vs-verified distinction.
+enum CardioSessionSource {
+  MANUAL
+  LIVE_GPS
+  WEARABLE
+}
+
 model CardioSession {
-  id                  String             @id @default(uuid())
+  id                  String              @id @default(uuid())
   userId              String
   activityType        CardioActivityType
+  source              CardioSessionSource @default(MANUAL)
   startedAt           DateTime
   durationSeconds     Int
   distanceMeters      Float?
@@ -1034,15 +1050,24 @@ model CardioSession {
   // one.
   regionLabel         String?
   // Private-by-default route/location visibility, independent toggles
-  // per Scenario 12's "hide start / end / route" requirement — currently
-  // enforced because there is no route data to expose yet, and honored
-  // going forward once real route recording exists.
-  hideRoute           Boolean            @default(true)
-  hideStartLocation   Boolean            @default(true)
-  hideEndLocation     Boolean            @default(true)
+  // per Scenario 12's "hide start / end / route" requirement.
+  hideRoute           Boolean             @default(true)
+  hideStartLocation   Boolean             @default(true)
+  hideEndLocation     Boolean             @default(true)
+  // Google-style encoded polyline (see common/geo/polyline.util.ts) of a
+  // LIVE_GPS session's route, already endpoint-trimmed per
+  // hideStartLocation/hideEndLocation and entirely absent when
+  // hideRoute is true — trimmed/discarded points are never persisted in
+  // the first place, not merely filtered at read time. Null for MANUAL
+  // sessions (no coordinates were ever recorded) and for any session
+  // whose owner chose hideRoute.
+  encodedRoute        String?             @db.Text
+  // Point count of the route actually stored (post-trimming), kept
+  // alongside encodedRoute for display/debugging without decoding it.
+  routePointCount     Int?
   notes               String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

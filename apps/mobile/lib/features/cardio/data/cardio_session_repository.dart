@@ -6,6 +6,7 @@ import '../domain/cardio_session.dart';
 class CardioSessionInput {
   const CardioSessionInput({
     required this.activityType,
+    this.source,
     required this.startedAt,
     required this.durationSeconds,
     this.distanceMeters,
@@ -15,10 +16,13 @@ class CardioSessionInput {
     this.hideRoute,
     this.hideStartLocation,
     this.hideEndLocation,
+    this.routePoints,
     this.notes,
-  });
+    String? idempotencyKey,
+  }) : _idempotencyKey = idempotencyKey;
 
   final CardioActivityType activityType;
+  final CardioSessionSource? source;
   final DateTime startedAt;
   final int durationSeconds;
   final double? distanceMeters;
@@ -28,10 +32,13 @@ class CardioSessionInput {
   final bool? hideRoute;
   final bool? hideStartLocation;
   final bool? hideEndLocation;
+  final List<RoutePoint>? routePoints;
   final String? notes;
+  final String? _idempotencyKey;
 
   Map<String, dynamic> toJson() => {
     'activityType': cardioActivityTypeToJson(activityType),
+    if (source != null) 'source': cardioSessionSourceToJson(source!),
     'startedAt': startedAt.toUtc().toIso8601String(),
     'durationSeconds': durationSeconds,
     'distanceMeters': ?distanceMeters,
@@ -41,8 +48,15 @@ class CardioSessionInput {
     'hideRoute': ?hideRoute,
     'hideStartLocation': ?hideStartLocation,
     'hideEndLocation': ?hideEndLocation,
+    if (routePoints != null && routePoints!.isNotEmpty)
+      'routePoints': routePoints!.map((p) => p.toJson()).toList(),
     'notes': ?notes,
-    'idempotencyKey': generateIdempotencyKey('cardio-session'),
+    // A caller finishing a recovered/interrupted live session passes its
+    // own stable idempotencyKey (the session's localId) so retrying the
+    // same finish() after a crash never creates a duplicate server
+    // session; every other caller gets a fresh one per call.
+    'idempotencyKey':
+        _idempotencyKey ?? generateIdempotencyKey('cardio-session'),
   };
 }
 

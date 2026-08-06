@@ -25,6 +25,7 @@ abstract final class RoutePaths {
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
   static const cardioLog = '/cardio/new';
+  static const liveCardio = '/cardio/live';
 
   // Workout Engine — pushed on top of the shell (not nested tab routes) so
   // the immersive player/summary screens can hide the bottom navigation.

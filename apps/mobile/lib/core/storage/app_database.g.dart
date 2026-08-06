@@ -7169,6 +7169,279 @@ class PendingCelebrationsCompanion extends UpdateCompanion<PendingCelebration> {
   }
 }
 
+class $CachedCardioSessionRowsTable extends CachedCardioSessionRows
+    with TableInfo<$CachedCardioSessionRowsTable, CachedCardioSessionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedCardioSessionRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sessionJsonMeta = const VerificationMeta(
+    'sessionJson',
+  );
+  @override
+  late final GeneratedColumn<String> sessionJson = GeneratedColumn<String>(
+    'session_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, sessionJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_cardio_session_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedCardioSessionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('session_json')) {
+      context.handle(
+        _sessionJsonMeta,
+        sessionJson.isAcceptableOrUnknown(
+          data['session_json']!,
+          _sessionJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedCardioSessionRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedCardioSessionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_json'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedCardioSessionRowsTable createAlias(String alias) {
+    return $CachedCardioSessionRowsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedCardioSessionRow extends DataClass
+    implements Insertable<CachedCardioSessionRow> {
+  final String id;
+  final String sessionJson;
+  final DateTime updatedAt;
+  const CachedCardioSessionRow({
+    required this.id,
+    required this.sessionJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['session_json'] = Variable<String>(sessionJson);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CachedCardioSessionRowsCompanion toCompanion(bool nullToAbsent) {
+    return CachedCardioSessionRowsCompanion(
+      id: Value(id),
+      sessionJson: Value(sessionJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CachedCardioSessionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedCardioSessionRow(
+      id: serializer.fromJson<String>(json['id']),
+      sessionJson: serializer.fromJson<String>(json['sessionJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sessionJson': serializer.toJson<String>(sessionJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CachedCardioSessionRow copyWith({
+    String? id,
+    String? sessionJson,
+    DateTime? updatedAt,
+  }) => CachedCardioSessionRow(
+    id: id ?? this.id,
+    sessionJson: sessionJson ?? this.sessionJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CachedCardioSessionRow copyWithCompanion(
+    CachedCardioSessionRowsCompanion data,
+  ) {
+    return CachedCardioSessionRow(
+      id: data.id.present ? data.id.value : this.id,
+      sessionJson: data.sessionJson.present
+          ? data.sessionJson.value
+          : this.sessionJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedCardioSessionRow(')
+          ..write('id: $id, ')
+          ..write('sessionJson: $sessionJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sessionJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedCardioSessionRow &&
+          other.id == this.id &&
+          other.sessionJson == this.sessionJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CachedCardioSessionRowsCompanion
+    extends UpdateCompanion<CachedCardioSessionRow> {
+  final Value<String> id;
+  final Value<String> sessionJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CachedCardioSessionRowsCompanion({
+    this.id = const Value.absent(),
+    this.sessionJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedCardioSessionRowsCompanion.insert({
+    required String id,
+    required String sessionJson,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sessionJson = Value(sessionJson),
+       updatedAt = Value(updatedAt);
+  static Insertable<CachedCardioSessionRow> custom({
+    Expression<String>? id,
+    Expression<String>? sessionJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionJson != null) 'session_json': sessionJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedCardioSessionRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sessionJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedCardioSessionRowsCompanion(
+      id: id ?? this.id,
+      sessionJson: sessionJson ?? this.sessionJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sessionJson.present) {
+      map['session_json'] = Variable<String>(sessionJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedCardioSessionRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionJson: $sessionJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7198,6 +7471,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CachedMacroTargetsTable(this);
   late final $PendingCelebrationsTable pendingCelebrations =
       $PendingCelebrationsTable(this);
+  late final $CachedCardioSessionRowsTable cachedCardioSessionRows =
+      $CachedCardioSessionRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7216,6 +7491,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedWaterEntries,
     cachedMacroTargets,
     pendingCelebrations,
+    cachedCardioSessionRows,
   ];
 }
 
@@ -10890,6 +11166,189 @@ typedef $$PendingCelebrationsTableProcessedTableManager =
       PendingCelebration,
       PrefetchHooks Function()
     >;
+typedef $$CachedCardioSessionRowsTableCreateCompanionBuilder =
+    CachedCardioSessionRowsCompanion Function({
+      required String id,
+      required String sessionJson,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedCardioSessionRowsTableUpdateCompanionBuilder =
+    CachedCardioSessionRowsCompanion Function({
+      Value<String> id,
+      Value<String> sessionJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedCardioSessionRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedCardioSessionRowsTable> {
+  $$CachedCardioSessionRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedCardioSessionRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedCardioSessionRowsTable> {
+  $$CachedCardioSessionRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedCardioSessionRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedCardioSessionRowsTable> {
+  $$CachedCardioSessionRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionJson => $composableBuilder(
+    column: $table.sessionJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CachedCardioSessionRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedCardioSessionRowsTable,
+          CachedCardioSessionRow,
+          $$CachedCardioSessionRowsTableFilterComposer,
+          $$CachedCardioSessionRowsTableOrderingComposer,
+          $$CachedCardioSessionRowsTableAnnotationComposer,
+          $$CachedCardioSessionRowsTableCreateCompanionBuilder,
+          $$CachedCardioSessionRowsTableUpdateCompanionBuilder,
+          (
+            CachedCardioSessionRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedCardioSessionRowsTable,
+              CachedCardioSessionRow
+            >,
+          ),
+          CachedCardioSessionRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedCardioSessionRowsTableTableManager(
+    _$AppDatabase db,
+    $CachedCardioSessionRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedCardioSessionRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedCardioSessionRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedCardioSessionRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sessionJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedCardioSessionRowsCompanion(
+                id: id,
+                sessionJson: sessionJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sessionJson,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedCardioSessionRowsCompanion.insert(
+                id: id,
+                sessionJson: sessionJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedCardioSessionRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedCardioSessionRowsTable,
+      CachedCardioSessionRow,
+      $$CachedCardioSessionRowsTableFilterComposer,
+      $$CachedCardioSessionRowsTableOrderingComposer,
+      $$CachedCardioSessionRowsTableAnnotationComposer,
+      $$CachedCardioSessionRowsTableCreateCompanionBuilder,
+      $$CachedCardioSessionRowsTableUpdateCompanionBuilder,
+      (
+        CachedCardioSessionRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedCardioSessionRowsTable,
+          CachedCardioSessionRow
+        >,
+      ),
+      CachedCardioSessionRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10926,4 +11385,9 @@ class $AppDatabaseManager {
       $$CachedMacroTargetsTableTableManager(_db, _db.cachedMacroTargets);
   $$PendingCelebrationsTableTableManager get pendingCelebrations =>
       $$PendingCelebrationsTableTableManager(_db, _db.pendingCelebrations);
+  $$CachedCardioSessionRowsTableTableManager get cachedCardioSessionRows =>
+      $$CachedCardioSessionRowsTableTableManager(
+        _db,
+        _db.cachedCardioSessionRows,
+      );
 }

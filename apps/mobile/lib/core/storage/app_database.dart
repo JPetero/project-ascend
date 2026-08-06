@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/achievement_celebration_table.dart';
+import 'tables/cached_cardio_session_table.dart';
 import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
 import 'tables/cached_workout_session_table.dart';
@@ -20,6 +21,7 @@ part 'app_database.g.dart';
 const _syncStatusRowId = 'singleton';
 const _onboardingDraftRowId = 'singleton';
 const _workoutSessionRowId = 'singleton';
+const _cardioSessionRowId = 'singleton';
 
 /// Project Ascend's offline foundation.
 ///
@@ -28,7 +30,10 @@ const _workoutSessionRowId = 'singleton';
 /// "synced 2 minutes ago"), plus an outbox for queued offline mutations,
 /// plus (as of schema version 5) the full offline-first Nutrition cache,
 /// plus (as of schema version 6) a durable queue of pending achievement
-/// celebrations — see packages/docs/build-session-5.md.
+/// celebrations — see packages/docs/build-session-5.md, plus (as of
+/// schema version 7) a single-row cache of the in-progress live-GPS
+/// cardio session, mirroring CachedWorkoutSessionRows — see
+/// packages/docs/build-session-7.md.
 @DriftDatabase(
   tables: [
     CachedProfiles,
@@ -44,13 +49,14 @@ const _workoutSessionRowId = 'singleton';
     CachedWaterEntries,
     CachedMacroTargets,
     PendingCelebrations,
+    CachedCardioSessionRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -82,6 +88,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 6) {
         await m.createTable(pendingCelebrations);
+      }
+      if (from < 7) {
+        await m.createTable(cachedCardioSessionRows);
       }
     },
   );
@@ -197,6 +206,36 @@ class AppDatabase extends _$AppDatabase {
     await (delete(
       cachedWorkoutSessionRows,
     )..where((t) => t.id.equals(_workoutSessionRowId))).go();
+  }
+
+  // ---------------------------------------------------------------------
+  // Live GPS cardio (schema version 7) — see
+  // tables/cached_cardio_session_table.dart's doc comment. Same
+  // single-row-cache shape as cacheWorkoutSession above, on purpose.
+  // ---------------------------------------------------------------------
+
+  Future<void> cacheLiveCardioSession(Map<String, dynamic> session) async {
+    await into(cachedCardioSessionRows).insertOnConflictUpdate(
+      CachedCardioSessionRowsCompanion.insert(
+        id: _cardioSessionRowId,
+        sessionJson: jsonEncode(session),
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> readCachedLiveCardioSession() async {
+    final row = await (select(
+      cachedCardioSessionRows,
+    )..where((t) => t.id.equals(_cardioSessionRowId))).getSingleOrNull();
+    if (row == null) return null;
+    return jsonDecode(row.sessionJson) as Map<String, dynamic>;
+  }
+
+  Future<void> clearCachedLiveCardioSession() async {
+    await (delete(
+      cachedCardioSessionRows,
+    )..where((t) => t.id.equals(_cardioSessionRowId))).go();
   }
 
   // ---------------------------------------------------------------------
@@ -477,6 +516,7 @@ class AppDatabase extends _$AppDatabase {
       delete(cachedWaterEntries).go(),
       delete(cachedMacroTargets).go(),
       delete(pendingCelebrations).go(),
+      delete(cachedCardioSessionRows).go(),
     ]);
   }
 }
