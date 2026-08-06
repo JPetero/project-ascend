@@ -188,3 +188,242 @@ their respective trees; no shared files were added this session that would need 
 
 See the "Build Session 1 (P0) — Verified Build Results" section added to the root `README.md`,
 generated from the actual command output captured in this log — not from memory or assumption.
+
+---
+
+# P1 — Workout Engine MVP (extending the already-substantial Sprint 2 implementation)
+
+The Workout Engine already existed as a complete, tested vertical slice from prior session work
+(catalog browsing, custom-from-catalog plans, full session lifecycle with offline-first logging,
+deterministic progression suggestions, personal-record detection, history, 8 Flutter screens, 30
+backend + 30 Flutter tests, all passing). This section's job was to close the specific gaps
+between that implementation and this session's fuller P1 spec — not to rebuild it.
+
+## P1.1 — Domain model: added `MeasurementType` and `targetDistanceMeters`
+
+Two real gaps in the existing normalized schema:
+1. **No `measurementType` on `Exercise`.** The data model could already store
+   reps/weight/duration/distance on a `WorkoutSet`, but nothing declared which combination was
+   *valid* for a given exercise, or told a client which input controls to show. Added
+   `enum MeasurementType { REPS_WEIGHT, REPS_ONLY, DURATION, DISTANCE_DURATION, ASSISTED_WEIGHT,
+   BODYWEIGHT }` and `Exercise.measurementType` (`@default(REPS_WEIGHT)`), plus a
+   `measurementType` filter on `GET /exercises`. Deliberately no `CALORIES` option — there is no
+   real calorie-estimation pipeline, and the P0 operating rules explicitly forbid faking health
+   data.
+2. **No distance target on prescribed exercises.** `WorkoutExercise`/`WorkoutPlanExercise` had
+   `targetReps`/`targetDurationSeconds`/`targetWeightKg` but no `targetDistanceMeters`, so a
+   walking/running entry in a plan had no way to prescribe a distance. Added
+   `targetDistanceMeters Float?` to both models.
+
+Migration: `20260806025612_p1_measurement_type_and_distance_target`, applied to both `ascend_dev`
+and `ascend_test`. Also added `ESTIMATED_ONE_REP_MAX` and `BEST_PACE` to `PersonalRecordType` (see
+P1.6 below) in the same migration.
+
+`ExercisesService.serialize()` now includes `measurementType` in the API response; the
+`Prisma migrate diff`/non-interactive workaround from P0.2/P0.3 was reused (this shell doesn't
+support `prisma migrate dev`'s interactive prompt).
+
+Not implemented: a separate `WorkoutSessionExercise` join table, or a
+`WorkoutSyncOperation`/idempotency-key table. The existing design already gets the required
+properties a different, already-working way — see P1.7 for why a formal idempotency-key table
+wasn't added on top of the existing offline-sync design.
+
+## P1.2 — Exercise safety model: already satisfied
+
+Every field the spec lists (name, slug, description, difficulty, instructions, primary/secondary
+muscles, equipment, safety guidance, common mistakes, alternatives, media placeholders) already
+existed from Sprint 2. "Movement pattern" and "regression/progression options" beyond
+`alternatives` were not added as separate fields — `alternatives` (bidirectional,
+`ExerciseAlternative`) already models exactly this relationship, and several new seed exercises
+are explicit regressions linked via that mechanism (e.g. `incline-push-up`/`knee-push-up` as
+alternatives of `push-up`; `chair-squat` of `bodyweight-squat`; `wall-sit` of `plank`). No sex-based
+exercise selection exists anywhere in the codebase — plan creation is driven by catalog choice,
+goals/equipment/experience already collected in onboarding, never by `sexForCalculations` (which
+exists solely for BMR/calorie-style calculations, unrelated to workout selection).
+
+## P1.3 — Seed data: expanded from 22 to 49 exercises, 4 to 13 workouts
+
+Added 27 new exercises to reach 49 total (`services/api/prisma/seed.ts`), covering every category
+the spec requires that wasn't already present: bodyweight regressions and core work (11:
+`incline-push-up`, `knee-push-up`, `wall-sit`, `glute-bridge`, `superman-hold`, `dead-bug`,
+`bird-dog`, `step-up`, `chair-squat`, `side-plank`, `bicycle-crunch`), dumbbell (6), barbell (2),
+resistance-band (3), mobility (2: `hip-flexor-stretch`, `ninety-ninety-hip-stretch`), and — the
+categories that were entirely missing before — walking and running (3: `brisk-walk`, `easy-run`,
+`interval-run`, all `DISTANCE_DURATION`). Added 14 new alternative pairs, several specifically
+regression/progression relationships (push-up family, squat family).
+
+Added the 9 required starter plans (`Beginner Full Body`, `Home Bodyweight`, `Dumbbell Full Body`,
+`Upper/Lower Starter`, `Push/Pull/Legs Starter`, `Calisthenics Starter`, `Mobility and Recovery`,
+`Beginner Walking Plan`, `Beginner Running Plan`) **as additions**, keeping the original 4 Sprint 2
+plans (`Full Body Strength`, `Upper Body Push`, `Bodyweight HIIT Blast`, `Mobility & Recovery
+Flow`) unchanged — `test/workout-engine.e2e-spec.ts` references `full-body-strength` by slug and
+its exact exercise list, and the spec's "at least these starter plans" is a floor, not a
+replacement list. `Upper/Lower Starter` and `Push/Pull/Legs Starter` are each one representative
+session introducing that split style, not a full multi-day rotation — the data model represents
+one `Workout` at a time, so a real multi-day program is out of scope here (documented in the seed
+file and in `roadmap.md`).
+
+**Idempotency verified for real, not assumed**: ran `pnpm prisma:seed` twice back-to-back, then
+queried actual row counts directly via `psql` (not the seed script's own log output, which only
+reflects source array lengths): `exercises=49`, `workouts=13`, `workout_exercises=52`,
+`exercise_alternatives=38` — identical after both runs, confirming the upsert-based seed is
+genuinely idempotent, not just log-idempotent.
+
+## P1.4 — Backend modules and APIs: measurement-type filter added, rest already existed
+
+`exercises`, `workouts`/`workout-plans`, `workout-sessions`, `personal-records`,
+`workout-history` modules, DTOs, controllers, and ownership checks (404, not 403, on
+cross-user access — see Sprint 2) already existed and already cover every required capability
+except measurement-type filtering, added this session (`QueryExercisesDto.measurementType`,
+`ExercisesService.list()`'s `where` clause). Transactions for session completion and PR detection
+already existed (`WorkoutSessionsService.finish()` -> `endSession()` inside the session's own
+flow, `PersonalRecordsService.detectAndRecord()` called right after).
+
+## P1.5 — Progression suggestions: already satisfied
+
+`ExercisesService.getProgressionSuggestion()`/`suggestNext()` already implements exactly the rules
+the spec describes: conservative, deterministic, no AI, per-measurement-type rules (weight: small
+guaranteed increment; duration: `max(+5s, +10%)`; distance: `+10%`; reps-only: `+1`), and every
+suggestion's `rationale` string explicitly offers "repeat if not fully recovered" as an equally
+valid choice — nothing is forced. No "user-reported effort" input exists yet (RPE/RIR) — the
+existing rule set doesn't need it (it works from completed-vs-target reps already implicit in what
+was logged), and adding an effort-rating field/UI was out of scope for the time available this
+session; noted as a real gap below.
+
+## P1.6 — Personal record detection: added estimated 1RM and pace
+
+`PersonalRecordsService.computeCandidates()` already handled max weight/reps/duration/distance and
+session volume. Added two more candidate types, both across `MeasurementType` boundaries the spec
+calls out:
+- **`ESTIMATED_ONE_REP_MAX`** — Epley formula (`weight * (1 + reps/30)`), computed only from sets
+  of 12 reps or fewer (the formula's error grows sharply beyond that, to the point of being
+  actively misleading rather than a useful estimate), clearly typed/labeled as an estimate via its
+  enum name and `unit: 'kg'` — never presented as a measured max.
+- **`BEST_PACE`** — meters/second, computed only from sets carrying both `distanceMeters` and a
+  positive `durationSeconds` (a zero-duration set is excluded rather than dividing by zero).
+
+Both guarded by the same "only upsert if strictly better" logic as the existing types, so they
+share the "current-best, not append-only" design already in place. Unit tests added for both
+(Epley computation + the 12-rep cap, and pace computation + zero-duration exclusion).
+
+No cross-measurement-type comparisons are possible by construction — each `PersonalRecordType` is
+only ever computed from sets carrying the specific fields it needs, so e.g. a `BEST_PACE` value
+can never be compared against a `MAX_WEIGHT` value.
+
+## Verification after P1.1–P1.6 (backend)
+
+```
+$ pnpm exec tsc --noEmit         -> PASSED, 0 errors
+$ pnpm prisma:seed (x2, fresh)   -> PASSED both times; DB row counts identical after both runs
+                                    (49 exercises / 13 workouts / 52 workout_exercises /
+                                    38 exercise_alternatives) — confirmed via direct psql query,
+                                    not just the seed script's own log line
+$ pnpm api:lint                  -> PASSED, 0 errors/warnings
+$ pnpm api:test                  -> PASSED, 23/23 tests (was 21; +2 personal-record tests)
+$ pnpm api:test:e2e              -> PASSED, 33/33 tests (unchanged count — no new e2e tests added
+                                    this pass; existing coverage continues to pass against the
+                                    expanded catalog)
+$ pnpm api:build                 -> PASSED
+```
+
+## P1.9 (partial) — Rest timer: fixed a real backgrounding/accuracy bug
+
+The existing `RestTimer` decremented an in-memory `int` once per `Timer.periodic` tick — exactly
+the pattern the spec calls out as insufficient ("calculate from timestamps rather than relying
+only on an in-memory decrement"). Rewrote it to derive the displayed remaining time from
+`clock.now().difference(_endAt)` on every tick, where `_endAt` is an absolute end timestamp set
+once in `initState()`. This is correct across backgrounding: `Timer.periodic` doesn't fire while
+the app is suspended, but the very next tick after resuming recomputes the correct remaining time
+from the wall clock instead of continuing a now-stale countdown.
+
+Two real bugs caught and fixed *during this rewrite*, before commit, by actually running the
+existing widget tests rather than assuming the change was correct:
+1. **Lazy-`late` off-by-one.** The first version set `_endAt` via a `late final` field
+   initializer (`late final DateTime _endAt = clock.now().add(...)`). Dart's `late` fields
+   initialize on first *read*, which turned out to be inside the first `_tick()` call — a full
+   second after construction — silently shifting the entire countdown a tick late. Fixed by
+   setting `_endAt` explicitly and eagerly in `initState()`.
+2. **Truncation off-by-one.** Using `.difference(...).inSeconds` truncates toward zero, so a
+   181ms-under-a-full-second remainder (ordinary scheduling jitter) would read as one second
+   *lower* than it should and could end the rest a tick early. Fixed by computing from
+   milliseconds and rounding up (`(remainingMs / 1000).ceil()`).
+3. **`DateTime.now()` isn't fake-clock-aware in `flutter_test`.** Flutter's `tester.pump(duration)`
+   only fake-advances `Timer`s and microtasks, not raw `DateTime.now()` calls, so widget tests
+   using `pump()` to simulate elapsed seconds would never see the countdown move. Added
+   `package:clock` as a direct dependency and switched to `clock.now()`, which *is* zone-aware and
+   picks up Flutter's fake test clock automatically — the same integration point
+   `package:fake_async` (which underlies `flutter_test`) is designed around.
+
+All three were caught by actually running `flutter test test/features/workout/rest_timer_test.dart`
+after each change, not assumed correct from reading the diff.
+
+## P1.10 — Dashboard integration: replaced fixture-only workout/streak data with real data
+
+`HomeDashboardScreen` previously rendered *only* `DashboardFixture` sample data for everything,
+including "Today's Workout" (a hardcoded title) and "Streak" (a hardcoded number) — despite a
+complete, working Workout Engine already existing to answer both questions for real. This was a
+named P1 acceptance criterion ("dashboard uses real workout data").
+
+Changes (`apps/mobile/lib/features/dashboard/presentation/screens/home_dashboard_screen.dart`):
+- New `_WorkoutStatusCard`, driven entirely by `workoutSessionControllerProvider` and
+  `workoutHistoryListProvider` (both pre-existing providers, no new backend calls needed): shows
+  "Workout in progress"/"Workout paused" with a Resume action when a session is active (mirrors
+  the same banner already used on the Workout tab), otherwise the most recently completed
+  real workout with a relative date, otherwise an honest "No workouts yet" empty state — never
+  fixture data.
+- **Streak** now comes from a new pure function, `computeWorkoutStreak()`
+  (`apps/mobile/lib/features/dashboard/domain/workout_streak.dart`): consecutive calendar days
+  with a completed session, counted backward from today, staying "alive" through today even
+  before today's workout is logged (so the streak doesn't flicker to 0 at midnight-minus-a-workout).
+  Replaces `DashboardFixture.sample().streakDays` (a hardcoded `4`) in the UI.
+- New "New personal record" card (only rendered when `personalRecordsProvider` has data) showing
+  the most recently achieved record, linking to the Personal Records screen.
+- The remaining fixture-backed cards (Recovery, Protein, Hydration, Steps, Sleep) are untouched
+  functionally but their "Sample data" label was made more specific ("Nutrition, sleep & recovery
+  — sample data") now that the workout/streak/PR sections sitting right next to them are real —
+  leaving the old blanket label would have made the real sections look like sample data too.
+
+New tests: `test/features/dashboard/workout_streak_test.dart` (7 cases covering the pure
+streak function: zero/today/yesterday-still-alive/consecutive-run/gap-stops-the-count/
+same-day-counted-once). `test/features/dashboard/home_dashboard_test.dart` was rewritten (1 test
+-> 6 tests): last-real-workout display, honest empty state, streak sourced from real data (not
+the fixture's `4`), personal-record card, and the active-session Resume state.
+
+## Verification after P1.9 (rest timer) + P1.10 (dashboard)
+
+```
+$ flutter pub get                -> PASSED (added `clock: ^1.1.1` as a direct dependency)
+$ flutter analyze                -> PASSED — "No issues found!"
+$ dart format --set-exit-if-changed .  -> PASSED after applying formatting
+$ flutter test                   -> PASSED, 45/45 tests (was 33; +2 rest-timer fix coverage
+                                     already counted, +7 workout-streak unit tests, +5 net on
+                                     dashboard tests [1 replaced by 6])
+```
+
+## Not implemented this session (real, honest gaps)
+
+Time ran out before these could be done properly — listed here rather than silently skipped:
+- **Exercise substitution during an active session** (P1's capability #10 / P1.9). The backend
+  already supports logging a set against any valid exercise id, so this is purely a Flutter-side
+  gap: the workout player has no UI to swap the current exercise for one of its `alternatives`
+  mid-session. `Exercise.alternatives` (bidirectional) and 19 alternative pairs already exist in
+  the catalog to support this once built.
+- **Custom plan editor** (build a `WorkoutPlan` from scratch in the UI, not just "start from a
+  catalog `Workout`"). The backend already accepts an explicit `exercises` array in
+  `POST /workout-plans` (see `CreateWorkoutPlanDto`'s `@ValidateIf`), so this is also purely a
+  Flutter UI gap.
+- **User-reported effort (RPE/RIR) input**, feeding into progression suggestions as the spec
+  mentions. The existing deterministic progression rules work without it; adding it would touch
+  the `WorkoutSet` schema, the set-logging UI, and `suggestNext()`'s rule set together.
+- **Idempotency keys formalized as a table/DTO field** for offline sync. The existing design
+  already gets safe retries a different way (see `architecture.md`'s "Offline and synchronization
+  strategy": local Drift is the source of truth, and the replay-or-push reconciliation at
+  finish/retry is naturally idempotent per session since it always checks `serverId`/`set.isSynced`
+  before pushing) — but there's no explicit `WorkoutSyncOperation` table or client-generated
+  idempotency key on `POST /workout-sessions/:id/sets`, so a literal duplicate network request
+  (not just a retry from the same client state) could in principle double-log a set. This is a
+  real gap worth closing with a proper idempotency-key column if multi-device or genuinely
+  unreliable networks become a priority.
+- **P2 (Nutrition Tracking foundation)**: not started. All available time went to closing real P1
+  gaps; per the operating rules, P2 should not begin while P1 gaps remain open, and several
+  genuine ones are listed above.

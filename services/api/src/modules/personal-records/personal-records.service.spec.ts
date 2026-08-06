@@ -86,9 +86,10 @@ describe('PersonalRecordsService', () => {
   });
 
   it('does not overwrite an existing record when the new value does not beat it', async () => {
-    // A single set carrying both reps and weight yields three candidates
-    // (MAX_WEIGHT, MAX_REPS, MAX_VOLUME) — every one of them must already
-    // have an unbeatable existing record for "nothing breaks" to hold.
+    // A single set carrying both reps and weight yields four candidates
+    // (MAX_WEIGHT, MAX_REPS, MAX_VOLUME, ESTIMATED_ONE_REP_MAX) — every one
+    // of them must already have an unbeatable existing record for "nothing
+    // breaks" to hold.
     prisma.workoutSet.findMany.mockResolvedValue([set({ reps: 5, weightKg: 50 })]);
     prisma.personalRecord.findUnique.mockImplementation(({ where }) =>
       Promise.resolve({ id: 'existing', value: 999_999, type: where.userId_exerciseId_type.type }),
@@ -150,5 +151,44 @@ describe('PersonalRecordsService', () => {
 
     expect(broken.some((r) => r.type === PersonalRecordType.MAX_VOLUME)).toBe(false);
     expect(broken.some((r) => r.type === PersonalRecordType.MAX_DURATION)).toBe(true);
+  });
+
+  it('computes an estimated one-rep max via the Epley formula, capped to sets of 12 reps or fewer', async () => {
+    prisma.workoutSet.findMany.mockResolvedValue([
+      set({ reps: 5, weightKg: 100 }),
+      // A 20-rep set would otherwise dominate the Epley estimate despite
+      // being a much lighter, less reliable data point — excluded.
+      set({ id: 'set-2', setNumber: 2, reps: 20, weightKg: 100 }),
+    ]);
+    prisma.personalRecord.findUnique.mockResolvedValue(null);
+    prisma.personalRecord.upsert.mockImplementation(({ create }) =>
+      Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
+    );
+
+    const broken = await service.detectAndRecord('user-1', 'session-1');
+
+    const estimated1rm = broken.find((r) => r.type === PersonalRecordType.ESTIMATED_ONE_REP_MAX);
+    expect(estimated1rm).toBeDefined();
+    // Epley: 100 * (1 + 5/30) = 116.67, from the 5-rep set only.
+    expect(estimated1rm!.value).toBeCloseTo(116.7, 1);
+    expect(estimated1rm!.unit).toBe('kg');
+  });
+
+  it('computes best pace from sets with both distance and duration, ignoring zero-duration sets', async () => {
+    prisma.workoutSet.findMany.mockResolvedValue([
+      set({ distanceMeters: 1000, durationSeconds: 300 }),
+      set({ id: 'set-2', setNumber: 2, distanceMeters: 500, durationSeconds: 0 }),
+    ]);
+    prisma.personalRecord.findUnique.mockResolvedValue(null);
+    prisma.personalRecord.upsert.mockImplementation(({ create }) =>
+      Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
+    );
+
+    const broken = await service.detectAndRecord('user-1', 'session-1');
+
+    const pace = broken.find((r) => r.type === PersonalRecordType.BEST_PACE);
+    expect(pace).toBeDefined();
+    expect(pace!.value).toBeCloseTo(1000 / 300, 2);
+    expect(pace!.unit).toBe('m/s');
   });
 });

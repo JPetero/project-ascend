@@ -359,3 +359,61 @@ verification was done by direct execution (see the Backend table above and
 Everything else audited under P0 (Flutter/Dart version pinning, onboarding's local-first
 persistence, both CI workflows) was already correct from prior session work and required no
 changes — see `build-session-1.md` for the item-by-item verification.
+
+## Build Session 1 (P1) — Verified Build Results
+
+Workout Engine MVP gap-closing pass (the vertical slice already existed from Sprint 2; this closed
+the remaining gaps against a fuller spec). Full log in
+[`packages/docs/build-session-1.md`](packages/docs/build-session-1.md), including the honest list
+of what's still **not** done (exercise substitution UI, a from-scratch plan editor, RPE input, and
+a formal idempotency-key column for offline sync — see that file's "Not implemented this session"
+section).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Type check | `pnpm exec tsc --noEmit` | PASSED, 0 errors |
+| Migration created and applied | `20260806025612_p1_measurement_type_and_distance_target` (adds `Exercise.measurementType`, `targetDistanceMeters` on prescribed exercises, `ESTIMATED_ONE_REP_MAX`/`BEST_PACE` personal-record types) | PASSED, applied to `ascend_dev` and `ascend_test` |
+| Seed idempotency | `pnpm prisma:seed` run twice, then real DB row counts queried via `psql` (not the seed script's own log line) | PASSED — `exercises=49`, `workouts=13`, `workout_exercises=52`, `exercise_alternatives=38`, identical after both runs |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 23/23 tests** (up from 21; +2 personal-record tests for estimated 1RM and best pace) |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 33/33 tests** (unchanged count; existing coverage continues to pass against the expanded 49-exercise/13-workout catalog) |
+| Build | `pnpm api:build` | PASSED |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| Dependencies | `flutter pub get` | PASSED (added `clock: ^1.1.1` as a direct dependency, for a fake-clock-testable rest timer) |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 45/45 tests** (up from 33; +7 `workout_streak_test.dart`, +5 net on dashboard tests, rest-timer fix re-verified against its existing 2 tests) |
+
+**What changed**
+
+- `Exercise.measurementType` (`REPS_WEIGHT`/`REPS_ONLY`/`DURATION`/`DISTANCE_DURATION`/
+  `ASSISTED_WEIGHT`/`BODYWEIGHT`, filterable via `GET /exercises?measurementType=`) and
+  `targetDistanceMeters` on prescribed exercises, closing a real data-model gap (walking/running
+  entries had nowhere to prescribe a distance target).
+- Seed catalog expanded from 22 to 49 exercises (added bodyweight regressions, more dumbbell/
+  barbell/resistance-band movements, mobility stretches, and — previously entirely missing —
+  walking/running entries) and from 4 to 13 workouts (added the 9 required starter plans as
+  genuine additions, keeping the original 4 unchanged so existing e2e coverage keeps passing).
+- Two new personal-record types: `ESTIMATED_ONE_REP_MAX` (Epley formula, capped to ≤12-rep sets,
+  always labeled as an estimate) and `BEST_PACE` (m/s, from sets with both distance and duration).
+- Rest timer rewritten to compute from wall-clock timestamps instead of an in-memory tick
+  counter — catching and fixing two real off-by-one bugs (a lazy-`late`-field bug that shifted the
+  whole countdown a full tick late, and a truncation-vs-rounding bug) by actually running its
+  tests after each change, not just reading the diff.
+- Dashboard now shows real workout status (active/resumable session, or the most recent real
+  completed workout, or an honest empty state), a real streak (`computeWorkoutStreak()`, a pure
+  function over completed-session dates), and a real most-recent-personal-record card — replacing
+  the `DashboardFixture` sample data that previously stood in for all three. The remaining
+  nutrition/sleep/recovery cards stay fixture-backed and are now more specifically labeled
+  ("Nutrition, sleep & recovery — sample data") so they don't look like the newly-real sections
+  next to them.
+
+**Docker**: same unavailable-in-this-sandbox situation as P0 and the prior audits; no new Docker
+verification was needed for P1 since `infrastructure/docker/api.Dockerfile` and
+`docker-compose.yml` weren't touched this pass.

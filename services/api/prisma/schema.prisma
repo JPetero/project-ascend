@@ -262,6 +262,27 @@ enum PersonalRecordType {
   MAX_DURATION
   MAX_DISTANCE
   MAX_VOLUME
+  // Epley-formula estimate from a single completed set (see
+  // ProgressionService docs) — always presented to the user as an
+  // estimate, never a measured max.
+  ESTIMATED_ONE_REP_MAX
+  // Fastest meters-per-second across a session's distance+duration sets;
+  // only ever computed when both values are present and valid.
+  BEST_PACE
+}
+
+// Controls which of WorkoutSet's optional fields are meaningful for a given
+// exercise, and which input controls the Workout Player shows. Deliberately
+// excludes a CALORIES option — see build-session-1.md's P1.1 entry for why
+// (no real estimation pipeline exists yet, and a fabricated calorie number
+// would violate the "no fake health data" rule).
+enum MeasurementType {
+  REPS_WEIGHT
+  REPS_ONLY
+  DURATION
+  DISTANCE_DURATION
+  ASSISTED_WEIGHT
+  BODYWEIGHT
 }
 
 model ExerciseCategory {
@@ -296,22 +317,23 @@ model EquipmentType {
 }
 
 model Exercise {
-  id             String             @id @default(uuid())
-  name           String
-  slug           String             @unique
-  description    String
-  difficulty     ExerciseDifficulty @default(BEGINNER)
-  instructions   String
-  safetyTips     String
-  commonMistakes String
+  id              String             @id @default(uuid())
+  name            String
+  slug            String             @unique
+  description     String
+  difficulty      ExerciseDifficulty @default(BEGINNER)
+  measurementType MeasurementType    @default(REPS_WEIGHT)
+  instructions    String
+  safetyTips      String
+  commonMistakes  String
   // Placeholders only in this sprint — no media pipeline yet (see
   // packages/docs/roadmap.md). Nullable so seed data can omit them without
   // every exercise needing a fake URL.
-  imageUrl       String?
-  videoUrl       String?
-  categoryId     String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  imageUrl        String?
+  videoUrl        String?
+  categoryId      String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   category  ExerciseCategory    @relation(fields: [categoryId], references: [id])
   muscles   ExerciseMuscle[]
@@ -400,6 +422,7 @@ model WorkoutExercise {
   targetReps            Int?
   targetDurationSeconds Int?
   targetWeightKg        Float?
+  targetDistanceMeters  Float?
   restSeconds           Int     @default(60)
   notes                 String?
 
@@ -440,6 +463,7 @@ model WorkoutPlanExercise {
   targetReps            Int?
   targetDurationSeconds Int?
   targetWeightKg        Float?
+  targetDistanceMeters  Float?
   restSeconds           Int     @default(60)
   notes                 String?
 

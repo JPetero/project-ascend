@@ -20,6 +20,7 @@ export class ExercisesService {
     const where: Prisma.ExerciseWhereInput = {
       ...(query.categorySlug ? { category: { slug: query.categorySlug } } : {}),
       ...(query.difficulty ? { difficulty: query.difficulty } : {}),
+      ...(query.measurementType ? { measurementType: query.measurementType } : {}),
       ...(query.muscleSlug
         ? { muscles: { some: { muscleGroup: { slug: query.muscleSlug } } } }
         : {}),
@@ -169,6 +170,7 @@ export class ExercisesService {
       slug: exercise.slug,
       description: exercise.description,
       difficulty: exercise.difficulty,
+      measurementType: exercise.measurementType,
       instructions: exercise.instructions,
       safetyTips: exercise.safetyTips,
       commonMistakes: exercise.commonMistakes,

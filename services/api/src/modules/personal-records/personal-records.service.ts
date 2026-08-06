@@ -106,6 +106,37 @@ export class PersonalRecordsService {
     if (weightedSets.length > 0) {
       const volume = weightedSets.reduce((sum, s) => sum + s.reps * s.weightKg, 0);
       candidates.push({ type: PersonalRecordType.MAX_VOLUME, value: volume, unit: 'kg' });
+
+      // Epley formula (weight * (1 + reps/30)), a standard, well-documented
+      // estimate — never a measured max. The API/mobile layers must always
+      // label this as an estimate (see ExercisesService.getProgressionSuggestion
+      // for the same "estimate, not fact" framing applied elsewhere).
+      // Capped to sets of 12 reps or fewer: the formula's error grows
+      // sharply on higher-rep sets, to the point of being misleading rather
+      // than a useful estimate.
+      const oneRepMaxes = weightedSets
+        .filter((s) => s.reps <= 12)
+        .map((s) => s.weightKg * (1 + s.reps / 30));
+      if (oneRepMaxes.length > 0) {
+        candidates.push({
+          type: PersonalRecordType.ESTIMATED_ONE_REP_MAX,
+          value: Math.round(Math.max(...oneRepMaxes) * 10) / 10,
+          unit: 'kg',
+        });
+      }
+    }
+
+    const pacedSets = sets.filter(
+      (s): s is WorkoutSet & { distanceMeters: number; durationSeconds: number } =>
+        s.distanceMeters !== null && s.durationSeconds !== null && s.durationSeconds > 0,
+    );
+    if (pacedSets.length > 0) {
+      const bestPace = Math.max(...pacedSets.map((s) => s.distanceMeters / s.durationSeconds));
+      candidates.push({
+        type: PersonalRecordType.BEST_PACE,
+        value: Math.round(bestPace * 100) / 100,
+        unit: 'm/s',
+      });
     }
 
     return candidates;
