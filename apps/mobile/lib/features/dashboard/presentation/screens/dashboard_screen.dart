@@ -8,6 +8,7 @@ import '../../../../core/progress/progress_util.dart';
 import '../../../auth/domain/auth_identity.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_identity_controller.dart';
+import '../../../companion/domain/companion_dialogue.dart';
 import '../../../nutrition/domain/nutrition_dashboard_summary.dart';
 import '../../../nutrition/presentation/providers/nutrition_summary_controller.dart';
 import '../../../profile/domain/preferences_model.dart';
@@ -85,6 +86,16 @@ class DashboardScreen extends ConsumerWidget {
                   message: 'Pull to refresh to try again.',
                 ),
               ),
+              if (preferences != null)
+                _MissedWorkoutNudge(
+                  preferences: preferences,
+                  daysSinceLastWorkout: daysSinceLastWorkout(
+                    (historyAsync.value ?? const <WorkoutHistoryEntry>[])
+                        .map((e) => e.completedAt)
+                        .whereType<DateTime>()
+                        .toList(),
+                  ),
+                ),
               const SizedBox(height: AscendSpacing.lg),
               const DeloadCard(),
               _BmiCard(profile: profile),
@@ -487,6 +498,58 @@ class _ProgressSection extends StatelessWidget {
         const SizedBox(height: AscendSpacing.md),
         _WorkoutCalendar(workoutDays: workoutDaysFrom(completedDates)),
       ],
+    );
+  }
+}
+
+/// A companion-voiced nudge shown only once the user has an actual
+/// completed-workout history to compare against (never for a brand-new
+/// account) and only once enough days have passed that it's genuinely
+/// useful rather than nagging. See
+/// packages/docs/product/atlas-nova-bible.md for the tone rules this
+/// follows via [CompanionDialogue.missedWorkout].
+class _MissedWorkoutNudge extends StatelessWidget {
+  const _MissedWorkoutNudge({
+    required this.preferences,
+    required this.daysSinceLastWorkout,
+  });
+
+  final PreferencesModel preferences;
+  final int? daysSinceLastWorkout;
+
+  static const _nudgeThresholdDays = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    final days = daysSinceLastWorkout;
+    if (days == null || days < _nudgeThresholdDays) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AscendSpacing.lg),
+      child: AscendCard(
+        semanticLabel: 'Missed workout encouragement',
+        child: Row(
+          children: [
+            Icon(
+              Icons.favorite_outline,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: AscendSpacing.sm),
+            Expanded(
+              child: Text(
+                CompanionDialogue.missedWorkout(
+                  companion: preferences.companion,
+                  style: preferences.coachingStyle,
+                  daysSinceLastWorkout: days,
+                ),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

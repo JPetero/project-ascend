@@ -5,6 +5,7 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
+import '../../domain/companion_dialogue.dart';
 import '../providers/companion_chat_controller.dart';
 import '../widgets/companion_avatar.dart';
 
@@ -60,6 +61,11 @@ class _AscendCommandCenterScreenState
         (s) => s.asData?.value?.companion ?? Companion.atlas,
       ),
     );
+    final coachingStyle = ref.watch(
+      preferencesControllerProvider.select(
+        (s) => s.asData?.value?.coachingStyle ?? CoachingStyle.balanced,
+      ),
+    );
     final reducedMotion = ref.watch(
       preferencesControllerProvider.select(
         (s) => s.asData?.value?.reducedMotion ?? false,
@@ -85,7 +91,13 @@ class _AscendCommandCenterScreenState
             ),
             Expanded(
               child: chatState.messages.isEmpty
-                  ? _EmptyChatState(onQuickCommand: _send)
+                  ? _EmptyChatState(
+                      onQuickCommand: _send,
+                      welcomeMessage: CompanionDialogue.welcome(
+                        companion: companion,
+                        style: coachingStyle,
+                      ),
+                    )
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(
@@ -142,9 +154,13 @@ class _AscendCommandCenterScreenState
 }
 
 class _EmptyChatState extends StatelessWidget {
-  const _EmptyChatState({required this.onQuickCommand});
+  const _EmptyChatState({
+    required this.onQuickCommand,
+    required this.welcomeMessage,
+  });
 
   final ValueChanged<String> onQuickCommand;
+  final String welcomeMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +169,7 @@ class _EmptyChatState extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'Ask about a workout, a meal, or how your week is going.',
+            welcomeMessage,
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),

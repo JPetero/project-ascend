@@ -25,3 +25,15 @@ int computeWorkoutStreak(List<DateTime> completedAtDates, {DateTime? now}) {
 }
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
+
+/// Whole calendar days since the most recent completed workout, or `null`
+/// if there is no completed workout to compare against — the caller
+/// should treat `null` as "nothing to say yet," never as zero.
+int? daysSinceLastWorkout(List<DateTime> completedAtDates, {DateTime? now}) {
+  if (completedAtDates.isEmpty) return null;
+  final today = _dateOnly(now ?? DateTime.now());
+  final mostRecent = completedAtDates
+      .map(_dateOnly)
+      .reduce((a, b) => a.isAfter(b) ? a : b);
+  return today.difference(mostRecent).inDays;
+}

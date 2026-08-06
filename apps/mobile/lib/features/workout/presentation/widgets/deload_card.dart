@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../companion/domain/companion_dialogue.dart';
+import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../providers/deload_controller.dart';
 
 /// Shows the user's active deload recommendation, if any — see
@@ -15,10 +17,19 @@ class DeloadCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deloadAsync = ref.watch(activeDeloadProvider);
+    final preferences = ref.watch(
+      preferencesControllerProvider.select((s) => s.asData?.value),
+    );
 
     return deloadAsync.maybeWhen(
       data: (recommendation) {
         if (recommendation == null) return const SizedBox.shrink();
+        final intro = preferences == null
+            ? null
+            : CompanionDialogue.deloadIntro(
+                companion: preferences.companion,
+                style: preferences.coachingStyle,
+              );
         return Padding(
           padding: const EdgeInsets.only(bottom: AscendSpacing.lg),
           child: AscendCard(
@@ -42,6 +53,10 @@ class DeloadCard extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: AscendSpacing.xs),
+                if (intro != null) ...[
+                  Text(intro, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: AscendSpacing.xs),
+                ],
                 Text(
                   recommendation.reason,
                   style: Theme.of(context).textTheme.bodyMedium,

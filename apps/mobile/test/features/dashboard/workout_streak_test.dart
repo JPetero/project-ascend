@@ -49,4 +49,29 @@ void main() {
     ], now: today);
     expect(streak, 1);
   });
+
+  group('daysSinceLastWorkout', () {
+    test('is null with no completed workouts', () {
+      expect(daysSinceLastWorkout(const [], now: today), isNull);
+    });
+
+    test('is zero for a workout completed today', () {
+      expect(daysSinceLastWorkout([DateTime(2026, 8, 6, 9)], now: today), 0);
+    });
+
+    test('counts whole days since the most recent workout', () {
+      expect(daysSinceLastWorkout([DateTime(2026, 8, 2, 9)], now: today), 4);
+    });
+
+    test('uses the most recent of several completed workouts', () {
+      expect(
+        daysSinceLastWorkout([
+          DateTime(2026, 7, 1, 9),
+          DateTime(2026, 8, 4, 9),
+          DateTime(2026, 7, 20, 9),
+        ], now: today),
+        2,
+      );
+    });
+  });
 }
