@@ -2,6 +2,11 @@
 
 Thanks for helping build Project Ascend. This repository is a modular-monolith monorepo containing a NestJS API and a Flutter mobile app.
 
+> **Before implementing product behavior**, read the Project Ascend product documents in
+> [`packages/docs/product/`](packages/docs/product/) (start with `founder-vision-bible.md`). They
+> override unstated implementation assumptions but do not override security, law, platform policy,
+> or verified technical constraints.
+
 ## Workflow
 
 1. Create a feature branch from `main`.

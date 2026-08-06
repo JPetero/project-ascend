@@ -18,6 +18,11 @@ together, [`packages/docs/security.md`](packages/docs/security.md) for current c
 known gaps, [`packages/docs/wearables.md`](packages/docs/wearables.md) for the device-integration
 strategy, and [`packages/docs/roadmap.md`](packages/docs/roadmap.md) for what's next.
 
+> **Before implementing product behavior**, read the Project Ascend product documents in
+> [`packages/docs/product/`](packages/docs/product/) (start with `founder-vision-bible.md`). They
+> override unstated implementation assumptions but do not override security, law, platform policy,
+> or verified technical constraints.
+
 ## Repository structure
 
 ```text
