@@ -61,7 +61,8 @@ class FakeWorkoutPlanRepository extends WorkoutPlanRepository {
   final List<WorkoutPlan> created = [];
 
   @override
-  Future<List<WorkoutPlan>> list() async => [sampleWorkoutPlan];
+  Future<List<WorkoutPlan>> list({bool includeArchived = false}) async =>
+      [sampleWorkoutPlan];
 
   @override
   Future<WorkoutPlan> getById(String id) async => sampleWorkoutPlan;
@@ -74,6 +75,33 @@ class FakeWorkoutPlanRepository extends WorkoutPlanRepository {
     created.add(sampleWorkoutPlan);
     return sampleWorkoutPlan;
   }
+
+  @override
+  Future<Map<String, dynamic>> create({
+    required String name,
+    String? description,
+    required List<Map<String, dynamic>> exercises,
+    String? idempotencyKey,
+  }) async {
+    created.add(sampleWorkoutPlan);
+    return {'id': sampleWorkoutPlan.id, 'name': name};
+  }
+
+  @override
+  Future<Map<String, dynamic>> update(
+    String id, {
+    String? name,
+    String? description,
+    List<Map<String, dynamic>>? exercises,
+  }) async {
+    return {'id': id, 'name': name ?? sampleWorkoutPlan.name};
+  }
+
+  @override
+  Future<void> archive(String id) async {}
+
+  @override
+  Future<void> unarchive(String id) async {}
 
   @override
   Future<void> delete(String id) async {}
