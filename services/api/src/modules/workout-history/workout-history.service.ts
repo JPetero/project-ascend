@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, WorkoutSet } from '@prisma/client';
+import { calculateStreak } from '../../common/progress/progress.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryWorkoutHistoryDto } from './dto/query-workout-history.dto';
 
@@ -46,6 +47,18 @@ export class WorkoutHistoryService {
       data: sessions.map((session) => this.summarize(session)),
       meta: { page: query.page, limit: query.limit, total },
     };
+  }
+
+  /** Current consecutive-day workout streak, via the shared
+   * `calculateStreak` (see `common/progress`) — the same calculation a
+   * future Nutrition "days logged" streak would reuse. */
+  async streak(userId: string) {
+    const sessions = await this.prisma.workoutSession.findMany({
+      where: { userId, status: 'COMPLETED' },
+      select: { completedAt: true },
+    });
+    const days = sessions.map((s) => s.completedAt).filter((d): d is Date => d !== null);
+    return { currentStreakDays: calculateStreak(days) };
   }
 
   async getById(userId: string, id: string) {

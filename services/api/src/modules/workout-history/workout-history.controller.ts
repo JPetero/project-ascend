@@ -16,6 +16,11 @@ export class WorkoutHistoryController {
     return this.workoutHistoryService.list(user.id, query);
   }
 
+  @Get('streak')
+  streak(@CurrentUser() user: AuthenticatedUser) {
+    return this.workoutHistoryService.streak(user.id);
+  }
+
   @Get(':id')
   getById(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.workoutHistoryService.getById(user.id, id);
