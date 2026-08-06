@@ -1527,9 +1527,9 @@ async function seedLegalDocuments() {
 
 // `key` is the stable identity `AchievementsService`'s rules match
 // against — see services/api/src/modules/achievements/achievements.service.ts.
-// GPS Cardio and Recovery achievements aren't seeded yet since those
-// verticals don't award anything this session; `AchievementCategory`
-// already reserves room for them.
+// Recovery achievements aren't seeded yet — deload doesn't have a
+// countable "did this" trigger the way workout/nutrition/cardio logging
+// do; `AchievementCategory` already reserves room for it.
 const ACHIEVEMENTS = [
   {
     key: 'first_workout',
@@ -1594,6 +1594,22 @@ const ACHIEVEMENTS = [
     iconAsset: 'restaurant',
     category: AchievementCategory.NUTRITION,
     targetSteps: 100,
+  },
+  {
+    key: 'first_cardio_session',
+    title: 'On the Move',
+    description: 'Log your first cardio session.',
+    iconAsset: 'directions_run',
+    category: AchievementCategory.CARDIO,
+    targetSteps: 1,
+  },
+  {
+    key: 'ten_cardio_sessions',
+    title: 'Going the Distance',
+    description: 'Log 10 cardio sessions.',
+    iconAsset: 'directions_run',
+    category: AchievementCategory.CARDIO,
+    targetSteps: 10,
   },
 ] as const;
 

@@ -6,6 +6,7 @@ import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/achievements/presentation/providers/achievement_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
+import 'package:mobile/features/cardio/presentation/providers/cardio_session_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/meal_entry_controller.dart';
@@ -27,6 +28,7 @@ import 'package:mobile/features/workout/presentation/providers/workout_session_c
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_achievement_repositories.dart';
+import 'fake_cardio_repositories.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_repositories.dart';
 import 'fake_workout_repositories.dart';
@@ -53,6 +55,7 @@ Future<ProviderContainer> createTestContainer({
   FakeSavedMealRepository? savedMealRepository,
   FakeMacroTargetRepository? macroTargetRepository,
   FakeAchievementRepository? achievementRepository,
+  FakeCardioSessionRepository? cardioSessionRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -131,6 +134,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       achievementRepositoryProvider.overrideWithValue(
         achievementRepository ?? FakeAchievementRepository(),
+      ),
+      cardioSessionRepositoryProvider.overrideWithValue(
+        cardioSessionRepository ?? FakeCardioSessionRepository(),
       ),
     ],
   );

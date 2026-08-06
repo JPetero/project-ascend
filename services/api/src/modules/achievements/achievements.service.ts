@@ -8,6 +8,7 @@ interface AchievementContext {
   currentWorkoutStreakDays: number;
   personalRecordCount: number;
   mealsLoggedCount: number;
+  cardioSessionCount: number;
 }
 
 interface AchievementRule {
@@ -17,10 +18,9 @@ interface AchievementRule {
 
 /**
  * Every achievement this build can award, keyed to the seeded `Achievement`
- * catalog rows (see prisma/seed.ts's `seedAchievements`). GPS Cardio
- * achievements aren't included yet — that vertical doesn't exist until a
- * later pass — so `AchievementCategory.CARDIO`/`RECOVERY` have no rules
- * here, only a reserved place in the schema.
+ * catalog rows (see prisma/seed.ts's `seedAchievements`). `RECOVERY` has no
+ * rules yet — deload doesn't have a countable "did this" trigger the way
+ * workout/nutrition/cardio logging do.
  */
 const WORKOUT_RULES: AchievementRule[] = [
   { key: 'first_workout', progress: (c) => c.completedWorkoutCount },
@@ -35,6 +35,19 @@ const NUTRITION_RULES: AchievementRule[] = [
   { key: 'first_meal_logged', progress: (c) => c.mealsLoggedCount },
   { key: 'hundred_meals_logged', progress: (c) => c.mealsLoggedCount },
 ];
+
+const CARDIO_RULES: AchievementRule[] = [
+  { key: 'first_cardio_session', progress: (c) => c.cardioSessionCount },
+  { key: 'ten_cardio_sessions', progress: (c) => c.cardioSessionCount },
+];
+
+const EMPTY_CONTEXT: AchievementContext = {
+  completedWorkoutCount: 0,
+  currentWorkoutStreakDays: 0,
+  personalRecordCount: 0,
+  mealsLoggedCount: 0,
+  cardioSessionCount: 0,
+};
 
 @Injectable()
 export class AchievementsService {
@@ -90,10 +103,10 @@ export class AchievementsService {
     );
 
     return this.evaluate(userId, WORKOUT_RULES, {
+      ...EMPTY_CONTEXT,
       completedWorkoutCount,
       currentWorkoutStreakDays,
       personalRecordCount,
-      mealsLoggedCount: 0,
     });
   }
 
@@ -103,12 +116,16 @@ export class AchievementsService {
   async evaluateNutritionAchievements(userId: string) {
     const mealsLoggedCount = await this.prisma.mealEntry.count({ where: { userId } });
 
-    return this.evaluate(userId, NUTRITION_RULES, {
-      completedWorkoutCount: 0,
-      currentWorkoutStreakDays: 0,
-      personalRecordCount: 0,
-      mealsLoggedCount,
-    });
+    return this.evaluate(userId, NUTRITION_RULES, { ...EMPTY_CONTEXT, mealsLoggedCount });
+  }
+
+  /** Same idempotent pattern as {@link evaluateWorkoutAchievements}, for
+   * the GPS Cardio achievements — safe to call after every logged cardio
+   * session. */
+  async evaluateCardioAchievements(userId: string) {
+    const cardioSessionCount = await this.prisma.cardioSession.count({ where: { userId } });
+
+    return this.evaluate(userId, CARDIO_RULES, { ...EMPTY_CONTEXT, cardioSessionCount });
   }
 
   private async evaluate(userId: string, rules: AchievementRule[], context: AchievementContext) {

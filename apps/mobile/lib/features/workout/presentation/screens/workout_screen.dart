@@ -39,6 +39,11 @@ class WorkoutScreen extends ConsumerWidget {
             onPressed: () => context.push(RoutePaths.achievements),
           ),
           IconButton(
+            icon: const Icon(Icons.directions_run_outlined),
+            tooltip: 'Cardio',
+            onPressed: () => context.push(RoutePaths.cardioHistory),
+          ),
+          IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'History',
             onPressed: () => context.push(RoutePaths.workoutHistory),

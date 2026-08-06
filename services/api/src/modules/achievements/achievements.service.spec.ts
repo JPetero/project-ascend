@@ -25,6 +25,7 @@ describe('AchievementsService', () => {
     workoutSession: { count: jest.Mock; findMany: jest.Mock };
     personalRecord: { count: jest.Mock };
     mealEntry: { count: jest.Mock };
+    cardioSession: { count: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -34,6 +35,7 @@ describe('AchievementsService', () => {
       workoutSession: { count: jest.fn(), findMany: jest.fn() },
       personalRecord: { count: jest.fn() },
       mealEntry: { count: jest.fn() },
+      cardioSession: { count: jest.fn() },
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -148,6 +150,29 @@ describe('AchievementsService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].key).toBe('first_meal_logged');
+    });
+  });
+
+  describe('evaluateCardioAchievements', () => {
+    it('awards the first-cardio-session achievement', async () => {
+      prisma.cardioSession.count.mockResolvedValue(1);
+      prisma.achievement.findMany.mockResolvedValue([
+        achievement({
+          key: 'first_cardio_session',
+          category: AchievementCategory.CARDIO,
+          targetSteps: 1,
+        }),
+      ]);
+      prisma.achievementAward.findMany.mockResolvedValue([]);
+      prisma.achievementAward.upsert.mockResolvedValue({
+        progress: 1,
+        earnedAt: new Date('2026-08-06'),
+      });
+
+      const result = await service.evaluateCardioAchievements('user-1');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].key).toBe('first_cardio_session');
     });
   });
 });

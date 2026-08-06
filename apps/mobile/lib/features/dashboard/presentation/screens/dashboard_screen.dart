@@ -14,6 +14,7 @@ import '../../../achievements/presentation/widgets/achievement_icon.dart';
 import '../../../auth/domain/auth_identity.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../auth/presentation/providers/auth_identity_controller.dart';
+import '../../../cardio/presentation/providers/cardio_session_controller.dart';
 import '../../../companion/domain/companion_dialogue.dart';
 import '../../../nutrition/domain/nutrition_dashboard_summary.dart';
 import '../../../nutrition/presentation/providers/nutrition_summary_controller.dart';
@@ -55,6 +56,7 @@ class DashboardScreen extends ConsumerWidget {
     final nutritionAsync = ref.watch(nutritionDashboardSummaryProvider);
     final identitiesAsync = ref.watch(authIdentitiesProvider);
     final achievementsAsync = ref.watch(achievementsProvider);
+    final cardioSessionsAsync = ref.watch(cardioSessionsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
@@ -66,6 +68,7 @@ class DashboardScreen extends ConsumerWidget {
             ref.refresh(nutritionDashboardSummaryProvider.future),
             ref.refresh(authIdentitiesProvider.future),
             ref.refresh(achievementsProvider.future),
+            ref.refresh(cardioSessionsProvider.future),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
@@ -83,6 +86,9 @@ class DashboardScreen extends ConsumerWidget {
                   entries: entries,
                   workoutSchedule: profile?.workoutSchedule,
                   recentRecord: _mostRecentRecord(recordsAsync.value),
+                  cardioDates: (cardioSessionsAsync.value ?? const [])
+                      .map((s) => s.startedAt)
+                      .toList(),
                 ),
                 loading: () => const Padding(
                   padding: EdgeInsets.symmetric(vertical: AscendSpacing.lg),
@@ -443,11 +449,17 @@ class _ProgressSection extends StatelessWidget {
     required this.entries,
     required this.workoutSchedule,
     required this.recentRecord,
+    this.cardioDates = const [],
   });
 
   final List<WorkoutHistoryEntry> entries;
   final WorkoutSchedule? workoutSchedule;
   final PersonalRecord? recentRecord;
+  // Merged into the calendar's marked days only — cardio sessions are a
+  // real activity worth showing there, but the streak and weekly-plan
+  // percentage above stay workout-specific so they don't quietly change
+  // meaning.
+  final List<DateTime> cardioDates;
 
   @override
   Widget build(BuildContext context) {
@@ -524,7 +536,9 @@ class _ProgressSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AscendSpacing.md),
-        _WorkoutCalendar(workoutDays: workoutDaysFrom(completedDates)),
+        _WorkoutCalendar(
+          workoutDays: workoutDaysFrom([...completedDates, ...cardioDates]),
+        ),
       ],
     );
   }

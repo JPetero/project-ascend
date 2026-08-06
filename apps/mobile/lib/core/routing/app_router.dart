@@ -8,6 +8,8 @@ import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
+import '../../features/cardio/presentation/screens/cardio_history_screen.dart';
+import '../../features/cardio/presentation/screens/cardio_log_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
@@ -128,6 +130,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.achievements,
         builder: (context, state) => const AchievementsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.cardioHistory,
+        builder: (context, state) => const CardioHistoryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.cardioLog,
+        builder: (context, state) => const CardioLogScreen(),
       ),
       GoRoute(
         path: RoutePaths.foodSearch,
