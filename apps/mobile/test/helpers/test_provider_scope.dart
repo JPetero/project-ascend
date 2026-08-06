@@ -34,6 +34,7 @@ Future<ProviderContainer> createTestContainer({
   PreferencesModel? initialPreferences,
   FakeWorkoutSessionRepository? workoutSessionRepository,
   FakeWorkoutHistoryRepository? workoutHistoryRepository,
+  bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
   final sharedPreferences = await SharedPreferences.getInstance();
@@ -59,6 +60,7 @@ Future<ProviderContainer> createTestContainer({
         FakeProfileRepository(
           database: database,
           initialProfile: initialProfile,
+          failFetch: failProfileFetch,
         ),
       ),
       preferencesRepositoryProvider.overrideWithValue(

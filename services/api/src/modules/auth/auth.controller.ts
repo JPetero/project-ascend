@@ -49,6 +49,14 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  async logoutAll(@CurrentUser() user: AuthenticatedUser) {
+    await this.authService.logoutAll(user.id);
+    return { loggedOut: true };
+  }
+
+  @ApiBearerAuth()
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.me(user.id);

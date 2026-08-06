@@ -185,7 +185,7 @@ describe('AuthService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
         where: { familyId: 'family-1', revokedAt: null },
-        data: { revokedAt: expect.any(Date) },
+        data: { revokedAt: expect.any(Date), reusedAt: expect.any(Date) },
       });
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -222,10 +222,26 @@ describe('AuthService', () => {
       // And the loss is treated exactly like reuse: whole family revoked.
       expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
         where: { familyId: 'family-1', revokedAt: null },
-        data: { revokedAt: expect.any(Date) },
+        data: { revokedAt: expect.any(Date), reusedAt: expect.any(Date) },
       });
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'auth.refresh_token_reuse_detected' }),
+      );
+    });
+  });
+
+  describe('logoutAll', () => {
+    it('revokes every active token for the user and records an audit event distinct from reuse handling', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 3 });
+
+      await authService.logoutAll('user-1');
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', action: 'auth.logout_all' }),
       );
     });
   });

@@ -201,6 +201,27 @@ export class AuthService {
     });
   }
 
+  /**
+   * Revokes every active refresh token across every family for this user —
+   * "sign out everywhere". Unlike reuse handling, this is a deliberate
+   * user action, not theft detection, so it doesn't record a
+   * `reusedAt`/reuse audit event, just an ordinary revoke plus its own
+   * audit trail entry.
+   */
+  async logoutAll(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.logout_all',
+      entityType: 'User',
+      entityId: userId,
+    });
+  }
+
   async me(userId: string): Promise<AuthenticatedUser> {
     const user = await this.usersService.findById(userId);
     if (!this.usersService.isActive(user)) {
@@ -216,9 +237,10 @@ export class AuthService {
    * throws — the security reason (possible theft) stays server-side.
    */
   private async handleRefreshTokenReuse(stored: RefreshToken): Promise<void> {
+    const now = new Date();
     await this.prisma.refreshToken.updateMany({
       where: { familyId: stored.familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: now, reusedAt: now },
     });
 
     await this.auditService.record({

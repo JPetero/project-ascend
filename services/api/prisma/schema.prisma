@@ -89,6 +89,12 @@ model RefreshToken {
   tokenHash  String
   expiresAt  DateTime
   revokedAt  DateTime?
+  // Set only when this specific token was revoked as part of family-wide
+  // reuse handling (AuthService.handleRefreshTokenReuse), never on an
+  // ordinary rotation revoke — lets an auditor distinguish "rotated
+  // normally" from "killed because a stolen/replayed token surfaced" just
+  // by reading the row, without needing the AuditEvent log.
+  reusedAt   DateTime?
   deviceName String?
   createdAt  DateTime  @default(now())
 
@@ -171,6 +177,13 @@ model DeviceConnection {
   id                String                 @id @default(uuid())
   userId            String
   provider          String
+  // Distinguishes multiple physical devices from the same provider (e.g.
+  // two paired Garmin watches). Defaults to the literal "default" when the
+  // client doesn't supply one, which preserves the original one-connection-
+  // per-provider behavior for providers/clients that don't yet track a
+  // real per-device identifier — see packages/docs/build-session-1.md for
+  // the reasoning.
+  connectionKey     String                 @default("default")
   displayName       String
   status            DeviceConnectionStatus @default(PENDING)
   externalAccountId String?
@@ -181,7 +194,7 @@ model DeviceConnection {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, provider])
+  @@unique([userId, provider, connectionKey])
   @@index([userId])
   @@index([provider])
   @@map("device_connections")

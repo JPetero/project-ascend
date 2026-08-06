@@ -303,3 +303,59 @@ restriction as the Sprint 0/1 audit above — see that section's "Docker" note).
 Docker itself was not re-verified as a container build in this pass, for the same environment
 reason as the Sprint 0/1 audit; `docker-build` in `.github/workflows/backend.yml` covers that on
 every push/PR.
+
+## Build Session 1 (P0) — Verified Build Results
+
+Foundation-repair pass. Full log with per-item reasoning in
+[`packages/docs/build-session-1.md`](packages/docs/build-session-1.md). Environment: same
+sandboxed Linux container, Node 22, pnpm 9.15.9, PostgreSQL 16 (local, not Docker — the daemon is
+unreachable in this sandbox; see below).
+
+**Backend**
+
+| Check | Command | Result |
+|---|---|---|
+| Migration created and applied | `prisma migrate diff` + `prisma migrate deploy` (non-interactive `migrate dev` isn't supported in this shell) | PASSED — `20260806024532_p0_refresh_token_reuse_and_device_key`, applied to both `ascend_dev` and `ascend_test` |
+| Lint | `pnpm api:lint` | PASSED, 0 errors/warnings |
+| Unit tests | `pnpm api:test` | **PASSED — 21/21 tests** (up from 20; +1 `logoutAll` test) |
+| E2E tests | `pnpm api:test:e2e` | **PASSED — 33/33 tests** (up from 31; +1 multi-device `connectionKey` test, +1 `logout-all` test) |
+| Build | `pnpm api:build` | PASSED |
+| Deployed-output smoke test (Docker unavailable — see below) | `node dist/main.js` against real Postgres with production env vars | PASSED — `/health` returned `200`, `/auth/register` succeeded end-to-end, `Mapped {/auth/logout-all, POST} route` confirmed registered |
+
+**Mobile**
+
+| Check | Command | Result |
+|---|---|---|
+| `flutter --version` | — | `Flutter 3.44.8 • channel stable`, matches `pubspec.yaml`'s `sdk: ^3.12.2` and CI's pin exactly — no drift found |
+| Static analysis | `flutter analyze` | PASSED — "No issues found!" |
+| Formatting | `dart format --output=none --set-exit-if-changed .` | PASSED |
+| Tests | `flutter test` | **PASSED — 33/33 tests** (up from 30; +3 `splash_resilience_test.dart`: recoverable profile-fetch-failure state, sign-out from that state, session-expired handling) |
+
+**Docker**
+
+`docker compose up --build -d` could not be run: the Docker daemon is unreachable in this sandbox
+(`Cannot connect to the Docker daemon at unix:///var/run/docker.sock`; `service docker start`
+fails with `ulimit: error setting limit (Operation not permitted)`, a container-level privilege
+restriction — confirmed on two attempts, one with an unsandboxed shell). This is unchanged from
+the Sprint 0/1 and Sprint 2 audits above. `infrastructure/docker/api.Dockerfile` and
+`docker-compose.yml` were inspected and already satisfy every P0.6 requirement (non-root runtime
+user, healthcheck against `/health`, `migrate` stage running `prisma migrate deploy` — never
+`migrate dev` — gating the `api` service via `service_completed_successfully`); compensating
+verification was done by direct execution (see the Backend table above and
+`build-session-1.md`'s P0.6 entry for full detail). `docker-build` in
+`.github/workflows/backend.yml` builds both the `runtime` and `migrate` targets on every push/PR.
+
+**What changed**
+
+- `RefreshToken.reusedAt` (distinguishes family-revoked-by-reuse-detection from an ordinary
+  rotation revoke) and `POST /auth/logout-all` ("sign out everywhere").
+- `DeviceConnection.connectionKey` (`@@unique([userId, provider, connectionKey])`, default
+  `"default"`) so a provider that supports multiple physical devices (e.g. two paired watches) can
+  register more than one connection instead of silently upserting into a single row.
+- `apps/mobile/test/core/splash_resilience_test.dart` — new coverage for the recoverable
+  splash-error state and session-expired handling (both were already implemented in code; only
+  the tests were missing).
+
+Everything else audited under P0 (Flutter/Dart version pinning, onboarding's local-first
+persistence, both CI workflows) was already correct from prior session work and required no
+changes — see `build-session-1.md` for the item-by-item verification.

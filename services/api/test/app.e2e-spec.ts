@@ -230,6 +230,30 @@ describe('Project Ascend API (e2e)', () => {
     expect(listRes.body.data).toHaveLength(1);
   });
 
+  it('a distinct connectionKey registers a second physical device for the same provider', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/devices')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        provider: 'APPLE_HEALTH',
+        displayName: 'Apple Health (second watch)',
+        connectionKey: 'watch-2',
+      })
+      .expect(201);
+    expect(res.body.data.id).not.toBe(deviceId);
+
+    const listRes = await request(app.getHttpServer())
+      .get('/devices')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(listRes.body.data).toHaveLength(2);
+
+    await request(app.getHttpServer())
+      .delete(`/devices/${res.body.data.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+  });
+
   it('updates a device connection', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/devices/${deviceId}`)
@@ -251,6 +275,31 @@ describe('Project Ascend API (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(res.body.data).toHaveLength(0);
+  });
+
+  it('logs out of all sessions and revokes every active refresh token for the user', async () => {
+    const server = app.getHttpServer();
+
+    const loginA = await request(server)
+      .post('/auth/login')
+      .send({ email: registerPayload.email, password: registerPayload.password })
+      .expect(200);
+    const loginB = await request(server)
+      .post('/auth/login')
+      .send({ email: registerPayload.email, password: registerPayload.password })
+      .expect(200);
+
+    const tokenA: string = loginA.body.data.tokens.refreshToken;
+    const tokenB: string = loginB.body.data.tokens.refreshToken;
+    const accessA: string = loginA.body.data.tokens.accessToken;
+
+    await request(server)
+      .post('/auth/logout-all')
+      .set('Authorization', `Bearer ${accessA}`)
+      .expect(200);
+
+    await request(server).post('/auth/refresh').send({ refreshToken: tokenA }).expect(401);
+    await request(server).post('/auth/refresh').send({ refreshToken: tokenB }).expect(401);
   });
 
   it('logs out and revokes the refresh token', async () => {
