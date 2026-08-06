@@ -275,9 +275,7 @@ class _WorkoutPlayerScreenState extends ConsumerState<WorkoutPlayerScreen> {
 
     final index = _exerciseIndex.clamp(0, plan.exercises.length - 1);
     final entry = plan.exercises[index];
-    final activeSubstitution = session.activeSubstitutionFor(
-      entry.exercise.id,
-    );
+    final activeSubstitution = session.activeSubstitutionFor(entry.exercise.id);
     final effectiveExerciseId =
         activeSubstitution?.substituteExerciseId ?? entry.exercise.id;
     final effectiveExerciseName =

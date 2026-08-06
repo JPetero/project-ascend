@@ -8,7 +8,8 @@ class SyncStatus {
     required this.failedCount,
   });
 
-  const SyncStatus.idle() : this(isSyncing: false, pendingCount: 0, failedCount: 0);
+  const SyncStatus.idle()
+    : this(isSyncing: false, pendingCount: 0, failedCount: 0);
 
   final bool isSyncing;
   final int pendingCount;

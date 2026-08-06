@@ -31,5 +31,6 @@ final syncStatusStreamProvider = StreamProvider<SyncStatus>((ref) {
 /// on any stream error, since a sync status indicator failing open (shows
 /// nothing) is far better than it crashing the screen it's embedded in.
 final syncStatusProvider = Provider<SyncStatus>((ref) {
-  return ref.watch(syncStatusStreamProvider).valueOrNull ?? const SyncStatus.idle();
+  return ref.watch(syncStatusStreamProvider).valueOrNull ??
+      const SyncStatus.idle();
 });

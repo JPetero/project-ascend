@@ -13,7 +13,8 @@ class RpeSelector extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.label = 'Effort (RPE)',
-    this.helperText = 'Optional — how hard did that feel, 1 (easy) to 10 (max effort)?',
+    this.helperText =
+        'Optional — how hard did that feel, 1 (easy) to 10 (max effort)?',
   });
 
   final int? value;

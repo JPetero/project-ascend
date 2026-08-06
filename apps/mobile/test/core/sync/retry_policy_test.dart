@@ -21,12 +21,15 @@ void main() {
       expect(policy.delayFor(30), const Duration(minutes: 10));
     });
 
-    test('hasAttemptsRemaining is true below maxAttempts and false at or above it', () {
-      expect(policy.hasAttemptsRemaining(0), isTrue);
-      expect(policy.hasAttemptsRemaining(5), isTrue);
-      expect(policy.hasAttemptsRemaining(6), isFalse);
-      expect(policy.hasAttemptsRemaining(100), isFalse);
-    });
+    test(
+      'hasAttemptsRemaining is true below maxAttempts and false at or above it',
+      () {
+        expect(policy.hasAttemptsRemaining(0), isTrue);
+        expect(policy.hasAttemptsRemaining(5), isTrue);
+        expect(policy.hasAttemptsRemaining(6), isFalse);
+        expect(policy.hasAttemptsRemaining(100), isFalse);
+      },
+    );
   });
 
   group('isRetryableErrorCode', () {

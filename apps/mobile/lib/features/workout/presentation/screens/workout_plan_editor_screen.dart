@@ -53,9 +53,7 @@ class _WorkoutPlanEditorScreenState
   Future<void> _addExercise() async {
     final chosen = await showExercisePickerSheet(context);
     if (chosen == null) return;
-    setState(
-      () => _exercises.add(PlanExerciseDraft.fromExercise(chosen)),
-    );
+    setState(() => _exercises.add(PlanExerciseDraft.fromExercise(chosen)));
   }
 
   Future<void> _save() async {

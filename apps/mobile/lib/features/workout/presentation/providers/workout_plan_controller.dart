@@ -17,7 +17,8 @@ final workoutPlanDetailProvider = FutureProvider.autoDispose
 /// The signed-in user's own plans (custom or copied-from-catalog),
 /// including archived ones — "My Plans" filters client-side by
 /// [WorkoutPlan.isArchived] rather than round-tripping for each toggle.
-class MyWorkoutPlansController extends StateNotifier<AsyncValue<List<WorkoutPlan>>> {
+class MyWorkoutPlansController
+    extends StateNotifier<AsyncValue<List<WorkoutPlan>>> {
   MyWorkoutPlansController({required WorkoutPlanRepository repository})
     : _repository = repository,
       super(const AsyncValue.loading()) {
@@ -69,9 +70,10 @@ class MyWorkoutPlansController extends StateNotifier<AsyncValue<List<WorkoutPlan
 }
 
 final myWorkoutPlansControllerProvider =
-    StateNotifierProvider<MyWorkoutPlansController, AsyncValue<List<WorkoutPlan>>>((
-      ref,
-    ) {
+    StateNotifierProvider<
+      MyWorkoutPlansController,
+      AsyncValue<List<WorkoutPlan>>
+    >((ref) {
       return MyWorkoutPlansController(
         repository: ref.watch(workoutPlanRepositoryProvider),
       );

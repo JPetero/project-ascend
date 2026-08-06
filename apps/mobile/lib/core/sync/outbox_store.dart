@@ -55,24 +55,24 @@ class OutboxStore {
   }
 
   Stream<List<OutboxEntry>> watchAll() {
-    return (_db.select(
-      _db.outboxEntryRows,
-    )..orderBy([(t) => OrderingTerm.asc(t.createdAt)])).watch().map(
-      (rows) => rows.map(OutboxEntry.fromRow).toList(),
-    );
+    return (_db.select(_db.outboxEntryRows)
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .watch()
+        .map((rows) => rows.map(OutboxEntry.fromRow).toList());
   }
 
   Future<void> markProcessing(String id) => _updateStatus(id, 'processing');
 
   Future<void> markCompleted(String id, {String? resultEntityId}) async {
-    await (_db.update(_db.outboxEntryRows)..where((t) => t.id.equals(id)))
-        .write(
-          OutboxEntryRowsCompanion(
-            status: const Value('completed'),
-            resultEntityId: Value(resultEntityId),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+    await (_db.update(
+      _db.outboxEntryRows,
+    )..where((t) => t.id.equals(id))).write(
+      OutboxEntryRowsCompanion(
+        status: const Value('completed'),
+        resultEntityId: Value(resultEntityId),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// `retryAt` null means "exhausted its retry budget, or a permanent
@@ -87,30 +87,32 @@ class OutboxStore {
     required String? errorCode,
     DateTime? retryAt,
   }) async {
-    await (_db.update(_db.outboxEntryRows)..where((t) => t.id.equals(id)))
-        .write(
-          OutboxEntryRowsCompanion(
-            status: const Value('failed'),
-            retryCount: Value(retryCount),
-            lastErrorMessage: Value(errorMessage),
-            lastErrorCode: Value(errorCode),
-            nextAttemptAt: Value(retryAt ?? _farFuture),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+    await (_db.update(
+      _db.outboxEntryRows,
+    )..where((t) => t.id.equals(id))).write(
+      OutboxEntryRowsCompanion(
+        status: const Value('failed'),
+        retryCount: Value(retryCount),
+        lastErrorMessage: Value(errorMessage),
+        lastErrorCode: Value(errorCode),
+        nextAttemptAt: Value(retryAt ?? _farFuture),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Resets a `failed` entry back to `pending` with an immediate
   /// `nextAttemptAt` — the "manual retry" action in the sync status UI.
   Future<void> resetForManualRetry(String id) async {
-    await (_db.update(_db.outboxEntryRows)..where((t) => t.id.equals(id)))
-        .write(
-          OutboxEntryRowsCompanion(
-            status: const Value('pending'),
-            nextAttemptAt: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+    await (_db.update(
+      _db.outboxEntryRows,
+    )..where((t) => t.id.equals(id))).write(
+      OutboxEntryRowsCompanion(
+        status: const Value('pending'),
+        nextAttemptAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   Future<void> discard(String id) async {
@@ -118,28 +120,27 @@ class OutboxStore {
   }
 
   Future<int> pendingCount() async {
-    final rows =
-        await (_db.select(
-          _db.outboxEntryRows,
-        )..where((t) => t.status.equals('pending'))).get();
+    final rows = await (_db.select(
+      _db.outboxEntryRows,
+    )..where((t) => t.status.equals('pending'))).get();
     return rows.length;
   }
 
   Future<int> failedCount() async {
-    final rows =
-        await (_db.select(
-          _db.outboxEntryRows,
-        )..where((t) => t.status.equals('failed'))).get();
+    final rows = await (_db.select(
+      _db.outboxEntryRows,
+    )..where((t) => t.status.equals('failed'))).get();
     return rows.length;
   }
 
   Future<void> _updateStatus(String id, String status) async {
-    await (_db.update(_db.outboxEntryRows)..where((t) => t.id.equals(id)))
-        .write(
-          OutboxEntryRowsCompanion(
-            status: Value(status),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+    await (_db.update(
+      _db.outboxEntryRows,
+    )..where((t) => t.id.equals(id))).write(
+      OutboxEntryRowsCompanion(
+        status: Value(status),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 }

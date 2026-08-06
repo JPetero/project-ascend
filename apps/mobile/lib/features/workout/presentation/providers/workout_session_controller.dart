@@ -192,7 +192,8 @@ class WorkoutSessionController extends StateNotifier<WorkoutSessionState?> {
     }
 
     final substitution = current.activeSubstitutionFor(exerciseId);
-    final effectiveExerciseId = substitution?.substituteExerciseId ?? exerciseId;
+    final effectiveExerciseId =
+        substitution?.substituteExerciseId ?? exerciseId;
     final effectiveExerciseName =
         substitution?.substituteExerciseName ?? exerciseName;
 

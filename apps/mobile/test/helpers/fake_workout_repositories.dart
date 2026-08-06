@@ -61,8 +61,9 @@ class FakeWorkoutPlanRepository extends WorkoutPlanRepository {
   final List<WorkoutPlan> created = [];
 
   @override
-  Future<List<WorkoutPlan>> list({bool includeArchived = false}) async =>
-      [sampleWorkoutPlan];
+  Future<List<WorkoutPlan>> list({bool includeArchived = false}) async => [
+    sampleWorkoutPlan,
+  ];
 
   @override
   Future<WorkoutPlan> getById(String id) async => sampleWorkoutPlan;

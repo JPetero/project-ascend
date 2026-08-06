@@ -284,7 +284,8 @@ class WorkoutSessionState {
       difficultyRating: json['difficultyRating'] as int?,
       substitutions: (json['substitutions'] as List<dynamic>? ?? [])
           .map(
-            (s) => ExerciseSubstitution.fromCacheJson(s as Map<String, dynamic>),
+            (s) =>
+                ExerciseSubstitution.fromCacheJson(s as Map<String, dynamic>),
           )
           .toList(),
       syncStatus: SessionSyncStatus.values.firstWhere(

@@ -24,7 +24,8 @@ class OutboxEntryRows extends Table {
   TextColumn get entityType => text()();
   TextColumn get operationType => text()();
   TextColumn get payloadJson => text()();
-  TextColumn get status => text()(); // pending | processing | completed | failed
+  TextColumn get status =>
+      text()(); // pending | processing | completed | failed
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
   TextColumn get lastErrorMessage => text().nullable()();
   TextColumn get lastErrorCode => text().nullable()();

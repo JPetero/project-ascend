@@ -28,9 +28,7 @@ class _TargetForm extends StatefulWidget {
 }
 
 class _TargetFormState extends State<_TargetForm> {
-  late final _sets = TextEditingController(
-    text: '${widget.draft.targetSets}',
-  );
+  late final _sets = TextEditingController(text: '${widget.draft.targetSets}');
   late final _reps = TextEditingController(
     text: widget.draft.targetReps?.toString() ?? '',
   );

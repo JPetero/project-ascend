@@ -45,9 +45,7 @@ class SyncStatusIndicator extends ConsumerWidget {
           children: [
             Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: AscendSpacing.sm),
-            Expanded(
-              child: Text(label, style: theme.textTheme.bodyMedium),
-            ),
+            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
             if (status.failedCount > 0 && !status.isSyncing)
               TextButton(
                 onPressed: () => ref.read(syncEngineProvider).retryAllFailed(),

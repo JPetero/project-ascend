@@ -124,8 +124,9 @@ class _ExerciseSubstitutionContentState
           ),
           isExpanded: _expandedCandidateId == exercise.id,
           onToggle: () => setState(
-            () => _expandedCandidateId =
-                _expandedCandidateId == exercise.id ? null : exercise.id,
+            () => _expandedCandidateId = _expandedCandidateId == exercise.id
+                ? null
+                : exercise.id,
           ),
           onConfirm: () => Navigator.of(context).pop(
             ExerciseSummary(
@@ -157,8 +158,9 @@ class _ExerciseSubstitutionContentState
           candidate: candidate,
           isExpanded: _expandedCandidateId == candidate.id,
           onToggle: () => setState(
-            () => _expandedCandidateId =
-                _expandedCandidateId == candidate.id ? null : candidate.id,
+            () => _expandedCandidateId = _expandedCandidateId == candidate.id
+                ? null
+                : candidate.id,
           ),
           onConfirm: () => Navigator.of(context).pop(candidate),
         );

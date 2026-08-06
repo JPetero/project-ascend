@@ -371,8 +371,7 @@ class _DashboardContent extends StatelessWidget {
                         progress:
                             nutrition.proteinGrams /
                             nutrition.proteinTargetGrams,
-                        label:
-                            '${nutrition.proteinGrams.round()}g',
+                        label: '${nutrition.proteinGrams.round()}g',
                         size: 76,
                       ),
                       loading: () => const AscendProgressRing(

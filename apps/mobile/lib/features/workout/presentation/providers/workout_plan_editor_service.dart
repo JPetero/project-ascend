@@ -38,7 +38,10 @@ class WorkoutPlanEditorService {
               .cast<Map<String, dynamic>>(),
           idempotencyKey: idempotencyKey,
         );
-        return SyncHandlerResult(entityId: result['id'] as String?, response: result);
+        return SyncHandlerResult(
+          entityId: result['id'] as String?,
+          response: result,
+        );
       }),
     );
     _syncEngine.registerHandler(
@@ -50,9 +53,13 @@ class WorkoutPlanEditorService {
           description: payload['description'] as String?,
           exercises: payload['exercises'] == null
               ? null
-              : (payload['exercises'] as List<dynamic>).cast<Map<String, dynamic>>(),
+              : (payload['exercises'] as List<dynamic>)
+                    .cast<Map<String, dynamic>>(),
         );
-        return SyncHandlerResult(entityId: result['id'] as String?, response: result);
+        return SyncHandlerResult(
+          entityId: result['id'] as String?,
+          response: result,
+        );
       }),
     );
   }

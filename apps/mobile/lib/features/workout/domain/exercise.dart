@@ -1,6 +1,12 @@
 enum ExerciseDifficulty { beginner, intermediate, advanced }
 
-enum MeasurementType { repsWeight, bodyweight, duration, repsOnly, distanceDuration }
+enum MeasurementType {
+  repsWeight,
+  bodyweight,
+  duration,
+  repsOnly,
+  distanceDuration,
+}
 
 MeasurementType measurementTypeFromJson(String value) =>
     MeasurementType.values.firstWhere(
