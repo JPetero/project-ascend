@@ -17,6 +17,12 @@ export class UpdateWorkoutPlanDto {
   @MaxLength(120)
   name?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
   /** When provided, replaces the plan's entire exercise list. */
   @ApiPropertyOptional({ type: [WorkoutPlanExerciseDto] })
   @IsOptional()

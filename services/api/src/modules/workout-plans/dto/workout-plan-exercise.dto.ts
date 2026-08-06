@@ -40,6 +40,13 @@ export class WorkoutPlanExerciseDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(200000)
+  targetDistanceMeters?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(900)

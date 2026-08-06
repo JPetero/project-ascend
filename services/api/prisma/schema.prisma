@@ -73,6 +73,11 @@ model User {
   workoutPlans    WorkoutPlan[]
   workoutSessions WorkoutSession[]
   personalRecords PersonalRecord[]
+  syncOperations  SyncOperation[]
+  ownedFoods      Food[]
+  mealEntries     MealEntry[]
+  macroTarget     MacroTarget?
+  waterEntries    WaterEntry[]
 
   @@index([status])
   @@map("users")
@@ -347,6 +352,9 @@ model Exercise {
   workoutSets          WorkoutSet[]
   personalRecords      PersonalRecord[]
 
+  substitutionsAsOriginal   WorkoutSessionSubstitution[] @relation("SubstitutionOriginal")
+  substitutionsAsSubstitute WorkoutSessionSubstitution[] @relation("SubstitutionReplacement")
+
   @@index([categoryId])
   @@map("exercises")
 }
@@ -435,15 +443,21 @@ model WorkoutExercise {
 }
 
 model WorkoutPlan {
-  id        String   @id @default(uuid())
-  userId    String
+  id          String    @id @default(uuid())
+  userId      String
   // The catalog Workout this plan started from, if any — kept only as a
   // "based on" reference; WorkoutPlanExercise rows are this plan's own
   // copy, so the plan is unaffected if the catalog Workout later changes.
-  workoutId String?
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  workoutId   String?
+  name        String
+  description String?
+  // Soft-delete: archived plans are hidden from the default plan list but
+  // never physically removed, so past sessions started from them keep a
+  // resolvable `workoutPlan` relation. `DELETE /workout-plans/:id` still
+  // exists for a true hard delete when nothing references the plan.
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   workout   Workout?              @relation(fields: [workoutId], references: [id], onDelete: SetNull)
@@ -494,17 +508,43 @@ model WorkoutSession {
   // since that delta would incorrectly include any paused time.
   activeDurationSeconds Int                  @default(0)
   notes                 String?
+  // Optional whole-session difficulty rating, same 1-10 scale as per-set
+  // RPE, entered once at finish() rather than per set.
+  difficultyRating      Int?
   createdAt             DateTime             @default(now())
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutPlan     WorkoutPlan?     @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
+  user            User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutPlan     WorkoutPlan?                 @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
   sets            WorkoutSet[]
   personalRecords PersonalRecord[]
+  substitutions   WorkoutSessionSubstitution[]
 
   @@index([userId])
   @@index([userId, status])
   @@index([workoutPlanId])
   @@map("workout_sessions")
+}
+
+// Records that, within one session, sets logged against `originalExerciseId`
+// should from now on be logged against `substituteExerciseId` instead.
+// Deliberately does NOT touch already-created `WorkoutSet` rows — those
+// keep referencing whichever exercise they were actually logged against,
+// so completed history is never rewritten. One active substitution per
+// (session, original exercise): substituting again just replaces it.
+model WorkoutSessionSubstitution {
+  id                   String   @id @default(uuid())
+  workoutSessionId     String
+  originalExerciseId   String
+  substituteExerciseId String
+  createdAt            DateTime @default(now())
+
+  workoutSession     WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  originalExercise   Exercise       @relation("SubstitutionOriginal", fields: [originalExerciseId], references: [id])
+  substituteExercise Exercise       @relation("SubstitutionReplacement", fields: [substituteExerciseId], references: [id])
+
+  @@unique([workoutSessionId, originalExerciseId])
+  @@index([workoutSessionId])
+  @@map("workout_session_substitutions")
 }
 
 model WorkoutSet {
@@ -516,6 +556,12 @@ model WorkoutSet {
   weightKg         Float?
   durationSeconds  Int?
   distanceMeters   Float?
+  // Rate of Perceived Exertion, 1-10, half-point increments allowed (e.g.
+  // 7.5) — the standard resolution most RPE scales use. Optional and
+  // purely subjective; never treated as a medical measurement. See
+  // ProgressionService for how it tempers (but never blocks) a load
+  // increase.
+  rpe              Float?
   isWarmup         Boolean  @default(false)
   completedAt      DateTime @default(now())
 
@@ -550,4 +596,195 @@ model PersonalRecord {
   @@unique([userId, exerciseId, type])
   @@index([userId])
   @@map("personal_records")
+}
+
+// ---------------------------------------------------------------------------
+// Shared synchronization / idempotency system (Build Session 2)
+// ---------------------------------------------------------------------------
+// One reusable idempotency ledger for every offline-capable mutation across
+// features (workout sets, plans, substitutions today; nutrition entries as
+// of this same session) rather than a bespoke table per feature. A client
+// generates `idempotencyKey` once per logical mutation (typically a UUID
+// stored alongside the local record) and resends the same key on every
+// retry; `IdempotencyService` (services/api/src/common/idempotency) turns
+// that into "run exactly once, replay the same result on any retry" for
+// whichever endpoints opt in. See packages/docs/build-session-2.md for the
+// conflict policy this implements.
+enum SyncOperationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model SyncOperation {
+  id              String              @id @default(uuid())
+  userId          String
+  idempotencyKey  String
+  entityType      String
+  operationType   String
+  localEntityId   String?
+  clientCreatedAt DateTime?
+  payloadVersion  Int                 @default(1)
+  status          SyncOperationStatus @default(PROCESSING)
+  resultEntityId  String?
+  // The exact response body returned the first time this key was
+  // processed, so a retry replays byte-for-byte instead of recomputing
+  // (and potentially disagreeing with) the original result.
+  resultPayload   Json?
+  errorMessage    String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Enforces "at most one outcome per user per idempotency key" at the
+  // database level — the real backstop against duplicate processing, not
+  // just application-level checking.
+  @@unique([userId, idempotencyKey])
+  @@index([userId])
+  @@map("sync_operations")
+}
+
+// ---------------------------------------------------------------------------
+// Nutrition Tracking foundation (Build Session 2)
+// ---------------------------------------------------------------------------
+// Deliberately no camera/scanner capture yet (see packages/docs/roadmap.md).
+// All macro values are stored per `Food`'s own reference serving
+// (`servingDescription`/`servingGrams`); `FoodServing` rows are just named,
+// user-facing serving options (e.g. "1 cup cooked", "100 g") that resolve to
+// a gram quantity for scaling, not a second copy of the macro data.
+// `MealEntry` snapshots the computed macros at log time rather than
+// re-deriving them from `Food` on every read, specifically so editing or
+// archiving a `Food` later never silently rewrites a user's already-logged
+// history — the same principle already used for `WorkoutSet`/`PersonalRecord`
+// in the Workout Engine.
+enum FoodSourceType {
+  SEED
+  USER
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model Food {
+  id                     String         @id @default(uuid())
+  // Stable natural key for seeded foods only, so the idempotent seed
+  // script can upsert by slug the same way the exercise/workout seed
+  // does. Always null for user-created foods — NULLs don't collide under
+  // a Postgres unique index, so many custom foods can coexist with none.
+  slug                   String?        @unique
+  name                   String
+  // e.g. a local-language name alongside `name` — informational only.
+  alternateName          String?
+  brand                  String?
+  sourceType             FoodSourceType @default(SEED)
+  // Set only for sourceType = USER; a seeded food has no owner and can
+  // never be edited or archived by any single user.
+  ownerId                String?
+  servingDescription     String
+  servingGrams           Float?
+  caloriesPerServing     Float
+  proteinGramsPerServing Float
+  carbGramsPerServing    Float
+  fatGramsPerServing     Float
+  fiberGramsPerServing   Float?
+  sodiumMgPerServing     Float?
+  // True for essentially all of this session's seed data and every
+  // user-entered custom food — this app has no lab-verified nutrition
+  // database, so values are always approximate unless a future, real
+  // verified source is integrated.
+  isEstimated            Boolean        @default(true)
+  archivedAt             DateTime?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  owner       User?         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  servings    FoodServing[]
+  mealEntries MealEntry[]
+
+  @@index([ownerId])
+  @@index([name])
+  @@map("foods")
+}
+
+model FoodServing {
+  id        String  @id @default(uuid())
+  foodId    String
+  label     String
+  // Null for a serving unit that isn't gram-convertible (e.g. "1 piece" for
+  // a food only ever logged by count) — `MealEntry.loggedByGrams` covers
+  // the gram-entry path independently of which serving option was picked.
+  grams     Float?
+  isDefault Boolean @default(false)
+
+  food        Food        @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  mealEntries MealEntry[]
+
+  @@index([foodId])
+  @@map("food_servings")
+}
+
+model MealEntry {
+  id            String   @id @default(uuid())
+  userId        String
+  foodId        String
+  foodServingId String?
+  mealType      MealType
+  date          DateTime @db.Date
+  quantity      Float
+  loggedByGrams Boolean  @default(false)
+  gramsLogged   Float?
+  // Snapshot at log time — see the section comment above.
+  calories      Float
+  proteinGrams  Float
+  carbGrams     Float
+  fatGrams      Float
+  fiberGrams    Float?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food        Food         @relation(fields: [foodId], references: [id])
+  foodServing FoodServing? @relation(fields: [foodServingId], references: [id])
+
+  @@index([userId, date])
+  @@map("meal_entries")
+}
+
+model MacroTarget {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  calorieTarget      Int
+  proteinGramsTarget Int
+  carbGramsTarget    Int
+  fatGramsTarget     Int
+  fiberGramsTarget   Int?
+  // True when this row was populated by the safe-default estimator rather
+  // than typed in by the user — the Flutter UI uses this to keep showing
+  // "estimated" framing until the user edits and implicitly confirms it.
+  isEstimatedDefault Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("macro_targets")
+}
+
+model WaterEntry {
+  id       String   @id @default(uuid())
+  userId   String
+  date     DateTime @db.Date
+  amountMl Int
+  loggedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("water_entries")
 }

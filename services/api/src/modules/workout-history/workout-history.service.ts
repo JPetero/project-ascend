@@ -3,9 +3,18 @@ import { Prisma, WorkoutSet } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryWorkoutHistoryDto } from './dto/query-workout-history.dto';
 
+const exerciseSummarySelect = { id: true, name: true, slug: true } satisfies Prisma.ExerciseSelect;
+
 const sessionInclude = {
   workoutPlan: { select: { id: true, name: true } },
-  sets: { include: { exercise: { select: { id: true, name: true, slug: true } } } },
+  sets: { include: { exercise: { select: exerciseSummarySelect } } },
+  substitutions: {
+    include: {
+      originalExercise: { select: exerciseSummarySelect },
+      substituteExercise: { select: exerciseSummarySelect },
+    },
+    orderBy: { createdAt: Prisma.SortOrder.asc },
+  },
 } satisfies Prisma.WorkoutSessionInclude;
 
 type SessionWithRelations = Prisma.WorkoutSessionGetPayload<{ include: typeof sessionInclude }>;
@@ -72,6 +81,7 @@ export class WorkoutHistoryService {
     return {
       ...this.summarize(session),
       notes: session.notes,
+      difficultyRating: session.difficultyRating,
       sets: session.sets
         .slice()
         .sort((a, b) => a.completedAt.getTime() - b.completedAt.getTime())
@@ -83,9 +93,16 @@ export class WorkoutHistoryService {
           weightKg: set.weightKg,
           durationSeconds: set.durationSeconds,
           distanceMeters: set.distanceMeters,
+          rpe: set.rpe,
           isWarmup: set.isWarmup,
           completedAt: set.completedAt,
         })),
+      substitutions: session.substitutions.map((s) => ({
+        id: s.id,
+        originalExercise: s.originalExercise,
+        substituteExercise: s.substituteExercise,
+        createdAt: s.createdAt,
+      })),
     };
   }
 

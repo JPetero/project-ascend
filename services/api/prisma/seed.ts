@@ -1,4 +1,10 @@
-import { PrismaClient, ExerciseDifficulty, MeasurementType, MuscleRole } from '@prisma/client';
+import {
+  PrismaClient,
+  ExerciseDifficulty,
+  MeasurementType,
+  MuscleRole,
+  FoodSourceType,
+} from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -992,6 +998,421 @@ const WORKOUTS: WorkoutSeed[] = [
   },
 ];
 
+interface FoodSeed {
+  slug: string;
+  name: string;
+  alternateName?: string;
+  servingDescription: string;
+  servingGrams: number | null;
+  caloriesPerServing: number;
+  proteinGramsPerServing: number;
+  carbGramsPerServing: number;
+  fatGramsPerServing: number;
+  fiberGramsPerServing?: number;
+  sodiumMgPerServing?: number;
+  /** Additional named serving options beyond the reference serving above.
+   * `grams: null` means that option isn't gram-convertible (e.g. "1 can"
+   * of a product whose can size varies) — logging by that option scales
+   * directly by quantity rather than through a gram ratio. */
+  servings?: Array<{ label: string; grams: number | null; isDefault?: boolean }>;
+}
+
+// A modest, illustrative multi-region dataset — not a comprehensive food
+// database. Values are approximate (typical reference-food composition
+// figures), which is exactly why every Food row carries `isEstimated:
+// true`. Philippine staples are included explicitly per this session's
+// brief, alongside common global staples, so the nutrition log is usable
+// out of the box for a broad range of diets rather than just one region.
+const NUTRITION_FOODS: FoodSeed[] = [
+  // --- Philippine staples --------------------------------------------------
+  {
+    slug: 'cooked-white-rice',
+    name: 'Cooked White Rice',
+    servingDescription: '1 cup cooked (158 g)',
+    servingGrams: 158,
+    caloriesPerServing: 205,
+    proteinGramsPerServing: 4.3,
+    carbGramsPerServing: 44.5,
+    fatGramsPerServing: 0.4,
+    fiberGramsPerServing: 0.6,
+    sodiumMgPerServing: 1.6,
+    servings: [
+      { label: '1 cup cooked', grams: 158, isDefault: true },
+      { label: '1/2 cup cooked', grams: 79 },
+    ],
+  },
+  {
+    slug: 'egg-boiled',
+    name: 'Egg (Boiled)',
+    servingDescription: '1 large egg (50 g)',
+    servingGrams: 50,
+    caloriesPerServing: 78,
+    proteinGramsPerServing: 6.3,
+    carbGramsPerServing: 0.6,
+    fatGramsPerServing: 5.3,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 62,
+    servings: [{ label: '1 large egg', grams: 50, isDefault: true }],
+  },
+  {
+    slug: 'chicken-breast-cooked',
+    name: 'Chicken Breast (Cooked, Skinless)',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 165,
+    proteinGramsPerServing: 31,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 3.6,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 74,
+  },
+  {
+    slug: 'chicken-thigh-cooked',
+    name: 'Chicken Thigh (Cooked, Skinless)',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 209,
+    proteinGramsPerServing: 26,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 10.9,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 90,
+  },
+  {
+    slug: 'canned-sardines',
+    name: 'Canned Sardines in Oil',
+    servingDescription: '1 can, drained (92 g)',
+    servingGrams: 92,
+    caloriesPerServing: 191,
+    proteinGramsPerServing: 22.7,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 10.5,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 282,
+    servings: [
+      { label: '1 can, drained', grams: null, isDefault: true },
+      { label: '100 g', grams: 100 },
+    ],
+  },
+  {
+    slug: 'milkfish-bangus-cooked',
+    name: 'Milkfish (Bangus), Cooked',
+    alternateName: 'Bangus',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 175,
+    proteinGramsPerServing: 20.5,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 10,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 78,
+  },
+  {
+    slug: 'tuna-canned-in-water',
+    name: 'Tuna, Canned in Water (Drained)',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 116,
+    proteinGramsPerServing: 25.5,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 0.8,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 247,
+  },
+  {
+    slug: 'tofu-firm',
+    name: 'Tofu (Firm)',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 144,
+    proteinGramsPerServing: 15.5,
+    carbGramsPerServing: 3.3,
+    fatGramsPerServing: 8.7,
+    fiberGramsPerServing: 2.3,
+    sodiumMgPerServing: 14,
+  },
+  {
+    slug: 'mung-beans-cooked',
+    name: 'Mung Beans, Cooked',
+    alternateName: 'Monggo',
+    servingDescription: '1 cup cooked (202 g)',
+    servingGrams: 202,
+    caloriesPerServing: 212,
+    proteinGramsPerServing: 14.2,
+    carbGramsPerServing: 38.7,
+    fatGramsPerServing: 0.8,
+    fiberGramsPerServing: 15.4,
+    sodiumMgPerServing: 4,
+  },
+  {
+    slug: 'water-spinach-cooked',
+    name: 'Water Spinach, Cooked',
+    alternateName: 'Kangkong',
+    servingDescription: '1 cup cooked (128 g)',
+    servingGrams: 128,
+    caloriesPerServing: 22,
+    proteinGramsPerServing: 2.6,
+    carbGramsPerServing: 3.9,
+    fatGramsPerServing: 0.3,
+    fiberGramsPerServing: 2.1,
+    sodiumMgPerServing: 88,
+  },
+  {
+    slug: 'banana',
+    name: 'Banana',
+    alternateName: 'Saba / Lakatan',
+    servingDescription: '1 medium (100 g)',
+    servingGrams: 100,
+    caloriesPerServing: 89,
+    proteinGramsPerServing: 1.1,
+    carbGramsPerServing: 22.8,
+    fatGramsPerServing: 0.3,
+    fiberGramsPerServing: 2.6,
+    sodiumMgPerServing: 1,
+    servings: [{ label: '1 medium', grams: 100, isDefault: true }],
+  },
+  {
+    slug: 'sweet-potato-boiled',
+    name: 'Sweet Potato, Boiled',
+    alternateName: 'Kamote',
+    servingDescription: '1 medium (151 g)',
+    servingGrams: 151,
+    caloriesPerServing: 135,
+    proteinGramsPerServing: 2.7,
+    carbGramsPerServing: 31.6,
+    fatGramsPerServing: 0.2,
+    fiberGramsPerServing: 4.5,
+    sodiumMgPerServing: 41,
+  },
+  {
+    slug: 'rolled-oats-dry',
+    name: 'Rolled Oats (Dry)',
+    servingDescription: '1/2 cup dry (40 g)',
+    servingGrams: 40,
+    caloriesPerServing: 150,
+    proteinGramsPerServing: 5.3,
+    carbGramsPerServing: 27,
+    fatGramsPerServing: 2.6,
+    fiberGramsPerServing: 4,
+    sodiumMgPerServing: 0,
+  },
+  {
+    slug: 'pandesal',
+    name: 'Pandesal (Bread Roll)',
+    servingDescription: '1 piece (30 g)',
+    servingGrams: 30,
+    caloriesPerServing: 84,
+    proteinGramsPerServing: 2.4,
+    carbGramsPerServing: 15.6,
+    fatGramsPerServing: 1.3,
+    fiberGramsPerServing: 0.6,
+    sodiumMgPerServing: 130,
+    servings: [{ label: '1 piece', grams: 30, isDefault: true }],
+  },
+  {
+    slug: 'peanut-butter',
+    name: 'Peanut Butter',
+    servingDescription: '2 tbsp (32 g)',
+    servingGrams: 32,
+    caloriesPerServing: 188,
+    proteinGramsPerServing: 8,
+    carbGramsPerServing: 6.9,
+    fatGramsPerServing: 16,
+    fiberGramsPerServing: 1.9,
+    sodiumMgPerServing: 147,
+  },
+  // --- Global staples --------------------------------------------------
+  {
+    slug: 'greek-yogurt-plain',
+    name: 'Greek Yogurt, Plain (Low-Fat)',
+    alternateName: 'Yogurt',
+    servingDescription: '1 cup (245 g)',
+    servingGrams: 245,
+    caloriesPerServing: 154,
+    proteinGramsPerServing: 23,
+    carbGramsPerServing: 8.8,
+    fatGramsPerServing: 3.8,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 82,
+  },
+  {
+    slug: 'lentils-cooked',
+    name: 'Lentils, Cooked',
+    servingDescription: '1 cup cooked (198 g)',
+    servingGrams: 198,
+    caloriesPerServing: 230,
+    proteinGramsPerServing: 17.9,
+    carbGramsPerServing: 39.9,
+    fatGramsPerServing: 0.8,
+    fiberGramsPerServing: 15.6,
+    sodiumMgPerServing: 4,
+  },
+  {
+    slug: 'black-beans-cooked',
+    name: 'Black Beans, Cooked',
+    servingDescription: '1 cup cooked (172 g)',
+    servingGrams: 172,
+    caloriesPerServing: 227,
+    proteinGramsPerServing: 15.2,
+    carbGramsPerServing: 40.8,
+    fatGramsPerServing: 0.9,
+    fiberGramsPerServing: 15,
+    sodiumMgPerServing: 2,
+  },
+  {
+    slug: 'potato-boiled',
+    name: 'Potato, Boiled (With Skin)',
+    servingDescription: '1 medium (167 g)',
+    servingGrams: 167,
+    caloriesPerServing: 128,
+    proteinGramsPerServing: 2.9,
+    carbGramsPerServing: 29.9,
+    fatGramsPerServing: 0.1,
+    fiberGramsPerServing: 2.9,
+    sodiumMgPerServing: 6,
+  },
+  {
+    slug: 'pasta-cooked',
+    name: 'Pasta, Cooked',
+    servingDescription: '1 cup cooked (140 g)',
+    servingGrams: 140,
+    caloriesPerServing: 221,
+    proteinGramsPerServing: 8.1,
+    carbGramsPerServing: 43.2,
+    fatGramsPerServing: 1.3,
+    fiberGramsPerServing: 2.5,
+    sodiumMgPerServing: 1,
+  },
+  {
+    slug: 'salmon-cooked',
+    name: 'Salmon, Cooked',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 208,
+    proteinGramsPerServing: 20.4,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 13.4,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 59,
+  },
+  {
+    slug: 'ground-beef-85-cooked',
+    name: 'Ground Beef (85% Lean), Cooked',
+    alternateName: 'Ground Meat',
+    servingDescription: '100 g',
+    servingGrams: 100,
+    caloriesPerServing: 250,
+    proteinGramsPerServing: 26,
+    carbGramsPerServing: 0,
+    fatGramsPerServing: 15,
+    fiberGramsPerServing: 0,
+    sodiumMgPerServing: 75,
+  },
+  {
+    slug: 'apple',
+    name: 'Apple',
+    servingDescription: '1 medium (182 g)',
+    servingGrams: 182,
+    caloriesPerServing: 95,
+    proteinGramsPerServing: 0.5,
+    carbGramsPerServing: 25,
+    fatGramsPerServing: 0.3,
+    fiberGramsPerServing: 4.4,
+    sodiumMgPerServing: 2,
+    servings: [{ label: '1 medium', grams: 182, isDefault: true }],
+  },
+  {
+    slug: 'orange',
+    name: 'Orange',
+    servingDescription: '1 medium (131 g)',
+    servingGrams: 131,
+    caloriesPerServing: 62,
+    proteinGramsPerServing: 1.2,
+    carbGramsPerServing: 15.4,
+    fatGramsPerServing: 0.2,
+    fiberGramsPerServing: 3.1,
+    sodiumMgPerServing: 0,
+    servings: [{ label: '1 medium', grams: 131, isDefault: true }],
+  },
+  {
+    slug: 'broccoli-cooked',
+    name: 'Broccoli, Cooked',
+    servingDescription: '1 cup cooked (156 g)',
+    servingGrams: 156,
+    caloriesPerServing: 55,
+    proteinGramsPerServing: 3.7,
+    carbGramsPerServing: 11.2,
+    fatGramsPerServing: 0.6,
+    fiberGramsPerServing: 5.1,
+    sodiumMgPerServing: 64,
+  },
+  {
+    slug: 'carrot-raw',
+    name: 'Carrot, Raw',
+    servingDescription: '1 medium (61 g)',
+    servingGrams: 61,
+    caloriesPerServing: 25,
+    proteinGramsPerServing: 0.6,
+    carbGramsPerServing: 5.8,
+    fatGramsPerServing: 0.1,
+    fiberGramsPerServing: 1.7,
+    sodiumMgPerServing: 42,
+    servings: [{ label: '1 medium', grams: 61, isDefault: true }],
+  },
+];
+
+async function seedNutrition() {
+  for (const food of NUTRITION_FOODS) {
+    const row = await prisma.food.upsert({
+      where: { slug: food.slug },
+      create: {
+        slug: food.slug,
+        name: food.name,
+        alternateName: food.alternateName,
+        sourceType: FoodSourceType.SEED,
+        servingDescription: food.servingDescription,
+        servingGrams: food.servingGrams,
+        caloriesPerServing: food.caloriesPerServing,
+        proteinGramsPerServing: food.proteinGramsPerServing,
+        carbGramsPerServing: food.carbGramsPerServing,
+        fatGramsPerServing: food.fatGramsPerServing,
+        fiberGramsPerServing: food.fiberGramsPerServing,
+        sodiumMgPerServing: food.sodiumMgPerServing,
+        isEstimated: true,
+      },
+      update: {
+        name: food.name,
+        alternateName: food.alternateName,
+        servingDescription: food.servingDescription,
+        servingGrams: food.servingGrams,
+        caloriesPerServing: food.caloriesPerServing,
+        proteinGramsPerServing: food.proteinGramsPerServing,
+        carbGramsPerServing: food.carbGramsPerServing,
+        fatGramsPerServing: food.fatGramsPerServing,
+        fiberGramsPerServing: food.fiberGramsPerServing,
+        sodiumMgPerServing: food.sodiumMgPerServing,
+      },
+    });
+
+    // Re-derive serving options from scratch each run, same pattern as
+    // the exercise seed's muscle/equipment join rows.
+    await prisma.foodServing.deleteMany({ where: { foodId: row.id } });
+    if (food.servings?.length) {
+      await prisma.foodServing.createMany({
+        data: food.servings.map((serving) => ({
+          foodId: row.id,
+          label: serving.label,
+          grams: serving.grams,
+          isDefault: serving.isDefault ?? false,
+        })),
+      });
+    }
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`Seeded ${NUTRITION_FOODS.length} foods.`);
+}
+
 async function main() {
   const categoryIds = new Map<string, string>();
   for (const category of CATEGORIES) {
@@ -1138,6 +1559,8 @@ async function main() {
   console.log(
     `Seeded ${CATEGORIES.length} categories, ${MUSCLE_GROUPS.length} muscle groups, ${EQUIPMENT_TYPES.length} equipment types, ${EXERCISES.length} exercises, ${WORKOUTS.length} workouts.`,
   );
+
+  await seedNutrition();
 }
 
 main()

@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
@@ -13,8 +24,8 @@ export class WorkoutPlansController {
   constructor(private readonly workoutPlansService: WorkoutPlansService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthenticatedUser) {
-    return this.workoutPlansService.list(user.id);
+  list(@CurrentUser() user: AuthenticatedUser, @Query('includeArchived') includeArchived?: string) {
+    return this.workoutPlansService.list(user.id, includeArchived === 'true');
   }
 
   @Get(':id')
@@ -34,6 +45,18 @@ export class WorkoutPlansController {
     @Body() dto: UpdateWorkoutPlanDto,
   ) {
     return this.workoutPlansService.update(user.id, id, dto);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  archive(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.workoutPlansService.archive(user.id, id);
+  }
+
+  @Post(':id/unarchive')
+  @HttpCode(HttpStatus.OK)
+  unarchive(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.workoutPlansService.unarchive(user.id, id);
   }
 
   @Delete(':id')

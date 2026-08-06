@@ -12,8 +12,10 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
 import { LogSetDto } from './dto/log-set.dto';
 import { StartWorkoutSessionDto } from './dto/start-workout-session.dto';
+import { SubstituteExerciseDto } from './dto/substitute-exercise.dto';
 import { UpdateSetDto } from './dto/update-set.dto';
 import { WorkoutSessionsService } from './workout-sessions.service';
 
@@ -52,8 +54,12 @@ export class WorkoutSessionsController {
 
   @Post(':id/finish')
   @HttpCode(HttpStatus.OK)
-  finish(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.workoutSessionsService.finish(user.id, id);
+  finish(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: FinishWorkoutSessionDto,
+  ) {
+    return this.workoutSessionsService.finish(user.id, id, dto);
   }
 
   @Post(':id/abandon')
@@ -65,6 +71,16 @@ export class WorkoutSessionsController {
   @Post(':id/sets')
   logSet(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: LogSetDto) {
     return this.workoutSessionsService.logSet(user.id, id, dto);
+  }
+
+  @Post(':id/substitutions')
+  @HttpCode(HttpStatus.OK)
+  substituteExercise(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SubstituteExerciseDto,
+  ) {
+    return this.workoutSessionsService.substituteExercise(user.id, id, dto);
   }
 
   @Patch(':id/sets/:setId')

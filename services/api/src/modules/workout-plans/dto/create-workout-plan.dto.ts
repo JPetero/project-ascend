@@ -26,6 +26,12 @@ export class CreateWorkoutPlanDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   workoutId?: string;
 
   @ApiPropertyOptional({ type: [WorkoutPlanExerciseDto] })
@@ -36,4 +42,13 @@ export class CreateWorkoutPlanDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutPlanExerciseDto)
   exercises?: WorkoutPlanExerciseDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Client-generated key identifying this exact create attempt, so a network retry never creates a duplicate plan.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey?: string;
 }

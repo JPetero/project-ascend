@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateWorkoutPlanDto } from './dto/create-workout-plan.dto';
 import { UpdateWorkoutPlanDto } from './dto/update-workout-plan.dto';
@@ -17,11 +18,14 @@ type WorkoutPlanWithRelations = Prisma.WorkoutPlanGetPayload<{ include: typeof p
 
 @Injectable()
 export class WorkoutPlansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
 
-  async list(userId: string) {
+  async list(userId: string, includeArchived = false) {
     const plans = await this.prisma.workoutPlan.findMany({
-      where: { userId },
+      where: { userId, ...(includeArchived ? {} : { archivedAt: null }) },
       include: planInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -34,23 +38,44 @@ export class WorkoutPlansService {
   }
 
   async create(userId: string, dto: CreateWorkoutPlanDto) {
-    const exerciseRows = dto.workoutId
-      ? await this.exercisesFromCatalogWorkout(dto.workoutId)
-      : (dto.exercises ?? []);
+    const run = async () => {
+      const exerciseRows = dto.workoutId
+        ? await this.exercisesFromCatalogWorkout(dto.workoutId)
+        : (dto.exercises ?? []);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const plan = await tx.workoutPlan.create({
-        data: { userId, name: dto.name, workoutId: dto.workoutId },
-      });
-      if (exerciseRows.length > 0) {
-        await tx.workoutPlanExercise.createMany({
-          data: exerciseRows.map((exercise) => ({ ...exercise, workoutPlanId: plan.id })),
+      const created = await this.prisma.$transaction(async (tx) => {
+        const plan = await tx.workoutPlan.create({
+          data: {
+            userId,
+            name: dto.name,
+            description: dto.description,
+            workoutId: dto.workoutId,
+          },
         });
-      }
-      return plan;
-    });
+        if (exerciseRows.length > 0) {
+          await tx.workoutPlanExercise.createMany({
+            data: exerciseRows.map((exercise) => ({ ...exercise, workoutPlanId: plan.id })),
+          });
+        }
+        return plan;
+      });
 
-    return this.getById(userId, created.id);
+      const result = await this.getById(userId, created.id);
+      return { entityId: created.id, payload: result };
+    };
+
+    if (dto.idempotencyKey) {
+      return this.idempotencyService.run(
+        {
+          userId,
+          idempotencyKey: dto.idempotencyKey,
+          entityType: 'WORKOUT_PLAN',
+          operationType: 'CREATE',
+        },
+        run,
+      );
+    }
+    return (await run()).payload;
   }
 
   async update(userId: string, id: string, dto: UpdateWorkoutPlanDto) {
@@ -67,10 +92,27 @@ export class WorkoutPlansService {
       }
       await tx.workoutPlan.update({
         where: { id },
-        data: { ...(dto.name !== undefined ? { name: dto.name } : {}), updatedAt: new Date() },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          updatedAt: new Date(),
+        },
       });
     });
 
+    return this.getById(userId, id);
+  }
+
+  /** Soft-delete: hidden from `list()` by default, never physically removed. */
+  async archive(userId: string, id: string) {
+    await this.findOwned(userId, id);
+    await this.prisma.workoutPlan.update({ where: { id }, data: { archivedAt: new Date() } });
+    return this.getById(userId, id);
+  }
+
+  async unarchive(userId: string, id: string) {
+    await this.findOwned(userId, id);
+    await this.prisma.workoutPlan.update({ where: { id }, data: { archivedAt: null } });
     return this.getById(userId, id);
   }
 
@@ -95,6 +137,7 @@ export class WorkoutPlansService {
       targetReps: we.targetReps ?? undefined,
       targetDurationSeconds: we.targetDurationSeconds ?? undefined,
       targetWeightKg: we.targetWeightKg ?? undefined,
+      targetDistanceMeters: we.targetDistanceMeters ?? undefined,
       restSeconds: we.restSeconds,
       notes: we.notes ?? undefined,
     }));
@@ -112,6 +155,8 @@ export class WorkoutPlansService {
     return {
       id: plan.id,
       name: plan.name,
+      description: plan.description,
+      archivedAt: plan.archivedAt,
       workout: plan.workout,
       createdAt: plan.createdAt,
       updatedAt: plan.updatedAt,
@@ -122,6 +167,7 @@ export class WorkoutPlansService {
         targetReps: pe.targetReps,
         targetDurationSeconds: pe.targetDurationSeconds,
         targetWeightKg: pe.targetWeightKg,
+        targetDistanceMeters: pe.targetDistanceMeters,
         restSeconds: pe.restSeconds,
         notes: pe.notes,
         exercise: {
