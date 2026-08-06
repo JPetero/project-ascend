@@ -14,6 +14,7 @@ import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
+import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/exercise_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/personal_record_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/workout_catalog_controller.dart';
@@ -44,6 +45,7 @@ Future<ProviderContainer> createTestContainer({
   FakeFoodRepository? foodRepository,
   FakeMealEntryRepository? mealEntryRepository,
   FakeWaterRepository? waterRepository,
+  FakeDeloadRepository? deloadRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -110,6 +112,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       waterRepositoryProvider.overrideWithValue(
         waterRepository ?? FakeWaterRepository(),
+      ),
+      deloadRepositoryProvider.overrideWithValue(
+        deloadRepository ?? FakeDeloadRepository(),
       ),
     ],
   );

@@ -21,6 +21,7 @@ import '../../../workout/domain/personal_record.dart';
 import '../../../workout/domain/workout_history_entry.dart';
 import '../../../workout/presentation/providers/personal_record_controller.dart';
 import '../../../workout/presentation/providers/workout_history_controller.dart';
+import '../../../workout/presentation/widgets/deload_card.dart';
 import '../../domain/bmi.dart';
 import '../../domain/workout_calendar.dart';
 import '../../domain/workout_streak.dart';
@@ -85,6 +86,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AscendSpacing.lg),
+              const DeloadCard(),
               _BmiCard(profile: profile),
               const SizedBox(height: AscendSpacing.lg),
               nutritionAsync.maybeWhen(

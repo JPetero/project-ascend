@@ -1,12 +1,14 @@
 import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/core/networking/api_client.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
+import 'package:mobile/features/workout/data/deload_repository.dart';
 import 'package:mobile/features/workout/data/exercise_repository.dart';
 import 'package:mobile/features/workout/data/personal_record_repository.dart';
 import 'package:mobile/features/workout/data/workout_catalog_repository.dart';
 import 'package:mobile/features/workout/data/workout_history_repository.dart';
 import 'package:mobile/features/workout/data/workout_plan_repository.dart';
 import 'package:mobile/features/workout/data/workout_session_repository.dart';
+import 'package:mobile/features/workout/domain/deload_recommendation.dart';
 import 'package:mobile/features/workout/domain/exercise.dart';
 import 'package:mobile/features/workout/domain/personal_record.dart';
 import 'package:mobile/features/workout/domain/progression_suggestion.dart';
@@ -223,5 +225,30 @@ class FakeWorkoutSessionRepository extends WorkoutSessionRepository {
       'substituteExerciseId': substituteExerciseId,
     });
     return {'id': id};
+  }
+}
+
+class FakeDeloadRepository extends DeloadRepository {
+  FakeDeloadRepository({DeloadRecommendation? active})
+    : _active = active,
+      super(apiClient: _unusedApiClient());
+
+  DeloadRecommendation? _active;
+  final List<String> dismissedIds = [];
+  final List<String> postponedIds = [];
+
+  @override
+  Future<DeloadRecommendation?> getActive() async => _active;
+
+  @override
+  Future<void> dismiss(String id) async {
+    dismissedIds.add(id);
+    _active = null;
+  }
+
+  @override
+  Future<void> postpone(String id, {int days = 7}) async {
+    postponedIds.add(id);
+    _active = null;
   }
 }
