@@ -1,10 +1,12 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMealEntryDto } from '../nutrition-log/dto/create-meal-entry.dto';
 import { NutritionLogService } from '../nutrition-log/nutrition-log.service';
 import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
 import { LogSavedMealDto } from './dto/log-saved-meal.dto';
+import { UpdateSavedMealDto } from './dto/update-saved-meal.dto';
 
 const savedMealInclude = {
   items: {
@@ -30,6 +32,7 @@ export class SavedMealsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly nutritionLogService: NutritionLogService,
+    private readonly idempotencyService: IdempotencyService,
   ) {}
 
   async list(userId: string) {
@@ -42,21 +45,62 @@ export class SavedMealsService {
   }
 
   async create(userId: string, dto: CreateSavedMealDto) {
-    const savedMeal = await this.prisma.savedMeal.create({
-      data: {
-        userId,
-        name: dto.name,
-        items: {
-          create: dto.items.map((item) => ({
+    const run = async () => {
+      const savedMeal = await this.prisma.savedMeal.create({
+        data: {
+          userId,
+          name: dto.name,
+          items: {
+            create: dto.items.map((item) => ({
+              foodId: item.foodId,
+              foodServingId: item.foodServingId,
+              quantity: item.quantity,
+            })),
+          },
+        },
+        include: savedMealInclude,
+      });
+      const payload = this.serialize(savedMeal);
+      return { entityId: payload.id, payload };
+    };
+
+    if (dto.idempotencyKey) {
+      return this.idempotencyService.run(
+        {
+          userId,
+          idempotencyKey: dto.idempotencyKey,
+          entityType: 'SAVED_MEAL',
+          operationType: 'CREATE',
+        },
+        run,
+      );
+    }
+    return (await run()).payload;
+  }
+
+  /** Replaces the name and/or the full item list — see UpdateSavedMealDto. */
+  async update(userId: string, id: string, dto: UpdateSavedMealDto) {
+    await this.findOwned(userId, id);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.items) {
+        await tx.savedMealItem.deleteMany({ where: { savedMealId: id } });
+        await tx.savedMealItem.createMany({
+          data: dto.items.map((item) => ({
+            savedMealId: id,
             foodId: item.foodId,
             foodServingId: item.foodServingId,
             quantity: item.quantity,
           })),
-        },
-      },
-      include: savedMealInclude,
+        });
+      }
+      if (dto.name !== undefined) {
+        await tx.savedMeal.update({ where: { id }, data: { name: dto.name } });
+      }
     });
-    return this.serialize(savedMeal);
+
+    const updated = await this.findOwned(userId, id);
+    return this.serialize(updated);
   }
 
   async delete(userId: string, id: string): Promise<void> {

@@ -157,6 +157,39 @@ describe('Nutrition Tracking (e2e)', () => {
         .set(authA())
         .expect(403);
     });
+
+    it('replays the same custom food for a repeated idempotency key instead of creating a duplicate', async () => {
+      const idempotencyKey = 'custom-food-create-key-1';
+      const payload = {
+        name: 'Offline-created Oatmeal',
+        servingDescription: '1 bowl',
+        caloriesPerServing: 250,
+        proteinGramsPerServing: 8,
+        carbGramsPerServing: 40,
+        fatGramsPerServing: 5,
+        idempotencyKey,
+      };
+
+      const first = await request(app.getHttpServer())
+        .post('/foods')
+        .set(authA())
+        .send(payload)
+        .expect(201);
+      const replay = await request(app.getHttpServer())
+        .post('/foods')
+        .set(authA())
+        .send(payload)
+        .expect(201);
+
+      expect(replay.body.data.id).toBe(first.body.data.id);
+
+      const search = await request(app.getHttpServer())
+        .get('/foods')
+        .query({ search: 'Offline-created Oatmeal' })
+        .set(authA())
+        .expect(200);
+      expect(search.body.data.data).toHaveLength(1);
+    });
   });
 
   describe('macro targets', () => {
@@ -490,6 +523,88 @@ describe('Nutrition Tracking (e2e)', () => {
       expect(summary.body.data.average.calories).toBe(
         round1((appleFood.caloriesPerServing * 2) / 7),
       );
+    });
+  });
+
+  describe('saved meals', () => {
+    it('creates a saved meal, replays the same result for a repeated idempotency key, edits, logs, and deletes it', async () => {
+      const search = await request(app.getHttpServer())
+        .get('/foods')
+        .query({ search: 'Cooked White Rice' })
+        .set(authA())
+        .expect(200);
+      const rice = search.body.data.data.find(
+        (f: { name: string }) => f.name === 'Cooked White Rice',
+      );
+      const appleSearch = await request(app.getHttpServer())
+        .get('/foods')
+        .query({ search: 'Apple' })
+        .set(authA())
+        .expect(200);
+      const apple = appleSearch.body.data.data.find((f: { name: string }) => f.name === 'Apple');
+
+      const idempotencyKey = 'saved-meal-create-key-1';
+      const first = await request(app.getHttpServer())
+        .post('/saved-meals')
+        .set(authA())
+        .send({ name: 'Rice bowl', items: [{ foodId: rice.id, quantity: 1 }], idempotencyKey })
+        .expect(201);
+
+      const replay = await request(app.getHttpServer())
+        .post('/saved-meals')
+        .set(authA())
+        .send({ name: 'Rice bowl', items: [{ foodId: rice.id, quantity: 1 }], idempotencyKey })
+        .expect(201);
+      expect(replay.body.data.id).toBe(first.body.data.id);
+
+      const listAfterCreate = await request(app.getHttpServer())
+        .get('/saved-meals')
+        .set(authA())
+        .expect(200);
+      expect(listAfterCreate.body.data).toHaveLength(1);
+
+      const savedMealId = first.body.data.id;
+
+      const updated = await request(app.getHttpServer())
+        .patch(`/saved-meals/${savedMealId}`)
+        .set(authA())
+        .send({ name: 'Rice and apple bowl', items: [{ foodId: apple.id, quantity: 3 }] })
+        .expect(200);
+      expect(updated.body.data.name).toBe('Rice and apple bowl');
+      expect(updated.body.data.items).toHaveLength(1);
+      expect(updated.body.data.items[0].food.name).toBe('Apple');
+      expect(updated.body.data.items[0].quantity).toBe(3);
+
+      await request(app.getHttpServer())
+        .patch(`/saved-meals/${savedMealId}`)
+        .set(authB())
+        .send({ name: 'Hijacked' })
+        .expect(403);
+
+      const logDate = '2026-04-01';
+      const logged = await request(app.getHttpServer())
+        .post(`/saved-meals/${savedMealId}/log`)
+        .set(authA())
+        .send({ mealType: 'LUNCH', date: logDate })
+        .expect(201);
+      expect(logged.body.data).toHaveLength(1);
+      expect(logged.body.data[0].calories).toBe(round1(apple.caloriesPerServing * 3));
+
+      await request(app.getHttpServer())
+        .delete(`/saved-meals/${savedMealId}`)
+        .set(authB())
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .delete(`/saved-meals/${savedMealId}`)
+        .set(authA())
+        .expect(200);
+
+      const listAfterDelete = await request(app.getHttpServer())
+        .get('/saved-meals')
+        .set(authA())
+        .expect(200);
+      expect(listAfterDelete.body.data).toHaveLength(0);
     });
   });
 });

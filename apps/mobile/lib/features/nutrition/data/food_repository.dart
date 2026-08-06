@@ -1,4 +1,5 @@
 import '../../../core/networking/api_client.dart';
+import '../../../core/sync/idempotency_key.dart';
 import '../domain/food.dart';
 
 class CustomFoodInput {
@@ -59,11 +60,34 @@ class FoodRepository {
     return items.map((f) => Food.fromJson(f as Map<String, dynamic>)).toList();
   }
 
-  Future<Food> createCustom(CustomFoodInput input) async {
+  Future<Food> createCustom(
+    CustomFoodInput input, {
+    String? idempotencyKey,
+  }) async {
     final envelope = await _apiClient.post(
       '/foods',
       (data) => data as Map<String, dynamic>,
+      data: {
+        ...input.toJson(),
+        'idempotencyKey': idempotencyKey ?? generateIdempotencyKey('food'),
+      },
+    );
+    return Food.fromJson(envelope.data!);
+  }
+
+  Future<Food> updateCustom(String id, CustomFoodInput input) async {
+    final envelope = await _apiClient.patch(
+      '/foods/$id',
+      (data) => data as Map<String, dynamic>,
       data: input.toJson(),
+    );
+    return Food.fromJson(envelope.data!);
+  }
+
+  Future<Food> archiveCustom(String id) async {
+    final envelope = await _apiClient.post(
+      '/foods/$id/archive',
+      (data) => data as Map<String, dynamic>,
     );
     return Food.fromJson(envelope.data!);
   }

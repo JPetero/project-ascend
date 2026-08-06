@@ -30,6 +30,7 @@ class MealEntryRepository {
     required MealType mealType,
     required DateTime date,
     required double quantity,
+    String? idempotencyKey,
   }) async {
     final envelope = await _apiClient.post(
       '/nutrition-log',
@@ -40,7 +41,35 @@ class MealEntryRepository {
         'mealType': mealTypeToJson(mealType),
         'date': formatDateOnly(date),
         'quantity': quantity,
-        'idempotencyKey': generateIdempotencyKey('meal-entry'),
+        'idempotencyKey':
+            idempotencyKey ?? generateIdempotencyKey('meal-entry'),
+      },
+    );
+    return MealEntry.fromJson(envelope.data!);
+  }
+
+  /// PATCH — naturally idempotent (applying the same absolute field values
+  /// twice yields the same result), so unlike creates this never needs its
+  /// own dedup key for offline-retry safety.
+  Future<MealEntry> updateEntry(
+    String id, {
+    String? foodId,
+    String? foodServingId,
+    MealType? mealType,
+    DateTime? date,
+    double? quantity,
+    String? notes,
+  }) async {
+    final envelope = await _apiClient.patch(
+      '/nutrition-log/$id',
+      (data) => data as Map<String, dynamic>,
+      data: {
+        'foodId': ?foodId,
+        'foodServingId': ?foodServingId,
+        if (mealType != null) 'mealType': mealTypeToJson(mealType),
+        if (date != null) 'date': formatDateOnly(date),
+        'quantity': ?quantity,
+        'notes': ?notes,
       },
     );
     return MealEntry.fromJson(envelope.data!);
@@ -54,6 +83,7 @@ class MealEntryRepository {
     required DateTime sourceDate,
     required DateTime targetDate,
     MealType? mealType,
+    String? idempotencyKey,
   }) async {
     final envelope = await _apiClient.post(
       '/nutrition-log/copy',
@@ -62,7 +92,8 @@ class MealEntryRepository {
         'sourceDate': formatDateOnly(sourceDate),
         'targetDate': formatDateOnly(targetDate),
         if (mealType != null) 'mealType': mealTypeToJson(mealType),
-        'idempotencyKey': generateIdempotencyKey('meal-entry-copy'),
+        'idempotencyKey':
+            idempotencyKey ?? generateIdempotencyKey('meal-entry-copy'),
       },
     );
     return (envelope.data ?? [])

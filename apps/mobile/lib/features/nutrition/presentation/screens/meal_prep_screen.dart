@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
-import '../../data/saved_meal_repository.dart';
+import '../../../../core/sync/sync_status_indicator.dart';
 import '../../domain/meal_entry.dart';
 import '../../domain/meal_type.dart';
 import '../../domain/nutrition_dashboard_summary.dart';
@@ -28,21 +28,25 @@ class MealPrepScreen extends ConsumerWidget {
     final today = DateTime.now();
     final yesterday = today.subtract(const Duration(days: 1));
     try {
-      final copied = await ref
-          .read(mealEntryRepositoryProvider)
+      final result = await ref
+          .read(todaysMealEntriesProvider.notifier)
           .copyEntries(sourceDate: yesterday, targetDate: today);
-      ref.invalidate(todaysMealEntriesProvider);
       ref.invalidate(nutritionDashboardSummaryProvider);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            copied.isEmpty
-                ? 'No meals logged yesterday to copy.'
-                : 'Copied ${copied.length} ${copied.length == 1 ? 'entry' : 'entries'} from yesterday.',
-          ),
-        ),
-      );
+      final String message;
+      if (!result.synced) {
+        message =
+            "You're offline — copying yesterday's meals once you're back online.";
+      } else if (result.copiedCount == 0) {
+        message = 'No meals logged yesterday to copy.';
+      } else {
+        message =
+            'Copied ${result.copiedCount} '
+            '${result.copiedCount == 1 ? 'entry' : 'entries'} from yesterday.';
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,13 +77,14 @@ class MealPrepScreen extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () => Future.wait([
             ref.refresh(nutritionDashboardSummaryProvider.future),
-            ref.refresh(todaysMealEntriesProvider.future),
-            ref.refresh(todaysWaterProvider.future),
-            ref.refresh(savedMealsProvider.future),
+            ref.read(todaysMealEntriesProvider.notifier).refresh(),
+            ref.read(todaysWaterProvider.notifier).refresh(),
+            ref.read(savedMealsProvider.notifier).refresh(),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
             children: [
+              const SyncStatusIndicator(),
               AscendSectionHeader(
                 title: "Today's macros",
                 actionLabel: 'Edit targets',
@@ -199,10 +204,7 @@ class _WaterTracker extends ConsumerWidget {
     int amountMl,
   ) async {
     try {
-      await ref
-          .read(waterRepositoryProvider)
-          .addEntry(date: DateTime.now(), amountMl: amountMl);
-      ref.invalidate(todaysWaterProvider);
+      await ref.read(todaysWaterProvider.notifier).addEntry(amountMl);
       ref.invalidate(nutritionDashboardSummaryProvider);
     } catch (_) {
       if (!context.mounted) return;
@@ -286,8 +288,7 @@ class _MealSection extends ConsumerWidget {
     MealEntry entry,
   ) async {
     try {
-      await ref.read(mealEntryRepositoryProvider).deleteEntry(entry.id);
-      ref.invalidate(todaysMealEntriesProvider);
+      await ref.read(todaysMealEntriesProvider.notifier).deleteEntry(entry.id);
       ref.invalidate(nutritionDashboardSummaryProvider);
     } catch (_) {
       if (!context.mounted) return;
@@ -320,20 +321,23 @@ class _MealSection extends ConsumerWidget {
 
     try {
       await ref
-          .read(savedMealRepositoryProvider)
+          .read(savedMealsProvider.notifier)
           .create(
             name: name,
             items: entries
                 .map(
-                  (e) => SavedMealItemInput(
+                  (e) => SavedMealItemDraft(
                     foodId: e.food.id,
+                    foodName: e.food.name,
+                    foodBrand: e.food.brand,
+                    foodIsEstimated: e.food.isEstimated,
                     foodServingId: e.foodServing?.id,
+                    foodServingLabel: e.foodServing?.label,
                     quantity: e.quantity,
                   ),
                 )
                 .toList(),
           );
-      ref.invalidate(savedMealsProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -422,8 +426,7 @@ class _SavedMealsSection extends ConsumerWidget {
     SavedMeal meal,
   ) async {
     try {
-      await ref.read(savedMealRepositoryProvider).delete(meal.id);
-      ref.invalidate(savedMealsProvider);
+      await ref.read(savedMealsProvider.notifier).delete(meal.id);
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -451,14 +454,16 @@ class _SavedMealsSection extends ConsumerWidget {
 
     try {
       await ref
-          .read(savedMealRepositoryProvider)
+          .read(savedMealsProvider.notifier)
           .logMeal(id: meal.id, mealType: mealType, date: DateTime.now());
-      ref.invalidate(todaysMealEntriesProvider);
       ref.invalidate(nutritionDashboardSummaryProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Logged "${meal.name}" to ${mealTypeLabel(mealType)}.'),
+          content: Text(
+            'Logging "${meal.name}" to ${mealTypeLabel(mealType)} — it will '
+            'appear once synced.',
+          ),
         ),
       );
     } catch (_) {

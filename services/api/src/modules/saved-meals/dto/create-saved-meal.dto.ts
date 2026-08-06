@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
@@ -41,4 +41,13 @@ export class CreateSavedMealDto {
   @ValidateNested({ each: true })
   @Type(() => SavedMealItemDto)
   items!: SavedMealItemDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Client-generated key identifying this exact create attempt, so a network retry never creates a duplicate saved meal.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey?: string;
 }

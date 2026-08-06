@@ -31,6 +31,7 @@ class WaterRepository {
   Future<WaterEntry> addEntry({
     required DateTime date,
     required int amountMl,
+    String? idempotencyKey,
   }) async {
     final envelope = await _apiClient.post(
       '/water',
@@ -38,8 +39,18 @@ class WaterRepository {
       data: {
         'date': formatDateOnly(date),
         'amountMl': amountMl,
-        'idempotencyKey': generateIdempotencyKey('water-entry'),
+        'idempotencyKey':
+            idempotencyKey ?? generateIdempotencyKey('water-entry'),
       },
+    );
+    return WaterEntry.fromJson(envelope.data!);
+  }
+
+  Future<WaterEntry> updateEntry(String id, {required int amountMl}) async {
+    final envelope = await _apiClient.patch(
+      '/water/$id',
+      (data) => data as Map<String, dynamic>,
+      data: {'amountMl': amountMl},
     );
     return WaterEntry.fromJson(envelope.data!);
   }

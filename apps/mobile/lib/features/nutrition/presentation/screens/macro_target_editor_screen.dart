@@ -46,7 +46,7 @@ class _MacroTargetEditorScreenState
     setState(() => _isSaving = true);
     try {
       await ref
-          .read(macroTargetRepositoryProvider)
+          .read(macroTargetProvider.notifier)
           .upsert(
             MacroTargetInput(
               calorieTarget: int.parse(_calories.text),
@@ -58,7 +58,6 @@ class _MacroTargetEditorScreenState
                   : int.parse(_fiber.text),
             ),
           );
-      ref.invalidate(macroTargetProvider);
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;

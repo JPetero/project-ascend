@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MealType } from '@prisma/client';
+import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NutritionLogService } from '../nutrition-log/nutrition-log.service';
 import { SavedMealsService } from './saved-meals.service';
@@ -12,10 +13,17 @@ describe('SavedMealsService', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       create: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
     };
+    savedMealItem: {
+      deleteMany: jest.Mock;
+      createMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
   let nutritionLogService: { addEntry: jest.Mock };
+  let idempotencyService: { run: jest.Mock };
 
   function savedMeal(overrides: Partial<Record<string, unknown>> = {}) {
     return {
@@ -43,16 +51,29 @@ describe('SavedMealsService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
       },
+      savedMealItem: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     };
     nutritionLogService = { addEntry: jest.fn() };
+    idempotencyService = {
+      run: jest.fn(async (_params: unknown, fn: () => Promise<unknown>) => {
+        const { payload } = (await fn()) as { payload: unknown };
+        return payload;
+      }),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         SavedMealsService,
         { provide: PrismaService, useValue: prisma },
         { provide: NutritionLogService, useValue: nutritionLogService },
+        { provide: IdempotencyService, useValue: idempotencyService },
       ],
     }).compile();
 
@@ -121,5 +142,57 @@ describe('SavedMealsService', () => {
     prisma.savedMeal.findUnique.mockResolvedValue(null);
 
     await expect(service.delete('user-1', 'missing')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('runs a create with an idempotencyKey through the idempotency ledger', async () => {
+    prisma.savedMeal.create.mockResolvedValue(savedMeal());
+
+    await service.create('user-1', {
+      name: 'Breakfast staple',
+      items: [{ foodId: 'food-1', quantity: 2 }],
+      idempotencyKey: 'create-key',
+    });
+
+    expect(idempotencyService.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        idempotencyKey: 'create-key',
+        entityType: 'SAVED_MEAL',
+        operationType: 'CREATE',
+      }),
+      expect.any(Function),
+    );
+    expect(prisma.savedMeal.create).toHaveBeenCalled();
+  });
+
+  it('replaces name and items on update', async () => {
+    prisma.savedMeal.findUnique.mockResolvedValue(savedMeal());
+
+    await service.update('user-1', 'saved-meal-1', {
+      name: 'New name',
+      items: [{ foodId: 'food-2', quantity: 1 }],
+    });
+
+    expect(prisma.savedMealItem.deleteMany).toHaveBeenCalledWith({
+      where: { savedMealId: 'saved-meal-1' },
+    });
+    expect(prisma.savedMealItem.createMany).toHaveBeenCalledWith({
+      data: [
+        { savedMealId: 'saved-meal-1', foodId: 'food-2', foodServingId: undefined, quantity: 1 },
+      ],
+    });
+    expect(prisma.savedMeal.update).toHaveBeenCalledWith({
+      where: { id: 'saved-meal-1' },
+      data: { name: 'New name' },
+    });
+  });
+
+  it('rejects updating a saved meal owned by another user', async () => {
+    prisma.savedMeal.findUnique.mockResolvedValue(savedMeal({ userId: 'someone-else' }));
+
+    await expect(
+      service.update('user-1', 'saved-meal-1', { name: 'New name' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.savedMeal.update).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { CreateSavedMealDto } from './dto/create-saved-meal.dto';
 import { LogSavedMealDto } from './dto/log-saved-meal.dto';
+import { UpdateSavedMealDto } from './dto/update-saved-meal.dto';
 import { SavedMealsService } from './saved-meals.service';
 
 @ApiBearerAuth()
@@ -20,6 +21,15 @@ export class SavedMealsController {
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateSavedMealDto) {
     return this.savedMealsService.create(user.id, dto);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateSavedMealDto,
+  ) {
+    return this.savedMealsService.update(user.id, id, dto);
   }
 
   @Delete(':id')

@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { FoodSourceType, Prisma } from '@prisma/client';
+import { IdempotencyService } from '../../common/idempotency/idempotency.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateFoodDto } from './dto/create-food.dto';
 import { QueryFoodsDto } from './dto/query-foods.dto';
@@ -10,7 +11,10 @@ type FoodWithRelations = Prisma.FoodGetPayload<{ include: typeof foodInclude }>;
 
 @Injectable()
 export class FoodsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idempotencyService: IdempotencyService,
+  ) {}
 
   /**
    * A user's search always sees the shared seed library plus *their own*
@@ -64,6 +68,26 @@ export class FoodsService {
   }
 
   async createCustom(userId: string, dto: CreateFoodDto) {
+    const run = async () => {
+      const created = await this.createCustomFood(userId, dto);
+      return { entityId: created.id, payload: created };
+    };
+
+    if (dto.idempotencyKey) {
+      return this.idempotencyService.run(
+        {
+          userId,
+          idempotencyKey: dto.idempotencyKey,
+          entityType: 'FOOD',
+          operationType: 'CREATE',
+        },
+        run,
+      );
+    }
+    return (await run()).payload;
+  }
+
+  private async createCustomFood(userId: string, dto: CreateFoodDto) {
     const food = await this.prisma.$transaction(async (tx) => {
       const created = await tx.food.create({
         data: {
