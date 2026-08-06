@@ -13,6 +13,8 @@ class OutboxStore {
 
   final AppDatabase _db;
 
+  static final DateTime _farFuture = DateTime.utc(9999);
+
   Future<void> enqueue({
     required String idempotencyKey,
     required String entityType,
@@ -73,8 +75,11 @@ class OutboxStore {
         );
   }
 
-  /// `retryAt` null means "exhausted its retry budget" — the row stays
-  /// `failed` until a human explicitly retries or discards it.
+  /// `retryAt` null means "exhausted its retry budget, or a permanent
+  /// error" — `nextAttemptAt` is pushed far into the future so [dueEntries]
+  /// never picks the row back up on its own. The row stays `failed` until
+  /// a human explicitly retries (resetting `nextAttemptAt` to now) or
+  /// discards it — never an automatic infinite retry loop.
   Future<void> markFailed(
     String id, {
     required int retryCount,
@@ -89,7 +94,7 @@ class OutboxStore {
             retryCount: Value(retryCount),
             lastErrorMessage: Value(errorMessage),
             lastErrorCode: Value(errorCode),
-            nextAttemptAt: Value(retryAt ?? DateTime.now()),
+            nextAttemptAt: Value(retryAt ?? _farFuture),
             updatedAt: Value(DateTime.now()),
           ),
         );
