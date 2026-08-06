@@ -7442,6 +7442,377 @@ class CachedCardioSessionRowsCompanion
   }
 }
 
+class $CachedHealthSyncStatusRowsTable extends CachedHealthSyncStatusRows
+    with
+        TableInfo<$CachedHealthSyncStatusRowsTable, CachedHealthSyncStatusRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedHealthSyncStatusRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _providerMeta = const VerificationMeta(
+    'provider',
+  );
+  @override
+  late final GeneratedColumn<String> provider = GeneratedColumn<String>(
+    'provider',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _metricMeta = const VerificationMeta('metric');
+  @override
+  late final GeneratedColumn<String> metric = GeneratedColumn<String>(
+    'metric',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lastSyncedAtMeta = const VerificationMeta(
+    'lastSyncedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncedAt = GeneratedColumn<DateTime>(
+    'last_synced_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    userId,
+    provider,
+    metric,
+    lastSyncedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_health_sync_status_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedHealthSyncStatusRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('provider')) {
+      context.handle(
+        _providerMeta,
+        provider.isAcceptableOrUnknown(data['provider']!, _providerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_providerMeta);
+    }
+    if (data.containsKey('metric')) {
+      context.handle(
+        _metricMeta,
+        metric.isAcceptableOrUnknown(data['metric']!, _metricMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_metricMeta);
+    }
+    if (data.containsKey('last_synced_at')) {
+      context.handle(
+        _lastSyncedAtMeta,
+        lastSyncedAt.isAcceptableOrUnknown(
+          data['last_synced_at']!,
+          _lastSyncedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastSyncedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedHealthSyncStatusRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedHealthSyncStatusRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      )!,
+      provider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider'],
+      )!,
+      metric: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metric'],
+      )!,
+      lastSyncedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_synced_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedHealthSyncStatusRowsTable createAlias(String alias) {
+    return $CachedHealthSyncStatusRowsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedHealthSyncStatusRow extends DataClass
+    implements Insertable<CachedHealthSyncStatusRow> {
+  final String id;
+  final String userId;
+  final String provider;
+  final String metric;
+  final DateTime lastSyncedAt;
+  const CachedHealthSyncStatusRow({
+    required this.id,
+    required this.userId,
+    required this.provider,
+    required this.metric,
+    required this.lastSyncedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['user_id'] = Variable<String>(userId);
+    map['provider'] = Variable<String>(provider);
+    map['metric'] = Variable<String>(metric);
+    map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
+    return map;
+  }
+
+  CachedHealthSyncStatusRowsCompanion toCompanion(bool nullToAbsent) {
+    return CachedHealthSyncStatusRowsCompanion(
+      id: Value(id),
+      userId: Value(userId),
+      provider: Value(provider),
+      metric: Value(metric),
+      lastSyncedAt: Value(lastSyncedAt),
+    );
+  }
+
+  factory CachedHealthSyncStatusRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedHealthSyncStatusRow(
+      id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String>(json['userId']),
+      provider: serializer.fromJson<String>(json['provider']),
+      metric: serializer.fromJson<String>(json['metric']),
+      lastSyncedAt: serializer.fromJson<DateTime>(json['lastSyncedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String>(userId),
+      'provider': serializer.toJson<String>(provider),
+      'metric': serializer.toJson<String>(metric),
+      'lastSyncedAt': serializer.toJson<DateTime>(lastSyncedAt),
+    };
+  }
+
+  CachedHealthSyncStatusRow copyWith({
+    String? id,
+    String? userId,
+    String? provider,
+    String? metric,
+    DateTime? lastSyncedAt,
+  }) => CachedHealthSyncStatusRow(
+    id: id ?? this.id,
+    userId: userId ?? this.userId,
+    provider: provider ?? this.provider,
+    metric: metric ?? this.metric,
+    lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+  );
+  CachedHealthSyncStatusRow copyWithCompanion(
+    CachedHealthSyncStatusRowsCompanion data,
+  ) {
+    return CachedHealthSyncStatusRow(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      provider: data.provider.present ? data.provider.value : this.provider,
+      metric: data.metric.present ? data.metric.value : this.metric,
+      lastSyncedAt: data.lastSyncedAt.present
+          ? data.lastSyncedAt.value
+          : this.lastSyncedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedHealthSyncStatusRow(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('provider: $provider, ')
+          ..write('metric: $metric, ')
+          ..write('lastSyncedAt: $lastSyncedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, userId, provider, metric, lastSyncedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedHealthSyncStatusRow &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.provider == this.provider &&
+          other.metric == this.metric &&
+          other.lastSyncedAt == this.lastSyncedAt);
+}
+
+class CachedHealthSyncStatusRowsCompanion
+    extends UpdateCompanion<CachedHealthSyncStatusRow> {
+  final Value<String> id;
+  final Value<String> userId;
+  final Value<String> provider;
+  final Value<String> metric;
+  final Value<DateTime> lastSyncedAt;
+  final Value<int> rowid;
+  const CachedHealthSyncStatusRowsCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.provider = const Value.absent(),
+    this.metric = const Value.absent(),
+    this.lastSyncedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedHealthSyncStatusRowsCompanion.insert({
+    required String id,
+    required String userId,
+    required String provider,
+    required String metric,
+    required DateTime lastSyncedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       userId = Value(userId),
+       provider = Value(provider),
+       metric = Value(metric),
+       lastSyncedAt = Value(lastSyncedAt);
+  static Insertable<CachedHealthSyncStatusRow> custom({
+    Expression<String>? id,
+    Expression<String>? userId,
+    Expression<String>? provider,
+    Expression<String>? metric,
+    Expression<DateTime>? lastSyncedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (provider != null) 'provider': provider,
+      if (metric != null) 'metric': metric,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedHealthSyncStatusRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? userId,
+    Value<String>? provider,
+    Value<String>? metric,
+    Value<DateTime>? lastSyncedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedHealthSyncStatusRowsCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      provider: provider ?? this.provider,
+      metric: metric ?? this.metric,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (provider.present) {
+      map['provider'] = Variable<String>(provider.value);
+    }
+    if (metric.present) {
+      map['metric'] = Variable<String>(metric.value);
+    }
+    if (lastSyncedAt.present) {
+      map['last_synced_at'] = Variable<DateTime>(lastSyncedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedHealthSyncStatusRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('provider: $provider, ')
+          ..write('metric: $metric, ')
+          ..write('lastSyncedAt: $lastSyncedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7473,6 +7844,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PendingCelebrationsTable(this);
   late final $CachedCardioSessionRowsTable cachedCardioSessionRows =
       $CachedCardioSessionRowsTable(this);
+  late final $CachedHealthSyncStatusRowsTable cachedHealthSyncStatusRows =
+      $CachedHealthSyncStatusRowsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7492,6 +7865,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedMacroTargets,
     pendingCelebrations,
     cachedCardioSessionRows,
+    cachedHealthSyncStatusRows,
   ];
 }
 
@@ -11349,6 +11723,227 @@ typedef $$CachedCardioSessionRowsTableProcessedTableManager =
       CachedCardioSessionRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedHealthSyncStatusRowsTableCreateCompanionBuilder =
+    CachedHealthSyncStatusRowsCompanion Function({
+      required String id,
+      required String userId,
+      required String provider,
+      required String metric,
+      required DateTime lastSyncedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedHealthSyncStatusRowsTableUpdateCompanionBuilder =
+    CachedHealthSyncStatusRowsCompanion Function({
+      Value<String> id,
+      Value<String> userId,
+      Value<String> provider,
+      Value<String> metric,
+      Value<DateTime> lastSyncedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedHealthSyncStatusRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedHealthSyncStatusRowsTable> {
+  $$CachedHealthSyncStatusRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metric => $composableBuilder(
+    column: $table.metric,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedHealthSyncStatusRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedHealthSyncStatusRowsTable> {
+  $$CachedHealthSyncStatusRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provider => $composableBuilder(
+    column: $table.provider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metric => $composableBuilder(
+    column: $table.metric,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedHealthSyncStatusRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedHealthSyncStatusRowsTable> {
+  $$CachedHealthSyncStatusRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get provider =>
+      $composableBuilder(column: $table.provider, builder: (column) => column);
+
+  GeneratedColumn<String> get metric =>
+      $composableBuilder(column: $table.metric, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSyncedAt => $composableBuilder(
+    column: $table.lastSyncedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$CachedHealthSyncStatusRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedHealthSyncStatusRowsTable,
+          CachedHealthSyncStatusRow,
+          $$CachedHealthSyncStatusRowsTableFilterComposer,
+          $$CachedHealthSyncStatusRowsTableOrderingComposer,
+          $$CachedHealthSyncStatusRowsTableAnnotationComposer,
+          $$CachedHealthSyncStatusRowsTableCreateCompanionBuilder,
+          $$CachedHealthSyncStatusRowsTableUpdateCompanionBuilder,
+          (
+            CachedHealthSyncStatusRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedHealthSyncStatusRowsTable,
+              CachedHealthSyncStatusRow
+            >,
+          ),
+          CachedHealthSyncStatusRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedHealthSyncStatusRowsTableTableManager(
+    _$AppDatabase db,
+    $CachedHealthSyncStatusRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedHealthSyncStatusRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedHealthSyncStatusRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedHealthSyncStatusRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String> provider = const Value.absent(),
+                Value<String> metric = const Value.absent(),
+                Value<DateTime> lastSyncedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedHealthSyncStatusRowsCompanion(
+                id: id,
+                userId: userId,
+                provider: provider,
+                metric: metric,
+                lastSyncedAt: lastSyncedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String userId,
+                required String provider,
+                required String metric,
+                required DateTime lastSyncedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedHealthSyncStatusRowsCompanion.insert(
+                id: id,
+                userId: userId,
+                provider: provider,
+                metric: metric,
+                lastSyncedAt: lastSyncedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedHealthSyncStatusRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedHealthSyncStatusRowsTable,
+      CachedHealthSyncStatusRow,
+      $$CachedHealthSyncStatusRowsTableFilterComposer,
+      $$CachedHealthSyncStatusRowsTableOrderingComposer,
+      $$CachedHealthSyncStatusRowsTableAnnotationComposer,
+      $$CachedHealthSyncStatusRowsTableCreateCompanionBuilder,
+      $$CachedHealthSyncStatusRowsTableUpdateCompanionBuilder,
+      (
+        CachedHealthSyncStatusRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedHealthSyncStatusRowsTable,
+          CachedHealthSyncStatusRow
+        >,
+      ),
+      CachedHealthSyncStatusRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11389,5 +11984,11 @@ class $AppDatabaseManager {
       $$CachedCardioSessionRowsTableTableManager(
         _db,
         _db.cachedCardioSessionRows,
+      );
+  $$CachedHealthSyncStatusRowsTableTableManager
+  get cachedHealthSyncStatusRows =>
+      $$CachedHealthSyncStatusRowsTableTableManager(
+        _db,
+        _db.cachedHealthSyncStatusRows,
       );
 }

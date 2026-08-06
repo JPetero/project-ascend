@@ -22,6 +22,7 @@ abstract final class RoutePaths {
   static const vision = '/vision';
 
   static const dashboard = '/dashboard';
+  static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
   static const cardioLog = '/cardio/new';

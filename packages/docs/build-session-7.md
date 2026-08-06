@@ -291,3 +291,225 @@ unix:///var/run/docker.sock`).
   calculation — the UI shows average pace (accumulated distance ÷
   accumulated active duration), which is honest and simple rather than a
   more sophisticated but harder-to-verify instantaneous estimate.
+
+---
+
+## Part 3 — Health Connect and HealthKit foundation
+
+Commit: `Implement connected health platform foundation`
+
+### What this part is
+
+Official OS health-platform integration — Android Health Connect and
+Apple HealthKit — behind a single unified sync pipeline, per Scenario 22
+(Founder features 21–27) and `packages/docs/wearables.md`'s
+previously-simulated wearables architecture. Steps, heart rate, resting
+heart rate, exercise sessions, active calories, distance, sleep, and
+cycling distance are all modeled. Xiaomi/Mi Fitness data is supported
+only through whatever it writes into Health Connect — Ascend never calls
+a private or reverse-engineered Xiaomi API directly, and the UI says so.
+
+### Backend: `health-metrics` module
+
+Deliberately **not** built inside the existing `health/` module — that
+module is the public `/health` liveness check
+(`@Public() @Get() /health` → `{status, timestamp}`), used by
+`test/app.e2e-spec.ts` and (presumably) container/orchestration health
+probes. A first pass accidentally created colliding files directly under
+`src/modules/health/`, overwriting the liveness controller; this was
+caught before commit (via `grep -rln "class HealthController"` plus
+checking `app.module.ts`'s imports) and fixed by restoring the original
+file with `git checkout --` and moving all new code to
+`src/modules/health-metrics/` (route prefix `/health-metrics`, classes
+`HealthMetricsController`/`HealthMetricsService`/`HealthMetricsModule`)
+instead. The two modules now coexist in `app.module.ts` with no naming or
+routing overlap.
+
+New Prisma models: `HealthMetricSample` (unique on
+`userId + metric + sourceProvider + recordedAt`, so a repeated sync of
+the same underlying platform record is silently absorbed rather than
+duplicated) and `HealthSyncCursor` (unique on `userId + provider +
+metric`, the backend's own bookmark of what's already been stored, kept
+deliberately separate from the Flutter app's local incremental-sync
+bookmark described below — one tracks what the server has, the other
+tracks what the client has already asked the platform for). A new
+`HealthMetric` enum covers all eight tracked metrics.
+
+`HealthMetricsService.sync()` accepts a provider id and up to 5,000
+samples per call, batch-inserts with `createMany({ skipDuplicates: true
+})` for efficient duplicate detection without per-row error handling, and
+advances the per-metric cursor. `syncStatus()` returns the caller's
+cursors (used by the Connected Health screen's "last synced" display per
+metric). `clearCursorsForProvider()` is called by
+`DevicesService.remove()` when a `DeviceConnection` is deleted, so
+disconnecting a provider on the backend also wipes its sync bookmarks —
+verified by an e2e test that connects, syncs, disconnects, and confirms
+`syncStatus()` comes back empty for that provider.
+
+Units and timestamps are normalized at the DTO boundary (samples arrive
+with an ISO timestamp and a bare numeric value; the metric enum itself
+carries the implied unit, e.g. steps are always a count, distance is
+always meters), and `sourceProvider`/`sourceId`/`sourceName` are stored
+per sample so a future UI could show "via Health Connect" vs. a specific
+wearable's own write, without the backend needing to special-case
+Xiaomi or any other vendor.
+
+A genuine, unrelated bug surfaced while testing the 5,000-sample payload
+limit: oversized JSON bodies are rejected by Express/body-parser
+*before* any NestJS DTO validation runs, as a raw `PayloadTooLargeError`
+(`.status = 413`) that isn't an `HttpException` — `AllExceptionsFilter`
+was defaulting every non-`HttpException` to a generic 500, silently
+hiding the real 413 for this (and every other) endpoint's oversized
+payloads. Fixed with a `statusFromRawError()` helper that reads a raw
+error's numeric `.status`/`.statusCode` when it's a genuine 4xx, with
+its own unit tests (including one confirming an out-of-range status like
+502 still correctly falls back to generic 500 rather than being trusted
+blindly).
+
+### Flutter: unified `HealthAdapter` interface
+
+`package:health` (v13.3.1) wraps both Health Connect and HealthKit
+behind one Dart API, but — following this session's established
+interface-over-plugin pattern (`LiveLocationService` in Part 2) — it's
+never referenced directly outside a single adapter file. `HealthAdapter`
+is an abstract class with concrete default behavior (an
+`unsupportedMetrics` getter derived from `supportedMetrics`), and
+`PlatformHealthAdapter` — the real, `package:health`-backed
+implementation — `extends` it (not `implements`, which would have
+dropped the concrete getter; caught by the analyzer and fixed). Real
+provider id strings (`androidHealthConnectProviderId` /
+`appleHealthProviderId`) intentionally match the pre-existing
+`wearableProviderCatalog` constants exactly, since the backend matches
+`DeviceConnection.provider` against `HealthSyncCursor.provider` by exact
+string on disconnect.
+
+`WearableSyncController` (a `StateNotifier`) orchestrates: availability
+detection, permission check/request, an incremental per-metric read
+(bounded to a 30-day lookback on a first sync, then reading only what's
+newer than the last locally-cached bookmark), upload via
+`HealthMetricsRepository`, and updating both the local Drift bookmark
+(`CachedHealthSyncStatusRows`, schema v7→v8, the same single-row-cache
+pattern established for `CachedCardioSessionRows`) and UI state.
+`disconnect()` revokes the platform permission and clears the local
+bookmark; the backend's matching cursor clear happens separately, driven
+by the existing device-disconnect flow.
+
+A real, pre-existing-adjacent race was found and fixed here, not worked
+around: `wearableSyncControllerProvider` originally watched
+`authControllerProvider.select((s) => s.user?.id)` to construct the
+controller with a fixed `userId`, matching a pattern already used
+elsewhere in this codebase (`liveCardioSessionControllerProvider`). But
+`ConnectedHealthScreen` calls `checkAvailability()` from `initState`
+immediately on mount — and if that call is still in flight when
+`AuthController`'s async bootstrap resolves from unauthenticated to
+authenticated (a real timing window, not just a test artifact), the
+provider tears down and rebuilds the controller mid-await, throwing
+`Bad state: Tried to use WearableSyncController after dispose was
+called`, and — even once guarded — silently losing whatever state the
+first, now-discarded instance had already computed. Fixed by having
+`WearableSyncController` take a `Ref` and read the signed-in user id
+*lazily* (`_ref.read(authControllerProvider)`, at the point each method
+actually needs it) instead of having it baked into the provider's
+`watch`-triggered construction — the controller instance is now stable
+across the auth bootstrap resolving, and every async state mutation is
+additionally guarded with `if (mounted)` as defense in depth. This was
+caught by writing and running `connected_health_screen_test.dart`
+against the real widget tree (not just the controller in isolation),
+which is exactly the kind of race a pure unit test would have missed.
+
+The Connected Health screen (`ConnectedHealthScreen`) shows: platform
+name and availability (Connected / Permission needed / Unavailable on
+this device — an honest state per metric, never a spinner that never
+resolves), a Xiaomi/Mi Fitness note on Android explaining it's
+Health-Connect-mediated only, a "Sync now" / "Grant permission" action
+depending on state, last-synced-per-metric from the backend's cursors,
+every supported metric with its sync status and every unsupported metric
+explicitly labeled "Unsupported" (never silently hidden), and a
+Disconnect action. It's reachable from the existing (still-simulated)
+`WearableConnectionsScreen` via a new "Connected Health" entry-point
+card, rather than replacing that screen — the two real providers now
+have a real screen; the remaining simulated vendor categories are
+untouched.
+
+### Integration points
+
+Wearable connections (`WearableConnectionsScreen` gained the entry point
+described above), devices (`DevicesService.remove()` now clears
+health-metrics cursors on disconnect), and the same extension-point
+philosophy as Part 2: `HealthMetricSample.sourceProvider` is exactly the
+kind of provenance field a future Dashboard/Rankings/Community
+consumption of synced health data would need, built now rather than
+retrofitted later.
+
+### Tests
+
+Backend: `health-metrics.service.spec.ts` (6 tests — sync/dedup via the
+unique constraint, cursor advancement, `syncStatus()`,
+`clearCursorsForProvider()`), `devices.service.spec.ts` (4 tests, new —
+disconnect clearing cursors), `all-exceptions.filter.spec.ts` (5 tests,
+new — the raw-4xx-status fix, plus the out-of-range-status fallback
+case), `health-metrics.e2e-spec.ts` (5 tests — sync + dedup + cursor
+round-trip over real HTTP, a date-range query filter, the 5,000-sample
+payload rejected at 413, disconnect clearing the cursor end-to-end, and
+confirming the pre-existing `/health` liveness check is completely
+unaffected by any of this).
+
+Flutter: `wearable_sync_controller_test.dart` (10 tests — availability
+detection in all three states, permission request + immediate sync,
+incremental-sync bookmark advancement, zero-sample syncs still advancing
+the bookmark, a failing sync recording a recoverable error rather than
+throwing, disconnect revoking + clearing), `connected_health_screen_test.dart`
+(3 widget tests — the unavailable state, the grant-permission state, and
+the connected state listing both supported and unsupported metrics).
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx tsc
+--noEmit` clean, `npx eslint "{src,test}/**/*.ts" --max-warnings=0`
+clean, `npx jest --silent` → 209 tests passed (was 194), `npx jest
+--config ./test/jest-e2e.json --silent` → 66 tests passed (was 61),
+`npx nest build` clean. A local Postgres was reachable in this
+environment for this part (`pg_isready` succeeded), so `prisma migrate
+dev` and the full e2e suite ran for real rather than being skipped.
+
+Flutter: `flutter pub add health` resolved cleanly (13.3.1), `dart run
+build_runner build` regenerated `app_database.g.dart` for schema v8,
+`dart format .` clean, `dart analyze` → "No issues found!", `flutter
+test` → 242 tests passed (was 229).
+
+### Platform limitations (honest, not fabricated)
+
+Same constraints as Part 2: no Android SDK, no Chrome, no Linux GTK dev
+libraries in this environment, so `flutter build apk --debug` was not
+attempted and no result is claimed for it. The Android
+`AndroidManifest.xml`/iOS `Info.plist` health-permission declarations
+required by `package:health` were **not** added in this part — the
+architecture (adapter interface, real `PlatformHealthAdapter`, sync
+controller, storage, UI) is complete and unit/widget-tested against a
+fake adapter, but the actual OS permission dialog appearing, a real
+Health Connect/HealthKit read succeeding, and the platform manifest
+entries themselves are unverified and not claimed to work at runtime.
+`docker compose build`/`up -d`/`ps` were attempted and could not run —
+no Docker daemon is reachable in this environment (`docker compose
+version` succeeds, but `docker ps` reports "Cannot connect to the Docker
+daemon at unix:///var/run/docker.sock").
+
+### Known scope decisions
+
+- **Manifest/`Info.plist` health-permission entries are not yet added.**
+  `package:health` requires its own Android permissions (health-data
+  read scopes) and an iOS `NSHealthShareUsageDescription`/
+  `NSHealthUpdateUsageDescription` pair plus the HealthKit capability in
+  the Xcode project — none of which can be meaningfully verified without
+  a real device/emulator and Xcode, so they were left as documented,
+  unimplemented next steps rather than added speculatively and claimed
+  to work.
+- **No background/periodic sync.** `sync()` is user-triggered ("Sync
+  now") or triggered once on granting permission — there is no
+  scheduled background refresh, matching this session's "foreground-only,
+  no surprise background activity" posture already established for GPS
+  cardio in Part 2.
+- **Xiaomi has no vendor-specific adapter.** Only whatever Xiaomi/Mi
+  Fitness writes into Health Connect is visible; there is no direct
+  Xiaomi integration and none is planned outside an explicitly
+  Xiaomi-approved future vendor SDK.

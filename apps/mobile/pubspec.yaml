@@ -34,6 +34,7 @@ dependencies:
   # test zone instead of waiting on real wall-clock seconds.
   clock: ^1.1.1
   geolocator: ^14.0.2
+  health: ^13.3.1
 
 dev_dependencies:
   flutter_test:

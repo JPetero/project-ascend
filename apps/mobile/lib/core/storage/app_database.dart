@@ -11,6 +11,7 @@ import 'tables/cached_cardio_session_table.dart';
 import 'tables/cached_preferences_table.dart';
 import 'tables/cached_profile_table.dart';
 import 'tables/cached_workout_session_table.dart';
+import 'tables/health_sync_status_table.dart';
 import 'tables/nutrition_tables.dart';
 import 'tables/onboarding_draft_table.dart';
 import 'tables/outbox_entries_table.dart';
@@ -50,13 +51,14 @@ const _cardioSessionRowId = 'singleton';
     CachedMacroTargets,
     PendingCelebrations,
     CachedCardioSessionRows,
+    CachedHealthSyncStatusRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -91,6 +93,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         await m.createTable(cachedCardioSessionRows);
+      }
+      if (from < 8) {
+        await m.createTable(cachedHealthSyncStatusRows);
       }
     },
   );
@@ -236,6 +241,46 @@ class AppDatabase extends _$AppDatabase {
     await (delete(
       cachedCardioSessionRows,
     )..where((t) => t.id.equals(_cardioSessionRowId))).go();
+  }
+
+  // ---------------------------------------------------------------------
+  // Health Connect/HealthKit incremental-sync bookmarks (schema version
+  // 8) — see tables/health_sync_status_table.dart's doc comment.
+  // ---------------------------------------------------------------------
+
+  Future<void> setHealthSyncStatus({
+    required String userId,
+    required String provider,
+    required String metric,
+    required DateTime lastSyncedAt,
+  }) async {
+    await into(cachedHealthSyncStatusRows).insertOnConflictUpdate(
+      CachedHealthSyncStatusRowsCompanion.insert(
+        id: '$userId:$provider:$metric',
+        userId: userId,
+        provider: provider,
+        metric: metric,
+        lastSyncedAt: lastSyncedAt,
+      ),
+    );
+  }
+
+  Future<DateTime?> readHealthSyncStatus({
+    required String userId,
+    required String provider,
+    required String metric,
+  }) async {
+    final row =
+        await (select(cachedHealthSyncStatusRows)
+              ..where((t) => t.id.equals('$userId:$provider:$metric')))
+            .getSingleOrNull();
+    return row?.lastSyncedAt;
+  }
+
+  Future<void> clearHealthSyncStatus(String userId) async {
+    await (delete(
+      cachedHealthSyncStatusRows,
+    )..where((t) => t.userId.equals(userId))).go();
   }
 
   // ---------------------------------------------------------------------
@@ -517,6 +562,7 @@ class AppDatabase extends _$AppDatabase {
       delete(cachedMacroTargets).go(),
       delete(pendingCelebrations).go(),
       delete(cachedCardioSessionRows).go(),
+      delete(cachedHealthSyncStatusRows).go(),
     ]);
   }
 }

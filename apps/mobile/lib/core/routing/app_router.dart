@@ -23,6 +23,7 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/social/presentation/screens/social_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
+import '../../features/wearables/presentation/screens/connected_health_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
 import '../../features/workout/presentation/screens/exercise_detail_screen.dart';
 import '../../features/workout/presentation/screens/exercise_library_screen.dart';
@@ -128,6 +129,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.dashboard,
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.connectedHealth,
+        builder: (context, state) => const ConnectedHealthScreen(),
       ),
       GoRoute(
         path: RoutePaths.achievements,

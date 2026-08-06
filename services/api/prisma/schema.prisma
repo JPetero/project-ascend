@@ -107,6 +107,8 @@ model User {
   savedMeals            SavedMeal[]
   achievementAwards     AchievementAward[]
   cardioSessions        CardioSession[]
+  healthMetricSamples   HealthMetricSample[]
+  healthSyncCursors     HealthSyncCursor[]
 
   @@index([status])
   @@map("users")
@@ -239,6 +241,73 @@ model DeviceConnection {
   @@index([userId])
   @@index([provider])
   @@map("device_connections")
+}
+
+// Normalized health-data types every adapter (Health Connect, HealthKit,
+// a future vendor adapter) maps its provider-specific data into — see
+// packages/docs/wearables.md's "Planned architecture for real
+// integrations" section, now implemented for Health Connect/HealthKit.
+enum HealthMetric {
+  STEPS
+  HEART_RATE
+  RESTING_HEART_RATE
+  EXERCISE_SESSION
+  ACTIVE_CALORIES
+  DISTANCE
+  SLEEP
+  CYCLING_DISTANCE
+}
+
+// One normalized sample from a connected health platform. `recordedAt` is
+// always stored in UTC; `recordedTimezone` preserves the originating IANA
+// timezone alongside it (e.g. "steps on Tuesday" depends on where the user
+// was) per wearables.md's timezone-handling requirement.
+model HealthMetricSample {
+  id               String       @id @default(uuid())
+  userId           String
+  metric           HealthMetric
+  value            Float
+  // Always the normalized unit for this metric (steps: count, heart
+  // rate: bpm, distance/cyclingDistance: meters, activeCalories: kcal,
+  // sleep: minutes) — never the platform's raw unit, which is converted
+  // at ingestion so nothing downstream needs to know which provider a
+  // sample came from.
+  unit             String
+  recordedAt       DateTime
+  recordedTimezone String?
+  // 'HEALTH_CONNECT' | 'APPLE_HEALTH' | a vendor string surfaced through
+  // one of those hubs (e.g. 'XIAOMI') — mirrors DeviceConnection.provider.
+  sourceProvider   String
+  sourceDeviceId   String?
+  // The platform's own record identifier, when it exposes one — kept
+  // for debugging/support, not used as the dedup key (see the unique
+  // constraint below, which is what actually prevents double-counting
+  // the same sample reported by two providers or re-synced twice).
+  externalId       String?
+  createdAt        DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric, sourceProvider, recordedAt])
+  @@index([userId, metric, recordedAt])
+  @@map("health_metric_samples")
+}
+
+// An opaque, per-(user, provider, metric) incremental-sync bookmark — see
+// wearables.md's SyncCursor design. Lets a sync call ask "anything new
+// since last time" instead of re-fetching a provider's entire history.
+model HealthSyncCursor {
+  id           String       @id @default(uuid())
+  userId       String
+  provider     String
+  metric       HealthMetric
+  cursor       String
+  lastSyncedAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, metric])
+  @@map("health_sync_cursors")
 }
 
 model AuditEvent {

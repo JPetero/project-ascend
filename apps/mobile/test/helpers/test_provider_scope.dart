@@ -8,6 +8,7 @@ import 'package:mobile/features/auth/presentation/providers/auth_controller.dart
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/cardio_session_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
+import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/meal_entry_controller.dart';
@@ -30,6 +31,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
+import 'fake_health_adapter.dart';
+import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_repositories.dart';
@@ -59,6 +62,8 @@ Future<ProviderContainer> createTestContainer({
   FakeAchievementRepository? achievementRepository,
   FakeCardioSessionRepository? cardioSessionRepository,
   FakeLiveLocationService? liveLocationService,
+  FakeHealthAdapter? healthAdapter,
+  FakeHealthMetricsRepository? healthMetricsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -143,6 +148,12 @@ Future<ProviderContainer> createTestContainer({
       ),
       liveLocationServiceProvider.overrideWithValue(
         liveLocationService ?? FakeLiveLocationService(),
+      ),
+      healthAdapterProvider.overrideWithValue(
+        healthAdapter ?? FakeHealthAdapter(),
+      ),
+      healthMetricsRepositoryProvider.overrideWithValue(
+        healthMetricsRepository ?? FakeHealthMetricsRepository(),
       ),
     ],
   );

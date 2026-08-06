@@ -19,6 +19,7 @@ import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise
 import { ExercisesModule } from './modules/exercises/exercises.module';
 import { FoodsModule } from './modules/foods/foods.module';
 import { HealthModule } from './modules/health/health.module';
+import { HealthMetricsModule } from './modules/health-metrics/health-metrics.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { MacroTargetsModule } from './modules/macro-targets/macro-targets.module';
 import { MuscleGroupsModule } from './modules/muscle-groups/muscle-groups.module';
@@ -61,6 +62,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PreferencesModule,
     DevicesModule,
     HealthModule,
+    HealthMetricsModule,
     ExerciseCategoriesModule,
     MuscleGroupsModule,
     EquipmentTypesModule,
