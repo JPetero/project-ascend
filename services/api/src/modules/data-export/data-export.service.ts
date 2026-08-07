@@ -2,16 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
- * Build Session 8 Part 14 — a user-initiated export of their own
- * account data, in the spirit of GDPR/CCPA data portability. This
- * covers the primary categories a user would recognize as "my data"
- * (account, fitness, nutrition, cardio, health, achievements, social);
- * it is a representative export, not a literal dump of every table
- * this account touches (e.g. Joint Workouts and Sports Matches
- * participation are not included this session — see
- * packages/docs/build-session-8.md's platform-limitations section).
- * Every query below is scoped to the requesting user's own id; there
- * is no cross-user access path here.
+ * Build Session 8 Part 14, extended in Build Session 9 Part 7 — a
+ * user-initiated export of their own account data, in the spirit of
+ * GDPR/CCPA data portability. This covers the primary categories a
+ * user would recognize as "my data" (account, fitness, nutrition,
+ * cardio, health, achievements, social, including Joint Workout and
+ * Sports Match participation); it is a representative export, not a
+ * literal dump of every table this account touches. Every query below
+ * is scoped to the requesting user's own id; there is no cross-user
+ * access path here.
  */
 @Injectable()
 export class DataExportService {
@@ -38,6 +37,8 @@ export class DataExportService {
       friendshipsAsB,
       directMessagesSent,
       savedNutrientArticles,
+      jointWorkoutParticipations,
+      sportMatchParticipations,
     ] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
@@ -95,6 +96,30 @@ export class DataExportService {
         where: { userId },
         include: { article: { select: { title: true, slug: true } } },
       }),
+      this.prisma.jointWorkoutParticipant.findMany({
+        where: { userId },
+        include: {
+          session: {
+            select: { id: true, title: true, status: true, startedAt: true, finishedAt: true },
+          },
+        },
+        orderBy: { invitedAt: 'desc' },
+      }),
+      this.prisma.sportMatchParticipant.findMany({
+        where: { userId },
+        include: {
+          match: {
+            select: {
+              id: true,
+              status: true,
+              startedAt: true,
+              confirmedAt: true,
+              sport: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { invitedAt: 'desc' },
+      }),
     ]);
 
     return {
@@ -133,6 +158,8 @@ export class DataExportService {
         ],
         sentMessages: directMessagesSent,
         savedNutrientArticles,
+        jointWorkoutParticipations,
+        sportMatchParticipations,
       },
     };
   }

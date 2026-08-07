@@ -5,10 +5,12 @@ import '../../../../core/design_system/design_system.dart';
 import '../providers/data_export_controller.dart';
 
 /// Lets the caller export their own account data — Build Session 8
-/// Part 14, in the spirit of GDPR/CCPA data portability. Covers the
-/// primary categories (account, fitness, nutrition, cardio, health,
-/// achievements, social) rather than every table this account touches
-/// — see [DataExportRepository]'s doc comment.
+/// Part 14, extended in Build Session 9 Part 7 to include Joint
+/// Workout and Sports Match participation. In the spirit of GDPR/CCPA
+/// data portability, this covers the primary categories (account,
+/// fitness, nutrition, cardio, health, achievements, social) rather
+/// than every table this account touches — see
+/// [DataExportRepository]'s doc comment.
 class DataExportScreen extends ConsumerWidget {
   const DataExportScreen({super.key});
 
@@ -36,9 +38,10 @@ class DataExportScreen extends ConsumerWidget {
                     'Your profile and preferences, completed workouts and '
                     'personal records, nutrition and water logs, cardio '
                     'sessions, connected health data, earned achievements, '
-                    'and your community profile, posts, friends, and sent '
-                    'messages. This is a snapshot of the main categories, '
-                    'not every record Ascend has ever stored.',
+                    'and your community profile, posts, friends, sent '
+                    'messages, and Joint Workout and Sports Match '
+                    'participation. This is a snapshot of the main '
+                    'categories, not every record Ascend has ever stored.',
                   ),
                   const SizedBox(height: AscendSpacing.md),
                   Builder(

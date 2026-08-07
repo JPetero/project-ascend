@@ -22,6 +22,8 @@ function makePrismaMock() {
     friendship: { findMany: jest.fn().mockResolvedValue([]) },
     directMessage: { findMany: jest.fn().mockResolvedValue([]) },
     savedNutrientArticle: { findMany: jest.fn().mockResolvedValue([]) },
+    jointWorkoutParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+    sportMatchParticipant: { findMany: jest.fn().mockResolvedValue([]) },
   };
 }
 
@@ -61,5 +63,36 @@ describe('DataExportService', () => {
     const result = await service.exportMyData('user-1');
 
     expect(result.social.friendIds).toEqual(['friend-a', 'friend-b']);
+  });
+
+  it("includes the user's own Joint Workout and Sports Match participation, scoped to their id", async () => {
+    const prisma = makePrismaMock();
+    prisma.jointWorkoutParticipant.findMany = jest
+      .fn()
+      .mockResolvedValue([{ id: 'participant-1', session: { id: 'session-1', title: 'Leg day' } }]);
+    prisma.sportMatchParticipant.findMany = jest
+      .fn()
+      .mockResolvedValue([
+        { id: 'participant-2', match: { id: 'match-1', sport: { name: 'Tennis' } } },
+      ]);
+    const moduleRef = await Test.createTestingModule({
+      providers: [DataExportService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    const service = moduleRef.get(DataExportService);
+
+    const result = await service.exportMyData('user-1');
+
+    expect(prisma.jointWorkoutParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1' } }),
+    );
+    expect(prisma.sportMatchParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1' } }),
+    );
+    expect(result.social.jointWorkoutParticipations).toEqual([
+      { id: 'participant-1', session: { id: 'session-1', title: 'Leg day' } },
+    ]);
+    expect(result.social.sportMatchParticipations).toEqual([
+      { id: 'participant-2', match: { id: 'match-1', sport: { name: 'Tennis' } } },
+    ]);
   });
 });
