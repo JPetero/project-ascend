@@ -28,7 +28,8 @@ import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../../profile/presentation/providers/profile_controller.dart';
 import '../../../rankings/domain/ranking.dart';
 import '../../../rankings/presentation/providers/rankings_controller.dart';
-import '../../../sharing/presentation/screens/share_achievement_screen.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../../wearables/presentation/screens/wearable_connections_screen.dart';
 import '../../../workout/domain/personal_record.dart';
 import '../../../workout/domain/workout_history_entry.dart';
@@ -1269,12 +1270,22 @@ class _ShareAchievementLink extends StatelessWidget {
     return AscendCard(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => ShareAchievementScreen(
-            title: streakDays > 0 ? '$streakDays-Day Streak' : 'Project Ascend',
-            subtitle: 'Staying consistent with Project Ascend',
-            weightLine: profile?.weightKg != null
-                ? 'Weight: ${profile!.weightKg!.toStringAsFixed(1)} kg'
-                : null,
+          builder: (context) => ShareContentScreen(
+            content: ShareContent(
+              type: ShareContentType.achievement,
+              title: streakDays > 0
+                  ? '$streakDays-Day Streak'
+                  : 'Project Ascend',
+              subtitle: 'Staying consistent with Project Ascend',
+              statLines: [
+                if (profile?.weightKg != null)
+                  ShareStatLine(
+                    label: 'Weight',
+                    value: '${profile!.weightKg!.toStringAsFixed(1)} kg',
+                    sensitive: true,
+                  ),
+              ],
+            ),
           ),
         ),
       ),

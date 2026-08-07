@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/cardio_session.dart';
 import '../providers/cardio_session_controller.dart';
 
@@ -139,6 +141,41 @@ class _CardioSessionCard extends StatelessWidget {
                   style: theme.textTheme.bodySmall,
                 ),
               ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share_rounded, size: 20),
+            tooltip: 'Share this session',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => ShareContentScreen(
+                  content: ShareContent(
+                    type: ShareContentType.cardio,
+                    title: cardioActivityTypeLabel(session.activityType),
+                    subtitle: '$minutes min',
+                    statLines: [
+                      if (session.distanceMeters != null)
+                        ShareStatLine(
+                          label: 'Distance',
+                          value:
+                              '${(session.distanceMeters! / 1000).toStringAsFixed(1)} km',
+                        ),
+                      if (session.estimatedCalories != null)
+                        ShareStatLine(
+                          label: 'Calories',
+                          value: '~${session.estimatedCalories!.round()} kcal',
+                          sensitive: true,
+                        ),
+                      if (session.hasRoute)
+                        const ShareStatLine(
+                          label: 'Route',
+                          value: 'Recorded',
+                          sensitive: true,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
           IconButton(

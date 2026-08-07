@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/personal_record.dart';
 import '../providers/personal_record_controller.dart';
 
@@ -99,6 +101,28 @@ class _RecordRow extends StatelessWidget {
             '${record.value} ${record.unit}',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share_rounded, size: 18),
+            tooltip: 'Share this record',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => ShareContentScreen(
+                  content: ShareContent(
+                    type: ShareContentType.personalRecord,
+                    title: 'New PR!',
+                    subtitle: record.exercise.name,
+                    statLines: [
+                      ShareStatLine(
+                        label: personalRecordTypeLabel(record.type),
+                        value: '${record.value} ${record.unit}',
+                        sensitive: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
