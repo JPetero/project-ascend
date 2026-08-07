@@ -3,6 +3,10 @@ abstract final class RoutePaths {
   static const welcome = '/welcome';
   static const register = '/register';
   static const signIn = '/sign-in';
+  // Password recovery / email verification — Build Session 9 Part 4.
+  static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
+  static const changePassword = '/account/change-password';
   static const onboarding = '/onboarding';
 
   // Primary six-destination navigation (product order — see

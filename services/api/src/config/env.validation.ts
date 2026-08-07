@@ -70,6 +70,41 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MEDIA_S3_PUBLIC_BASE_URL?: string;
+
+  // Email (Build Session 9 Part 4) — all optional. Defaults to the
+  // console provider, which logs instead of sending and needs no SMTP
+  // credentials to run tests or a local dev server.
+  @IsIn(['console', 'smtp'])
+  @IsOptional()
+  EMAIL_PROVIDER = 'console';
+
+  @IsString()
+  @IsOptional()
+  SMTP_HOST?: string;
+
+  @IsNumberString()
+  @IsOptional()
+  SMTP_PORT?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PASSWORD?: string;
+
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM_ADDRESS?: string;
+
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  APP_PUBLIC_URL?: string;
 }
 
 /**

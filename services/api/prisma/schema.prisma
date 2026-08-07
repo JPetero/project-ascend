@@ -88,15 +88,21 @@ enum DeviceConnectionStatus {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  status       UserStatus @default(ACTIVE)
-  role         UserRole   @default(MEMBER)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id              String     @id @default(uuid())
+  email           String     @unique
+  passwordHash    String
+  // Null until the user completes an email-verification link. Never
+  // inferred or auto-set — only EmailVerificationToken confirmation sets
+  // this (see AuthService.verifyEmail).
+  emailVerifiedAt DateTime?
+  status          UserStatus @default(ACTIVE)
+  role            UserRole   @default(MEMBER)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   refreshTokens                    RefreshToken[]
+  passwordResetTokens              PasswordResetToken[]
+  emailVerificationTokens          EmailVerificationToken[]
   profile                          Profile?
   preference                       Preference?
   equipment                        Equipment[]
@@ -197,6 +203,45 @@ model RefreshToken {
   @@index([expiresAt])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+/// Build Session 9 Part 4 — single-use, short-lived password-reset
+/// capability tokens. Follows RefreshToken's hashing convention exactly:
+/// only an argon2 hash of the random secret is ever stored, the raw
+/// secret exists only in the emailed link. `usedAt` guards against
+/// replay the same way RefreshToken.revokedAt does; requesting a new
+/// reset token invalidates any prior outstanding one for that user.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+/// Build Session 9 Part 4 — single-use email-ownership confirmation
+/// tokens, same shape and hashing convention as PasswordResetToken.
+/// Confirming one sets User.emailVerifiedAt.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 model Profile {

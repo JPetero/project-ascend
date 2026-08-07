@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 
@@ -12,10 +13,23 @@ describe('AuthService', () => {
   let authService: AuthService;
   let auditService: { record: jest.Mock };
   let usersService: { findByEmail: jest.Mock; findById: jest.Mock; isActive: jest.Mock };
+  let emailService: { sendPasswordResetEmail: jest.Mock; sendVerificationEmail: jest.Mock };
   let tx: { refreshToken: { updateMany: jest.Mock; create: jest.Mock } };
   let prisma: {
-    user: { create: jest.Mock };
+    user: { create: jest.Mock; update: jest.Mock };
     refreshToken: { findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
+    passwordResetToken: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    emailVerificationToken: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -24,9 +38,23 @@ describe('AuthService', () => {
       refreshToken: { updateMany: jest.fn(), create: jest.fn() },
     };
     prisma = {
-      user: { create: jest.fn() },
+      user: { create: jest.fn(), update: jest.fn() },
       refreshToken: { findUnique: jest.fn(), create: jest.fn(), updateMany: jest.fn() },
-      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(tx)),
+      passwordResetToken: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      emailVerificationToken: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      $transaction: jest.fn(async (arg: unknown) =>
+        Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => Promise<unknown>)(tx),
+      ),
     };
     auditService = { record: jest.fn() };
     usersService = {
@@ -34,6 +62,14 @@ describe('AuthService', () => {
       findById: jest.fn(),
       isActive: jest.fn((user: { status?: string } | null) => !!user && user.status === 'ACTIVE'),
     };
+    emailService = {
+      sendPasswordResetEmail: jest.fn().mockResolvedValue({ delivered: false }),
+      sendVerificationEmail: jest.fn().mockResolvedValue({ delivered: false }),
+    };
+    prisma.passwordResetToken.create.mockResolvedValue({ id: 'reset-token-id' });
+    prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+    prisma.emailVerificationToken.create.mockResolvedValue({ id: 'verify-token-id' });
+    prisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 0 });
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -55,6 +91,7 @@ describe('AuthService', () => {
         },
         { provide: AuditService, useValue: auditService },
         { provide: UsersService, useValue: usersService },
+        { provide: EmailService, useValue: emailService },
       ],
     }).compile();
 
@@ -226,6 +263,224 @@ describe('AuthService', () => {
       });
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'auth.refresh_token_reuse_detected' }),
+      );
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('resolves silently and sends no email when the address has no account', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      await authService.forgotPassword({ email: 'nobody@example.com' });
+
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('invalidates any prior outstanding token and sends a new one for a real account', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        id: 'user-1',
+        email: 'ada@example.com',
+        status: 'ACTIVE',
+      });
+
+      await authService.forgotPassword({ email: 'Ada@Example.com' });
+
+      expect(prisma.passwordResetToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', usedAt: null },
+        data: { usedAt: expect.any(Date) },
+      });
+      expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
+      expect(emailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'ada@example.com',
+        expect.stringContaining('reset-token-id.'),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.password_reset_requested' }),
+      );
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('rejects mismatched new passwords before touching the database', async () => {
+      await expect(
+        authService.resetPassword({
+          token: 'id.secret',
+          newPassword: 'NewPass1!',
+          confirmNewPassword: 'Different1!',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.passwordResetToken.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown, expired, or already-used token', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        authService.resetPassword({
+          token: 'missing-id.secret',
+          newPassword: 'NewPass1!',
+          confirmNewPassword: 'NewPass1!',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('rejects a token whose secret does not match the stored hash', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'reset-token-id',
+        userId: 'user-1',
+        tokenHash: await argon2.hash('correct-secret'),
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+
+      await expect(
+        authService.resetPassword({
+          token: 'reset-token-id.wrong-secret',
+          newPassword: 'NewPass1!',
+          confirmNewPassword: 'NewPass1!',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('marks the token used, updates the password hash, and signs out every session', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({
+        id: 'reset-token-id',
+        userId: 'user-1',
+        tokenHash: await argon2.hash('secret'),
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+      await authService.resetPassword({
+        token: 'reset-token-id.secret',
+        newPassword: 'NewPass1!',
+        confirmNewPassword: 'NewPass1!',
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const updateArgs = prisma.user.update.mock.calls[0][0];
+      expect(updateArgs.where).toEqual({ id: 'user-1' });
+      expect(updateArgs.data.passwordHash).not.toBe('NewPass1!');
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.password_reset_completed' }),
+      );
+      // Resetting a password ends every other session.
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+  });
+
+  describe('changePassword', () => {
+    it('rejects mismatched new passwords', async () => {
+      await expect(
+        authService.changePassword('user-1', {
+          currentPassword: 'Current1!',
+          newPassword: 'NewPass1!',
+          confirmNewPassword: 'Different1!',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects an incorrect current password', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        passwordHash: await argon2.hash('actual-current'),
+      });
+
+      await expect(
+        authService.changePassword('user-1', {
+          currentPassword: 'wrong-current',
+          newPassword: 'NewPass1!',
+          confirmNewPassword: 'NewPass1!',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('updates the password hash when the current password is correct', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        passwordHash: await argon2.hash('actual-current'),
+      });
+
+      await authService.changePassword('user-1', {
+        currentPassword: 'actual-current',
+        newPassword: 'NewPass1!',
+        confirmNewPassword: 'NewPass1!',
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledTimes(1);
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.password_changed' }),
+      );
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('rejects an unknown, expired, or already-used token', async () => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue(null);
+
+      await expect(authService.verifyEmail({ token: 'missing-id.secret' })).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('marks emailVerifiedAt on a valid token', async () => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue({
+        id: 'verify-token-id',
+        userId: 'user-1',
+        tokenHash: await argon2.hash('secret'),
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 100_000),
+      });
+
+      await authService.verifyEmail({ token: 'verify-token-id.secret' });
+
+      const updateArgs = prisma.user.update.mock.calls[0][0];
+      expect(updateArgs.where).toEqual({ id: 'user-1' });
+      expect(updateArgs.data.emailVerifiedAt).toBeInstanceOf(Date);
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.email_verified' }),
+      );
+    });
+  });
+
+  describe('resendVerification', () => {
+    it('does nothing for an already-verified account', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        email: 'ada@example.com',
+        emailVerifiedAt: new Date(),
+      });
+
+      await authService.resendVerification('user-1');
+
+      expect(emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
+
+    it('issues and sends a fresh verification token for an unverified account', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        email: 'ada@example.com',
+        emailVerifiedAt: null,
+      });
+
+      await authService.resendVerification('user-1');
+
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledWith(
+        'ada@example.com',
+        expect.stringContaining('verify-token-id.'),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.verification_email_resent' }),
       );
     });
   });

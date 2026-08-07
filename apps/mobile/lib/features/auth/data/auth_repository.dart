@@ -56,6 +56,58 @@ class AuthRepository {
     return AuthUser.fromJson(envelope.data!);
   }
 
+  Future<void> forgotPassword(String email) async {
+    await _apiClient.post(
+      '/auth/forgot-password',
+      (data) => data,
+      data: {'email': email},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    await _apiClient.post(
+      '/auth/reset-password',
+      (data) => data,
+      data: {
+        'token': token,
+        'newPassword': newPassword,
+        'confirmNewPassword': confirmNewPassword,
+      },
+    );
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    await _apiClient.post(
+      '/auth/change-password',
+      (data) => data,
+      data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+        'confirmNewPassword': confirmNewPassword,
+      },
+    );
+  }
+
+  Future<void> verifyEmail(String token) async {
+    await _apiClient.post(
+      '/auth/verify-email',
+      (data) => data,
+      data: {'token': token},
+    );
+  }
+
+  Future<void> resendVerification() async {
+    await _apiClient.post('/auth/resend-verification', (data) => data);
+  }
+
   Future<void> logout() async {
     final refreshToken = await _tokenStorage.readRefreshToken();
     if (refreshToken != null) {

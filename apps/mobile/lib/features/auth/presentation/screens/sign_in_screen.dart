@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../providers/auth_controller.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -40,16 +41,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     } on AppException catch (error) {
       setState(() => _errorMessage = error.message);
     }
-  }
-
-  void _showForgotPasswordPlaceholder() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Password reset is coming soon. Contact support for help in the meantime.',
-        ),
-      ),
-    );
   }
 
   @override
@@ -104,7 +95,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   alignment: Alignment.centerRight,
                   child: AscendGhostButton(
                     label: 'Forgot password?',
-                    onPressed: _showForgotPasswordPlaceholder,
+                    onPressed: () => context.push(RoutePaths.forgotPassword),
                   ),
                 ),
                 if (_errorMessage != null) ...[

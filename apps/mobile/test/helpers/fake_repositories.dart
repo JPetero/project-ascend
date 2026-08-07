@@ -31,6 +31,11 @@ class FakeAuthRepository extends AuthRepository {
 
   final SecureTokenStorage _tokenStorage;
   bool loggedOutCalled = false;
+  String? lastForgotPasswordEmail;
+  String? lastResetPasswordToken;
+  bool changePasswordCalled = false;
+  bool resendVerificationCalled = false;
+  bool throwOnNextCall = false;
 
   @override
   Future<AuthUser> register({
@@ -67,6 +72,55 @@ class FakeAuthRepository extends AuthRepository {
   Future<void> logout() async {
     loggedOutCalled = true;
     await _tokenStorage.clear();
+  }
+
+  @override
+  Future<void> forgotPassword(String email) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Something went wrong.',
+        code: 'UNKNOWN',
+      );
+    }
+    lastForgotPasswordEmail = email;
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'This reset link is invalid or has expired.',
+        code: 'UNKNOWN',
+      );
+    }
+    lastResetPasswordToken = token;
+  }
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Current password is incorrect.',
+        code: 'UNKNOWN',
+      );
+    }
+    changePasswordCalled = true;
+  }
+
+  @override
+  Future<void> verifyEmail(String token) async {}
+
+  @override
+  Future<void> resendVerification() async {
+    resendVerificationCalled = true;
   }
 }
 

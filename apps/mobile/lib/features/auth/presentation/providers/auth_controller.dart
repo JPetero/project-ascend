@@ -119,6 +119,53 @@ class AuthController extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  Future<void> forgotPassword(String email) async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      await _repository.forgotPassword(email);
+    } finally {
+      state = state.copyWith(isSubmitting: false);
+    }
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      await _repository.resetPassword(
+        token: token,
+        newPassword: newPassword,
+        confirmNewPassword: confirmNewPassword,
+      );
+    } finally {
+      state = state.copyWith(isSubmitting: false);
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmNewPassword,
+  }) async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      await _repository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmNewPassword: confirmNewPassword,
+      );
+    } finally {
+      state = state.copyWith(isSubmitting: false);
+    }
+  }
+
+  Future<void> resendVerification() async {
+    await _repository.resendVerification();
+  }
+
   /// Called when [ApiClient] reports a failed token refresh.
   Future<void> handleSessionExpired() async {
     if (state.status != AuthStatus.authenticated) return;
