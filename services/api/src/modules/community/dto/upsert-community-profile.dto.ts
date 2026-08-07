@@ -1,5 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
+import { CommunityProfileVisibility } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export class UpsertCommunityProfileDto {
   @ApiProperty()
@@ -25,4 +26,12 @@ export class UpsertCommunityProfileDto {
   @IsOptional()
   @IsBoolean()
   isTrainer?: boolean;
+
+  // Free from day one — see CommunityProfileVisibility's schema comment.
+  // Setting the avatar/cover MediaAsset is a separate action (Gallery's
+  // set-avatar/set-cover endpoints), not a field here.
+  @ApiPropertyOptional({ enum: CommunityProfileVisibility })
+  @IsOptional()
+  @IsEnum(CommunityProfileVisibility)
+  visibility?: CommunityProfileVisibility;
 }

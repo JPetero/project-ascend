@@ -165,6 +165,7 @@ model User {
   savedNutrientArticles            SavedNutrientArticle[]
   notificationPreference           NotificationPreference?
   notificationEvents               NotificationEvent[]
+  galleryAlbums                    GalleryAlbum[]
 
   @@index([status])
   @@map("users")
@@ -1225,6 +1226,17 @@ enum CommunityVisibility {
   PRIVATE
 }
 
+// A whole profile's own visibility — distinct from CommunityVisibility
+// above, which is per-post. FRIENDS uses the real mutual Friendship
+// graph (Build Session 8 Part 7), not CommunityFollow, matching
+// user-scenario-bible.md's "friends" privacy option.
+enum CommunityProfileVisibility {
+  PRIVATE
+  FRIENDS
+  FOLLOWERS
+  PUBLIC
+}
+
 enum CommunityModerationStatus {
   APPROVED
   PENDING
@@ -1252,19 +1264,32 @@ enum CommunityReportStatus {
 // data (date of birth, height/weight, goals) that must never be exposed
 // through a Community endpoint.
 model CommunityProfile {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  displayName String
-  bio         String?
-  avatarUrl   String?
+  id                 String                     @id @default(uuid())
+  userId             String                     @unique
+  displayName        String
+  bio                String?
+  // Kept for backward compatibility with profiles created before the
+  // Media Platform existed — new avatars/covers use avatarMediaAssetId/
+  // coverMediaAssetId below instead (Build Session 9 Part 2). Never
+  // written to for a new upload; still read as a fallback display value.
+  avatarUrl          String?
   // A trainer/creator's own posts can be flagged as trainer content per
   // post (CommunityPost.isTrainerContent); this flag controls whether a
   // "Trainer" badge shows next to their name/profile at all.
-  isTrainer   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isTrainer          Boolean                    @default(false)
+  // Free from day one — per parking-lot.md's "Profile customization and
+  // safe media (14)" note, privacy controls ship free, not as a later
+  // premium layer. PUBLIC matches the pre-existing default visibility a
+  // profile had before this field existed (Build Session 9 Part 2).
+  visibility         CommunityProfileVisibility @default(PUBLIC)
+  avatarMediaAssetId String?
+  coverMediaAssetId  String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarMediaAsset MediaAsset? @relation("CommunityProfileAvatar", fields: [avatarMediaAssetId], references: [id], onDelete: SetNull)
+  coverMediaAsset  MediaAsset? @relation("CommunityProfileCover", fields: [coverMediaAssetId], references: [id], onDelete: SetNull)
 
   @@map("community_profiles")
 }
@@ -1883,11 +1908,84 @@ model MediaAsset {
   usages             MediaUsage[]
   moderationResults  MediaModerationResult[]
   messageAttachments MessageAttachment[]
+  galleryMedia       GalleryMedia[]
+  avatarForProfiles  CommunityProfile[]      @relation("CommunityProfileAvatar")
+  coverForProfiles   CommunityProfile[]      @relation("CommunityProfileCover")
 
   @@index([ownerId, createdAt])
   @@index([moderationState])
   @@index([mediaType, ownerId])
   @@map("media_assets")
+}
+
+// Build Session 9 Part 2 — a private-by-default personal gallery built
+// entirely on top of the existing Media Platform (MediaAsset/MediaUsage
+// above); this module owns no storage of its own. Categories are the
+// exact set from user-scenario-bible.md's profile-media requirements —
+// SHARED and PRIVATE describe the album's own state as much as a topic,
+// which is intentional: an album's category and its visibility are
+// tracked separately (see GalleryVisibility) so "Shared" as a category
+// doesn't have to mean every photo in it is actually shared.
+enum GalleryCategory {
+  PROGRESS
+  WORKOUTS
+  MEALS
+  CARDIO
+  ACHIEVEMENTS
+  VISION
+  SHARED
+  PRIVATE
+}
+
+enum GalleryVisibility {
+  PRIVATE
+  SHARED
+}
+
+// Standardized angles for progress photos — user-scenario-bible.md's
+// front/side/back tagging. Optional and only meaningful on PROGRESS
+// media; nothing forces a photo in a PROGRESS album to be tagged.
+enum GalleryPoseTag {
+  FRONT
+  SIDE
+  BACK
+}
+
+model GalleryAlbum {
+  id         String            @id @default(uuid())
+  ownerId    String
+  name       String
+  category   GalleryCategory   @default(PRIVATE)
+  visibility GalleryVisibility @default(PRIVATE)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  owner User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  media GalleryMedia[]
+
+  @@index([ownerId, createdAt])
+  @@map("gallery_albums")
+}
+
+model GalleryMedia {
+  id           String          @id @default(uuid())
+  albumId      String
+  mediaAssetId String
+  note         String?
+  poseTag      GalleryPoseTag?
+  // A user-typed note, never a measured/derived value — see the
+  // wellness-ethics-bible.md rule this mirrors elsewhere: Ascend never
+  // infers or calculates a body metric on the user's behalf.
+  weightNote   String?
+  capturedAt   DateTime?
+  createdAt    DateTime        @default(now())
+
+  album      GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset   @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([albumId, createdAt])
+  @@index([mediaAssetId])
+  @@map("gallery_media")
 }
 
 // One row per upload attempt. A fresh MediaAsset+MediaUpload pair is

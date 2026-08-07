@@ -19,6 +19,7 @@ class CommunityRepository {
     String? bio,
     String? avatarUrl,
     bool? isTrainer,
+    CommunityProfileVisibility? visibility,
   }) async {
     final envelope = await _apiClient.post(
       '/community/profile',
@@ -28,6 +29,9 @@ class CommunityRepository {
         'bio': ?bio,
         'avatarUrl': ?avatarUrl,
         'isTrainer': ?isTrainer,
+        'visibility': visibility != null
+            ? communityProfileVisibilityToJson(visibility)
+            : null,
       },
     );
     return CommunityProfile.fromJson(envelope.data!);

@@ -26,6 +26,7 @@ import 'package:mobile/features/nutrition/presentation/providers/saved_meal_cont
 import 'package:mobile/features/nutrition/presentation/providers/water_controller.dart';
 import 'package:mobile/core/media/presentation/providers/media_upload_controller.dart';
 import 'package:mobile/features/friends/presentation/providers/friends_controller.dart';
+import 'package:mobile/features/gallery/presentation/providers/gallery_controller.dart';
 import 'package:mobile/features/joint_workouts/presentation/providers/joint_workout_sessions_controller.dart';
 import 'package:mobile/features/messages/presentation/providers/conversations_controller.dart';
 import 'package:mobile/features/nutrition_library/presentation/providers/nutrition_library_controller.dart';
@@ -57,6 +58,7 @@ import 'fake_health_metrics_repository.dart';
 import 'fake_joint_workout_sessions_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_friends_repository.dart';
+import 'fake_gallery_repository.dart';
 import 'fake_sports_repository.dart';
 import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
@@ -119,6 +121,7 @@ Future<ProviderContainer> createTestContainer({
   FakeNotificationsRepository? notificationsRepository,
   FakeDataExportRepository? dataExportRepository,
   FakeDataExportShareService? dataExportShareService,
+  FakeGalleryRepository? galleryRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -267,6 +270,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       dataExportShareServiceProvider.overrideWithValue(
         dataExportShareService ?? FakeDataExportShareService(),
+      ),
+      galleryRepositoryProvider.overrideWithValue(
+        galleryRepository ?? FakeGalleryRepository(),
       ),
     ],
   );

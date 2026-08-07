@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../domain/community_profile.dart';
 import '../providers/community_feed_controller.dart';
 import '../providers/community_profile_controller.dart';
 
@@ -22,6 +24,7 @@ class _EditCommunityProfileScreenState
   final _avatarUrlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isTrainer = false;
+  CommunityProfileVisibility _visibility = CommunityProfileVisibility.public_;
   bool _isSubmitting = false;
   bool _prefilled = false;
   String? _error;
@@ -44,6 +47,7 @@ class _EditCommunityProfileScreenState
       _bioController.text = profile.bio ?? '';
       _avatarUrlController.text = profile.avatarUrl ?? '';
       _isTrainer = profile.isTrainer;
+      _visibility = profile.visibility;
     }
     _prefilled = true;
   }
@@ -66,6 +70,7 @@ class _EditCommunityProfileScreenState
                 ? null
                 : _avatarUrlController.text.trim(),
             isTrainer: _isTrainer,
+            visibility: _visibility,
           );
       ref.invalidate(communityProfileControllerProvider(userId));
       if (!mounted) return;
@@ -113,6 +118,32 @@ class _EditCommunityProfileScreenState
                   controller: _avatarUrlController,
                   label: 'Avatar URL — optional',
                   keyboardType: TextInputType.url,
+                ),
+                const SizedBox(height: AscendSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed: () => context.push(RoutePaths.gallery),
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Choose avatar or cover from Gallery'),
+                ),
+                const SizedBox(height: AscendSpacing.md),
+                Text(
+                  'Who can see my profile',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: AscendSpacing.sm),
+                Wrap(
+                  spacing: AscendSpacing.sm,
+                  children: [
+                    for (final visibility in CommunityProfileVisibility.values)
+                      ChoiceChip(
+                        label: Text(
+                          communityProfileVisibilityLabel(visibility),
+                        ),
+                        selected: _visibility == visibility,
+                        onSelected: (_) =>
+                            setState(() => _visibility = visibility),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: AscendSpacing.md),
                 SwitchListTile(

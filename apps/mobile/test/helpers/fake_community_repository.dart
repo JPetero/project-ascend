@@ -65,6 +65,7 @@ class FakeCommunityRepository implements CommunityRepository {
     String? bio,
     String? avatarUrl,
     bool? isTrainer,
+    CommunityProfileVisibility? visibility,
   }) async {
     final profile = CommunityProfile(
       userId: 'me',
@@ -72,6 +73,7 @@ class FakeCommunityRepository implements CommunityRepository {
       bio: bio,
       avatarUrl: avatarUrl,
       isTrainer: isTrainer ?? false,
+      visibility: visibility ?? CommunityProfileVisibility.public_,
     );
     profiles.removeWhere((p) => p.userId == 'me');
     profiles.add(profile);

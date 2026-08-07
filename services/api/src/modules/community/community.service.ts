@@ -8,6 +8,7 @@ import {
   CommunityComment,
   CommunityModerationStatus,
   CommunityPost,
+  CommunityProfileVisibility,
   CommunityVisibility,
   Prisma,
 } from '@prisma/client';
@@ -27,9 +28,15 @@ const PROFILE_SELECT = {
   bio: true,
   avatarUrl: true,
   isTrainer: true,
+  visibility: true,
+  avatarMediaAsset: { select: { storageKey: true } },
+  coverMediaAsset: { select: { storageKey: true } },
 } as const;
 
 type ProfileSummary = Prisma.CommunityProfileGetPayload<{ select: typeof PROFILE_SELECT }>;
+type HydratedProfile = Omit<ProfileSummary, 'avatarMediaAsset' | 'coverMediaAsset'> & {
+  coverUrl: string | null;
+};
 
 /**
  * Community profiles, posts (including Reels — a VIDEO post is just a
@@ -60,6 +67,7 @@ export class CommunityService {
         bio: dto.bio,
         avatarUrl: dto.avatarUrl,
         ...(dto.isTrainer !== undefined ? { isTrainer: dto.isTrainer } : {}),
+        ...(dto.visibility !== undefined ? { visibility: dto.visibility } : {}),
       },
       create: {
         userId,
@@ -67,10 +75,11 @@ export class CommunityService {
         bio: dto.bio,
         avatarUrl: dto.avatarUrl,
         isTrainer: dto.isTrainer ?? false,
+        visibility: dto.visibility ?? undefined,
       },
       select: PROFILE_SELECT,
     });
-    return profile;
+    return this.hydrateProfile(profile);
   }
 
   async getProfile(viewerId: string, targetUserId: string) {
@@ -101,7 +110,50 @@ export class CommunityService {
             .then((f) => f != null),
     ]);
 
-    return { ...profile, postCount, followerCount, followingCount, isFollowedByViewer };
+    if (viewerId !== targetUserId) {
+      await this.assertProfileVisibleToViewer(viewerId, targetUserId, profile.visibility, {
+        isFollowedByViewer,
+      });
+    }
+
+    return {
+      ...this.hydrateProfile(profile),
+      postCount,
+      followerCount,
+      followingCount,
+      isFollowedByViewer,
+    };
+  }
+
+  // Same "not found, not forbidden" privacy pattern as
+  // assertNotBlockedEitherWay — a private profile a viewer can't see
+  // looks identical to one that doesn't exist.
+  private async assertProfileVisibleToViewer(
+    viewerId: string,
+    targetUserId: string,
+    visibility: CommunityProfileVisibility,
+    context: { isFollowedByViewer: boolean },
+  ): Promise<void> {
+    if (visibility === 'PUBLIC') return;
+    if (visibility === 'FOLLOWERS' && context.isFollowedByViewer) return;
+    if (
+      visibility === 'FRIENDS' &&
+      (await this.friendsService.areFriends(viewerId, targetUserId))
+    ) {
+      return;
+    }
+    throw new NotFoundException('Community profile not found.');
+  }
+
+  private hydrateProfile(profile: ProfileSummary): HydratedProfile {
+    const { avatarMediaAsset, coverMediaAsset, ...rest } = profile;
+    return {
+      ...rest,
+      avatarUrl: avatarMediaAsset
+        ? this.mediaService.getObjectUrl(avatarMediaAsset.storageKey)
+        : rest.avatarUrl,
+      coverUrl: coverMediaAsset ? this.mediaService.getObjectUrl(coverMediaAsset.storageKey) : null,
+    };
   }
 
   // --- Posts --------------------------------------------------------------
@@ -255,7 +307,7 @@ export class CommunityService {
       where: { userId: { in: authorIds } },
       select: PROFILE_SELECT,
     });
-    const byAuthor = new Map(profiles.map((p) => [p.userId, p]));
+    const byAuthor = new Map(profiles.map((p) => [p.userId, this.hydrateProfile(p)]));
     return {
       data: comments.map((c) => this.serializeComment(c, byAuthor.get(c.authorId) ?? null)),
       meta: paginationMeta(query, total),
@@ -323,7 +375,7 @@ export class CommunityService {
       where: { userId: { in: userIds } },
       select: PROFILE_SELECT,
     });
-    const byUser = new Map(profiles.map((p) => [p.userId, p]));
+    const byUser = new Map(profiles.map((p) => [p.userId, this.hydrateProfile(p)]));
     return {
       data: userIds.map((id) => byUser.get(id) ?? { userId: id, displayName: null }),
       meta: paginationMeta(query, total),
@@ -498,7 +550,11 @@ export class CommunityService {
   }
 
   private async authorSummary(userId: string) {
-    return this.prisma.communityProfile.findUnique({ where: { userId }, select: PROFILE_SELECT });
+    const profile = await this.prisma.communityProfile.findUnique({
+      where: { userId },
+      select: PROFILE_SELECT,
+    });
+    return profile ? this.hydrateProfile(profile) : null;
   }
 
   private async hydratePost(post: CommunityPost, viewerId: string) {
@@ -544,7 +600,7 @@ export class CommunityService {
     const saveCountByPost = new Map(saveCounts.map((c) => [c.postId, c._count]));
     const likedPostIds = new Set(likedByViewer.map((l) => l.postId));
     const savedPostIds = new Set(savedByViewer.map((s) => s.postId));
-    const profileByAuthor = new Map(authorProfiles.map((p) => [p.userId, p]));
+    const profileByAuthor = new Map(authorProfiles.map((p) => [p.userId, this.hydrateProfile(p)]));
 
     return posts.map((post) => ({
       id: post.id,
@@ -567,7 +623,7 @@ export class CommunityService {
     }));
   }
 
-  private serializeComment(comment: CommunityComment, author: ProfileSummary | null) {
+  private serializeComment(comment: CommunityComment, author: HydratedProfile | null) {
     return {
       id: comment.id,
       postId: comment.postId,
