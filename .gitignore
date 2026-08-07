@@ -20,6 +20,9 @@ services/api/generated/
 services/api/prisma/*.db
 services/api/prisma/migrations/dev/
 
+# Local media storage (LocalDevelopmentStorageProvider) — never commit uploads
+services/api/storage/
+
 # Flutter / Dart
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins
