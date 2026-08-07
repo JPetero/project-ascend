@@ -73,7 +73,41 @@ void main() {
   );
 
   testWidgets(
-    'a safety-critical message returns the shared redirect even with a '
+    'a red-flag message returns the shared emergency redirect even with a '
+    'swapped-in provider that would otherwise answer differently',
+    (tester) async {
+      final container = await createTestContainer(
+        aiProvider: const _FakeProvider(),
+      );
+      addTearDown(container.dispose);
+      // See the "hello" test above for why this listen is needed.
+      container.listen(companionChatControllerProvider, (_, _) {});
+      final controller = container.read(
+        companionChatControllerProvider.notifier,
+      );
+
+      unawaited(controller.sendMessage('I have chest pain'));
+      await pumpUntil(
+        tester,
+        () =>
+            container.read(companionChatControllerProvider).messages.length >=
+            2,
+      );
+
+      final reply = container
+          .read(companionChatControllerProvider)
+          .messages
+          .last;
+      expect(reply.text, AiProvider.emergencyRedirect);
+      expect(reply.text, isNot(contains('FAKE PROVIDER REPLY')));
+
+      await tester.pump(const Duration(milliseconds: 700));
+    },
+  );
+
+  testWidgets(
+    'a general pain mention asks a clarifying question first, then applies '
+    'the shared safety rule to the follow-up answer — even with a '
     'swapped-in provider that would otherwise answer differently',
     (tester) async {
       final container = await createTestContainer(
@@ -93,7 +127,22 @@ void main() {
             container.read(companionChatControllerProvider).messages.length >=
             2,
       );
+      final followUp = container
+          .read(companionChatControllerProvider)
+          .messages
+          .last;
+      expect(followUp.text, isNot(contains('FAKE PROVIDER REPLY')));
+      expect(followUp.text, isNot(AiProvider.safetyRedirect));
 
+      await tester.pump(const Duration(milliseconds: 700));
+
+      unawaited(controller.sendMessage('it has been getting worse for weeks'));
+      await pumpUntil(
+        tester,
+        () =>
+            container.read(companionChatControllerProvider).messages.length >=
+            4,
+      );
       final reply = container
           .read(companionChatControllerProvider)
           .messages

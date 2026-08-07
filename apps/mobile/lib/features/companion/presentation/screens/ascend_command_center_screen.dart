@@ -8,6 +8,7 @@ import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../domain/companion_dialogue.dart';
 import '../providers/companion_chat_controller.dart';
 import '../widgets/companion_avatar.dart';
+import 'research_mode_screen.dart';
 
 const _quickCommands = [
   'Plan today\'s workout',
@@ -76,7 +77,21 @@ class _AscendCommandCenterScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(companion == Companion.atlas ? 'Atlas' : 'Nova'),
-        actions: const [NotificationBellAction(), ProfileIconAction()],
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ResearchModeScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.science_outlined),
+            tooltip: 'Research mode',
+          ),
+          const NotificationBellAction(),
+          const ProfileIconAction(),
+        ],
       ),
       body: SafeArea(
         child: Column(
