@@ -55,6 +55,8 @@ class CompanionChatController extends StateNotifier<CompanionChatState> {
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
+    final priorMessages = state.messages;
+
     final userMessage = ChatMessage(
       id: 'msg-${_messageCounter++}',
       text: text.trim(),
@@ -71,10 +73,15 @@ class CompanionChatController extends StateNotifier<CompanionChatState> {
     // a real AI provider replaces this with actual request latency.
     await Future.delayed(const Duration(milliseconds: 400));
 
+    // History is everything before this turn's user message — it's how
+    // AiProvider.reply recognizes this input as the answer to its own
+    // previous pain-clarifying follow-up question rather than a new,
+    // unrelated mention.
     final responseText = await _provider.reply(
       input: text,
       companion: _companion,
       style: _style,
+      history: priorMessages,
     );
     if (!mounted) return;
 
