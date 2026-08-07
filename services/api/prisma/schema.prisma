@@ -153,6 +153,9 @@ model User {
   directMessagesSent               DirectMessage[]
   messageReceipts                  MessageReceipt[]
   messageReports                   MessageReport[]
+  hostedJointWorkoutSessions       JointWorkoutSession[]
+  jointWorkoutParticipations       JointWorkoutParticipant[]
+  jointWorkoutEvents               JointWorkoutEvent[]
 
   @@index([status])
   @@map("users")
@@ -2122,4 +2125,118 @@ model MessageReport {
   reporter User          @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@map("message_reports")
+}
+
+// --- Joint Workout Sessions — Build Session 8 Part 9. Friend-only: every
+// invite requires the host and invitee to already be Friends (see
+// FriendsService.areFriends), never open to strangers. JointWorkoutSharedResult
+// is a deliberately narrow whitelist — sets/duration/exercises/PRs/distance
+// only. It must never carry weight, BMI, health conditions, nutrition,
+// heart rate, or wearable metrics; JointWorkoutSessionService only ever
+// writes fields from that whitelist, and no other table's health data is
+// joined into a session response.
+
+enum JointWorkoutSessionStatus {
+  CREATED
+  IN_PROGRESS
+  FINISHED
+  CANCELED
+}
+
+enum JointWorkoutParticipantStatus {
+  INVITED
+  ACCEPTED
+  DECLINED
+  READY
+  ACTIVE
+  FINISHED
+  LEFT
+}
+
+model JointWorkoutSession {
+  id         String                    @id @default(uuid())
+  hostId     String
+  title      String?
+  status     JointWorkoutSessionStatus @default(CREATED)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  startedAt  DateTime?
+  finishedAt DateTime?
+  canceledAt DateTime?
+
+  host         User                      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  participants JointWorkoutParticipant[]
+  events       JointWorkoutEvent[]
+
+  @@index([hostId])
+  @@map("joint_workout_sessions")
+}
+
+model JointWorkoutParticipant {
+  id          String                        @id @default(uuid())
+  sessionId   String
+  userId      String
+  status      JointWorkoutParticipantStatus @default(INVITED)
+  invitedAt   DateTime                      @default(now())
+  respondedAt DateTime?
+  readyAt     DateTime?
+  finishedAt  DateTime?
+  leftAt      DateTime?
+
+  session JointWorkoutSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results JointWorkoutSharedResult[]
+
+  @@unique([sessionId, userId])
+  @@index([userId, status])
+  @@map("joint_workout_participants")
+}
+
+// Sets/duration/exercises/PRs/distance only — see the doc comment above
+// this section. No column here may ever hold weight, BMI, a health
+// condition, nutrition data, heart rate, or a wearable metric.
+model JointWorkoutSharedResult {
+  id               String   @id @default(uuid())
+  participantId    String
+  exerciseName     String?
+  setsCompleted    Int?
+  durationSeconds  Int?
+  distanceMeters   Float?
+  isPersonalRecord Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  participant JointWorkoutParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+  @@map("joint_workout_shared_results")
+}
+
+enum JointWorkoutEventType {
+  INVITED
+  ACCEPTED
+  DECLINED
+  READY
+  STARTED
+  PROGRESS
+  FINISHED
+  LEFT
+  CANCELED
+}
+
+// A lightweight, append-only activity feed for a session (e.g. "Bea is
+// ready", "Ada finished Squat: 3 sets") — purely derived from the
+// whitelisted fields above, never a health-data channel of its own.
+model JointWorkoutEvent {
+  id        String                @id @default(uuid())
+  sessionId String
+  userId    String?
+  type      JointWorkoutEventType
+  message   String?
+  createdAt DateTime              @default(now())
+
+  session JointWorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@map("joint_workout_events")
 }

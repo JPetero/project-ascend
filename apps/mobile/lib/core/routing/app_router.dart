@@ -23,6 +23,8 @@ import '../../features/challenges/presentation/screens/create_challenge_screen.d
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/joint_workouts/presentation/screens/joint_workout_session_detail_screen.dart';
+import '../../features/joint_workouts/presentation/screens/joint_workout_sessions_screen.dart';
 import '../../features/messages/presentation/screens/conversation_detail_screen.dart';
 import '../../features/messages/presentation/screens/conversations_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
@@ -246,6 +248,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ConversationDetailScreen(
           conversationId: state.pathParameters['id']!,
           otherUserId: state.extra as String?,
+        ),
+      ),
+      GoRoute(
+        path: RoutePaths.jointWorkouts,
+        builder: (context, state) => const JointWorkoutSessionsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.jointWorkoutDetail,
+        builder: (context, state) => JointWorkoutSessionDetailScreen(
+          sessionId: state.pathParameters['id']!,
         ),
       ),
       GoRoute(
