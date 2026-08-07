@@ -110,6 +110,12 @@ abstract final class RoutePaths {
   static const customFoodEditorNew = '/meal-prep/custom-food/new';
   static const customFoodEditorEdit = '/meal-prep/custom-food/:id/edit';
   static const macroTargetEditor = '/meal-prep/targets';
+  // Nutrition Library — Build Session 8 Part 11. Free on every tier.
+  static const nutritionLibrary = '/meal-prep/library';
+  static const nutrientArticleDetail = '/meal-prep/library/:slug';
+  static String nutrientArticleDetailPath(String slug) =>
+      '/meal-prep/library/$slug';
+  static const savedNutrientArticles = '/meal-prep/library/saved';
 
   static String communityPostDetailPath(String id) => '/social/posts/$id';
   static String communityProfilePath(String userId) =>

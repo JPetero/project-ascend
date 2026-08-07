@@ -66,6 +66,11 @@ class MealPrepScreen extends ConsumerWidget {
         title: const Text('Meal Prep'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.menu_book_outlined),
+            tooltip: 'Nutrition Library',
+            onPressed: () => context.push(RoutePaths.nutritionLibrary),
+          ),
+          IconButton(
             icon: const Icon(Icons.military_tech_outlined),
             tooltip: 'Achievements',
             onPressed: () => context.push(RoutePaths.achievements),
