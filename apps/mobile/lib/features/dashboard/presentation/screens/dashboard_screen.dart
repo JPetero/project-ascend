@@ -211,6 +211,18 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AscendSpacing.sm),
               AscendCard(
+                onTap: () => context.push(RoutePaths.dataExport),
+                child: const Row(
+                  children: [
+                    Icon(Icons.file_download_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Export my data')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
                 onTap: () => context.push(RoutePaths.support),
                 child: const Row(
                   children: [
