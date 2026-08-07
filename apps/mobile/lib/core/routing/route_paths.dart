@@ -81,6 +81,10 @@ abstract final class RoutePaths {
   static const jointWorkoutDetail = '/social/joint-workouts/:id';
   static String jointWorkoutDetailPath(String id) =>
       '/social/joint-workouts/$id';
+  // Sports Matches — Build Session 8 Part 10.
+  static const sportsMatches = '/social/sports';
+  static const sportMatchDetail = '/social/sports/:id';
+  static String sportMatchDetailPath(String id) => '/social/sports/$id';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

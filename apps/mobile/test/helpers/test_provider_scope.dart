@@ -28,6 +28,7 @@ import 'package:mobile/core/media/presentation/providers/media_upload_controller
 import 'package:mobile/features/friends/presentation/providers/friends_controller.dart';
 import 'package:mobile/features/joint_workouts/presentation/providers/joint_workout_sessions_controller.dart';
 import 'package:mobile/features/messages/presentation/providers/conversations_controller.dart';
+import 'package:mobile/features/sports/presentation/providers/sports_matches_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
@@ -53,6 +54,7 @@ import 'fake_health_metrics_repository.dart';
 import 'fake_joint_workout_sessions_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_friends_repository.dart';
+import 'fake_sports_repository.dart';
 import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
 import 'fake_messages_repository.dart';
@@ -106,6 +108,7 @@ Future<ProviderContainer> createTestContainer({
   FakeFriendsRepository? friendsRepository,
   FakeMessagesRepository? messagesRepository,
   FakeJointWorkoutSessionsRepository? jointWorkoutSessionsRepository,
+  FakeSportsRepository? sportsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -239,6 +242,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       jointWorkoutSessionsRepositoryProvider.overrideWithValue(
         jointWorkoutSessionsRepository ?? FakeJointWorkoutSessionsRepository(),
+      ),
+      sportsRepositoryProvider.overrideWithValue(
+        sportsRepository ?? FakeSportsRepository(),
       ),
     ],
   );

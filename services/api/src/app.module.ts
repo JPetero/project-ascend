@@ -37,6 +37,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { PromoteModule } from './modules/promote/promote.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
+import { SportsModule } from './modules/sports/sports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SupportModule } from './modules/support/support.module';
 import { TrainerGroupsModule } from './modules/trainer-groups/trainer-groups.module';
@@ -103,6 +104,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MediaModule,
     MessagesModule,
     JointWorkoutSessionsModule,
+    SportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
