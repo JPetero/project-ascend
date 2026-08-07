@@ -11,6 +11,9 @@ import 'package:mobile/features/cardio/presentation/providers/cardio_session_con
 import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
 import 'package:mobile/features/challenges/presentation/providers/challenges_controller.dart';
 import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
+import 'package:mobile/features/companion/data/ai_provider.dart';
+import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
+import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
 import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
@@ -82,6 +85,7 @@ Future<ProviderContainer> createTestContainer({
   FakeChallengesRepository? challengesRepository,
   FakeSubscriptionStatusRepository? subscriptionStatusRepository,
   FakeSubscriptionsRepository? subscriptionsRepository,
+  AiProvider? aiProvider,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -190,6 +194,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       subscriptionsRepositoryProvider.overrideWithValue(
         subscriptionsRepository ?? FakeSubscriptionsRepository(),
+      ),
+      aiProviderProvider.overrideWithValue(
+        aiProvider ?? const LocalDeterministicAiProvider(),
       ),
     ],
   );

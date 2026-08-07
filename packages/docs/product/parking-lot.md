@@ -39,9 +39,13 @@ actually in scope for the current session.
   self-service "upgrade" endpoint (faking one would mean a fabricated
   payment flow).
 - **Scanners** (food/body) — premium capability placeholder only.
-- **Live AI provider integration** — Atlas/Nova use deterministic local
-  dialogue. See `atlas-nova-bible.md` for the intended architecture when
-  this is picked up.
+- **Live AI provider integration** — Atlas/Nova still use deterministic
+  local dialogue; no live LLM call happens anywhere. Build Session 7
+  Part 9 added the provider-independent architecture that a live
+  integration will plug into (`AiProvider`, its shared safety gate, and
+  `LocalDeterministicAiProvider` as the only implementation so far) —
+  see `build-session-7.md` Part 9 and `atlas-nova-bible.md`'s "Future:
+  live AI" section for the intended architecture this now realizes.
 - **Voice integration** — not started; existing "coming soon" UI markers
   in the companion feature predate this session and remain accurate.
 - **Photos/videos gallery** — dashboard shows an honest unavailable state;

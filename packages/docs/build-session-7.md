@@ -1171,3 +1171,111 @@ libs, so `flutter build apk --debug` was not attempted.
 - **No per-mode entitlement granularity.** All six modes share the
   single `AppCapability.visionAccess` gate; Scenario 17 doesn't call
   for finer-grained gating and none was invented.
+
+## Part 9 — Provider-independent Ascend AI foundation
+
+Commit: `Add provider independent Ascend AI foundation`
+
+### What this part is
+
+`atlas-nova-bible.md`'s "Future: live AI" section left an explicit
+architectural instruction: whichever model eventually answers for Atlas
+and Nova, safety-relevant content must be identical regardless of
+companion or coaching style, via "a shared system-prompt safety layer,
+not a per-companion one" — and to document the decision "when that
+milestone begins so the constraint isn't rediscovered." This part
+builds that shell now, without integrating any live model (still out of
+scope — see `parking-lot.md`'s "Live AI provider integration" entry):
+an abstract `AiProvider` that structurally enforces the safety gate, and
+`LocalDeterministicAiProvider` as its only implementation, wrapping the
+existing fully-local dialogue engine unchanged.
+
+### Flutter: `AiProvider` and the safety gate
+
+`features/companion/data/ai_provider.dart` defines `AiProvider` as an
+abstract class with one concrete method, `reply()`, and one abstract
+method, `generateReply()` — the same "extends, not implements, for a
+concrete default method" pattern already used elsewhere in this
+codebase. `reply()` checks the same safety keyword list
+(`hurt`/`pain`/`injury`/`injured`) the local dialogue engine already
+used and returns the canonical, word-for-word-identical
+`AiProvider.safetyRedirect` before ever calling `generateReply()`. This
+makes the gate structurally impossible to bypass: a future live
+provider only ever overrides `generateReply()`, never `reply()`, so
+even a buggy or malicious provider implementation cannot skip the
+safety check — it never sees safety-critical input at all.
+`LocalDeterministicAiProvider extends AiProvider`, delegating
+`generateReply()` to the existing, completely unchanged
+`LocalCompanionResponseService` (its own test suite,
+`local_companion_response_service_test.dart`, was left untouched and
+still passes as-is). `CompanionChatController` was rewired from
+constructing `LocalCompanionResponseService` directly to reading an
+`AiProvider` through a new `aiProviderProvider` — the single place a
+future live provider gets swapped in, with zero other call-site
+changes required.
+
+### Tests
+
+Flutter: `ai_provider_test.dart` (4 tests — a fake provider that would
+otherwise answer differently per companion/style still produces the
+identical safety redirect for every combination and never reaches
+`generateReply`, non-safety input does reach `generateReply`, and
+`LocalDeterministicAiProvider` both delegates correctly and still
+enforces the shared redirect), `companion_chat_controller_test.dart` (3
+tests, new this part — the default local provider produces a reply
+naming the selected companion; a safety-critical message returns the
+shared redirect even with a swapped-in fake provider that would
+otherwise answer differently, proving the gate can't be bypassed by
+provider choice; and swapping the provider does change non-safety
+replies, proving the controller is genuinely provider-agnostic).
+
+**A real bug caught and fixed during this part**: the first draft of
+`companion_chat_controller_test.dart` used a bare `ProviderContainer`
+with only `aiProviderProvider` overridden, which hung the entire test
+run indefinitely — `authControllerProvider`'s bootstrap, with none of
+`createTestContainer`'s fakes in place, was left free to touch real
+storage/network with no timeout. Fixed by using `createTestContainer`
+(now extended with an `aiProvider` override parameter) like every other
+controller test. A second, more subtle issue surfaced next:
+`CompanionChatController.sendMessage`'s two `Future.delayed` calls (a
+simulated "thinking" latency) are genuine timers, which only fire while
+`tester.pump(duration)` is actively advancing the test framework's fake
+clock — awaiting `sendMessage()` directly (as `workout_session_controller_test.dart`
+safely does for a controller with no artificial delays) left those
+timers permanently unfired. Fixed by calling `sendMessage` with
+`unawaited` and driving it to completion with a `pump`-loop helper
+instead, plus a trailing pump in each test to drain the final "return to
+idle" timer before the test ends (an unfired timer at test end is a
+hard failure under `AutomatedTestWidgetsFlutterBinding`). Also added,
+as defense in depth found while touching this code: an `if (!mounted)
+return;` guard immediately after the new `await _provider.reply(...)`
+call, matching this session's established pattern of guarding every
+`StateNotifier` mutation after an `await`.
+
+### Commands run and results
+
+No backend changes this part — Ascend AI's dialogue generation is
+entirely client-side; there is no backend companion module to extend.
+
+Flutter: `dart format --set-exit-if-changed .` clean, `flutter analyze`
+→ "No issues found!", `flutter test` → 297 tests passed (was 290).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted.
+
+### Known scope decisions
+
+- **No live provider implementation.** `LocalDeterministicAiProvider`
+  is the only concrete `AiProvider` this session — no API key, no
+  network call, no LLM integration anywhere. This part is the seam a
+  future live provider plugs into, not the live provider itself.
+- **No backend AI provider abstraction.** The existing companion
+  dialogue system has always been 100% client-side; inventing a
+  backend module with no current caller would have been speculative
+  architecture, not a real integration point.
+- **Safety keyword list unchanged.** The same
+  `hurt`/`pain`/`injury`/`injured` list the local service already used
+  moved to the shared gate; broadening it (e.g. to more injury-adjacent
+  phrasing) was out of scope for this part.

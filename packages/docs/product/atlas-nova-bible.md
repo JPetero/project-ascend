@@ -128,3 +128,17 @@ answer identically on safety-relevant content regardless of which companion
 or style is presenting it. A shared system-prompt safety layer, not a
 per-companion one, is the intended architecture — document this decision
 here when that milestone begins so the constraint isn't rediscovered.
+
+**Architecture realized (Build Session 7 Part 9)**: the provider-
+independent shell this section calls for now exists —
+`apps/mobile/lib/features/companion/data/ai_provider.dart`'s `AiProvider`
+abstract class enforces the shared safety gate structurally (a concrete
+`reply()` method every provider inherits, which checks safety-critical
+input and only ever calls the provider-specific abstract
+`generateReply()` for everything else — a new provider cannot override
+`reply()` and bypass the gate). `LocalDeterministicAiProvider` is the
+only implementation; a live provider extends `AiProvider` directly and
+is swapped in via `aiProviderProvider` with no change to
+`CompanionChatController` or any other call site. Still no live model
+call anywhere — this is the architecture the milestone will plug into,
+not the milestone itself.
