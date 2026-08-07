@@ -40,6 +40,36 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   JWT_REFRESH_TTL = '30d';
+
+  // Media Platform (Build Session 8 Part 2) — all optional. Defaults to
+  // the local development storage provider, which needs none of these.
+  @IsIn(['local', 's3'])
+  @IsOptional()
+  MEDIA_STORAGE_PROVIDER = 'local';
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_ENDPOINT?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_REGION?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_BUCKET?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_ACCESS_KEY_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_SECRET_ACCESS_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_S3_PUBLIC_BASE_URL?: string;
 }
 
 /**

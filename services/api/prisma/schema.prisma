@@ -143,6 +143,7 @@ model User {
   supportTickets              SupportTicket[]
   supportTicketReplies        SupportTicketReply[]
   promotedCampaigns           PromotedCampaign[]
+  mediaAssets                 MediaAsset[]
 
   @@index([status])
   @@map("users")
@@ -1213,6 +1214,10 @@ enum CommunityReportTargetType {
   POST
   COMMENT
   PROFILE
+  // Reports against a MediaAsset directly (Build Session 8 Part 2's
+  // Media Platform) — e.g. a profile photo or chat image that never
+  // became a Community post. targetId is a MediaAsset.id.
+  MEDIA_ASSET
 }
 
 enum CommunityReportStatus {
@@ -1748,4 +1753,185 @@ model PromotedClick {
 
   @@index([campaignId])
   @@map("promoted_clicks")
+}
+
+// --- Media Platform (Build Session 8 Part 2). A single upload/storage
+// pipeline shared by every feature that accepts a photo/video, instead
+// of each module inventing its own. MediaAsset is the durable record;
+// MediaUpload is the one-shot upload attempt/contract; MediaVariant
+// holds the original plus any derived renditions (thumbnail today,
+// transcodes later); MediaUsage decouples "this file exists" from
+// "this file is currently attached somewhere" so deleting a Community
+// post never deletes a user's private gallery original (Part 6);
+// MediaModerationResult is the append-only history behind
+// MediaAsset.moderationState.
+
+enum MediaType {
+  PROFILE_IMAGE
+  COVER_IMAGE
+  COMMUNITY_IMAGE
+  COMMUNITY_REEL
+  CHAT_IMAGE
+  MEAL_PHOTO
+  PROGRESS_PHOTO
+  VISION_CAPTURE
+  WORKOUT_SHARE_MEDIA
+}
+
+enum MediaVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
+enum MediaProcessingState {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+// No real ML content classifier exists this session — every asset
+// auto-approves on upload completion (matching how a small real MVP
+// launches: human review triggered by a report, not pre-screened by a
+// model that doesn't exist yet). FLAGGED/REJECTED/REMOVED are reachable
+// only through the report → admin-review path, never automatically.
+enum MediaModerationState {
+  PENDING
+  APPROVED
+  FLAGGED
+  REJECTED
+  REMOVED
+}
+
+enum MediaRetentionState {
+  ACTIVE
+  ARCHIVED
+  PENDING_DELETION
+  DELETED
+}
+
+enum MediaUploadState {
+  INITIATED
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum MediaVariantType {
+  ORIGINAL
+  THUMBNAIL
+  PREVIEW
+}
+
+enum MediaUsageType {
+  PROFILE_AVATAR
+  PROFILE_COVER
+  COMMUNITY_POST
+  CHAT_MESSAGE
+  MEAL_ENTRY
+  PROGRESS_LOG
+  GALLERY
+  VISION_CAPTURE
+  SPORT_MATCH
+  WORKOUT_SHARE
+}
+
+model MediaAsset {
+  id                  String               @id @default(uuid())
+  ownerId             String
+  mediaType           MediaType
+  originalFilename    String
+  mimeType            String
+  sizeBytes           Int
+  width               Int?
+  height              Int?
+  durationSeconds     Float?
+  storageKey          String               @unique
+  visibility          MediaVisibility      @default(PRIVATE)
+  processingState     MediaProcessingState @default(PENDING)
+  moderationState     MediaModerationState @default(PENDING)
+  thumbnailStorageKey String?
+  createdAt           DateTime             @default(now())
+  deletedAt           DateTime?
+  retentionState      MediaRetentionState  @default(ACTIVE)
+
+  owner             User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  upload            MediaUpload?
+  variants          MediaVariant[]
+  usages            MediaUsage[]
+  moderationResults MediaModerationResult[]
+
+  @@index([ownerId, createdAt])
+  @@index([moderationState])
+  @@index([mediaType, ownerId])
+  @@map("media_assets")
+}
+
+// One row per upload attempt. A fresh MediaAsset+MediaUpload pair is
+// created every time `initiateUpload` is called — retrying a failed
+// upload starts a new pair rather than reusing an expired contract.
+model MediaUpload {
+  id              String           @id @default(uuid())
+  mediaAssetId    String           @unique
+  state           MediaUploadState @default(INITIATED)
+  storageProvider String
+  uploadMethod    String
+  expiresAt       DateTime
+  completedAt     DateTime?
+  createdAt       DateTime         @default(now())
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@map("media_uploads")
+}
+
+model MediaVariant {
+  id           String           @id @default(uuid())
+  mediaAssetId String
+  variantType  MediaVariantType
+  storageKey   String
+  width        Int?
+  height       Int?
+  sizeBytes    Int?
+  mimeType     String
+  createdAt    DateTime         @default(now())
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaAssetId, variantType])
+  @@map("media_variants")
+}
+
+model MediaUsage {
+  id           String         @id @default(uuid())
+  mediaAssetId String
+  usageType    MediaUsageType
+  // The id of the CommunityPost / DirectMessage / MealEntry / etc. this
+  // asset is currently attached to. Deliberately not a typed foreign
+  // key — MediaUsage exists precisely so Media doesn't need to know
+  // about every module that might attach it.
+  referenceId  String
+  attachedAt   DateTime       @default(now())
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([mediaAssetId])
+  @@index([usageType, referenceId])
+  @@map("media_usages")
+}
+
+model MediaModerationResult {
+  id           String               @id @default(uuid())
+  mediaAssetId String
+  status       MediaModerationState
+  reasonCode   String?
+  reviewedBy   String?
+  notes        String?
+  createdAt    DateTime             @default(now())
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([mediaAssetId, createdAt])
+  @@map("media_moderation_results")
 }

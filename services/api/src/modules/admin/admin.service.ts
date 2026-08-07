@@ -51,17 +51,34 @@ export class AdminService {
     if (!report) throw new NotFoundException('Report not found.');
 
     const shouldRemoveContent =
-      dto.status === CommunityReportStatus.ACTIONED &&
-      dto.removeContent === true &&
-      report.targetType === CommunityReportTargetType.POST;
+      dto.status === CommunityReportStatus.ACTIONED && dto.removeContent === true;
+    const shouldRemovePost =
+      shouldRemoveContent && report.targetType === CommunityReportTargetType.POST;
+    const shouldRemoveMedia =
+      shouldRemoveContent && report.targetType === CommunityReportTargetType.MEDIA_ASSET;
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.communityReport.update({ where: { id }, data: { status: dto.status } }),
-      ...(shouldRemoveContent
+      ...(shouldRemovePost
         ? [
             this.prisma.communityPost.update({
               where: { id: report.targetId },
               data: { moderationStatus: 'REMOVED' },
+            }),
+          ]
+        : []),
+      ...(shouldRemoveMedia
+        ? [
+            this.prisma.mediaAsset.update({
+              where: { id: report.targetId },
+              data: { moderationState: 'REMOVED' },
+            }),
+            this.prisma.mediaModerationResult.create({
+              data: {
+                mediaAssetId: report.targetId,
+                status: 'REMOVED',
+                reasonCode: 'ADMIN_REPORT_ACTIONED',
+              },
             }),
           ]
         : []),
