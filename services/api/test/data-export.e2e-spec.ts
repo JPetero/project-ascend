@@ -12,6 +12,7 @@ describe('Data Export (e2e)', () => {
   let prisma: PrismaService;
   let tokenA: string;
   let tokenB: string;
+  let userBId: string;
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -40,11 +41,17 @@ describe('Data Export (e2e)', () => {
           acceptedTerms: true,
         })
         .expect(201);
-      return res.body.data.tokens.accessToken as string;
+      return {
+        token: res.body.data.tokens.accessToken as string,
+        userId: res.body.data.user.id as string,
+      };
     };
 
-    tokenA = await register('export-a@example.com', 'Ada');
-    tokenB = await register('export-b@example.com', 'Bea');
+    const a = await register('export-a@example.com', 'Ada');
+    const b = await register('export-b@example.com', 'Bea');
+    tokenA = a.token;
+    tokenB = b.token;
+    userBId = b.userId;
   });
 
   afterAll(async () => {
@@ -95,5 +102,38 @@ describe('Data Export (e2e)', () => {
 
   it('rejects an unauthenticated request', async () => {
     await request(app.getHttpServer()).get('/account/data-export').expect(401);
+  });
+
+  it("includes the caller's own Joint Workout and Sports Match participation", async () => {
+    const jointWorkout = await request(app.getHttpServer())
+      .post('/joint-workouts')
+      .set(authFor(tokenA))
+      .send({ title: 'Export Test Session' })
+      .expect(201);
+
+    const sportMatch = await request(app.getHttpServer())
+      .post('/sports/matches')
+      .set(authFor(tokenA))
+      .send({ sportCode: 'BADMINTON', opponentId: userBId })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get('/account/data-export')
+      .set(authFor(tokenA))
+      .expect(200);
+
+    const joinedSessionIds = (
+      res.body.data.social.jointWorkoutParticipations as Array<{
+        session: { id: string; title: string | null };
+      }>
+    ).map((p) => p.session.id);
+    expect(joinedSessionIds).toContain(jointWorkout.body.data.id);
+
+    const matchIds = (
+      res.body.data.social.sportMatchParticipations as Array<{
+        match: { id: string; sport: { name: string } };
+      }>
+    ).map((p) => p.match.id);
+    expect(matchIds).toContain(sportMatch.body.data.id);
   });
 });
