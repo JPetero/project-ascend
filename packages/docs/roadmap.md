@@ -16,9 +16,21 @@ area. A Founder addendum then added Scenarios 11–20 (achievements, GPS cardio,
 presentation, safe social/media policy, location-based leaderboards, global meal support, a
 premium camera roadmap, companion voice, Assistant research behavior, and accessible scheduling)
 to the product documents — see `user-scenario-bible.md`'s addendum section and
-`product/parking-lot.md` for the full deferred list; none of Scenarios 11–20 is implemented yet.
-The product documents in [packages/docs/product/](product/) are now the authoritative source for
-what ships next and why — this file is kept for the pre-Session-3 modules that predate them.
+`product/parking-lot.md` for the full deferred list. Build Session 5 shipped offline-first
+Nutrition and achievement unlock celebrations (Scenario 11's celebration moment). The **Major
+Product Expansion session** then added a second Founder addendum, Scenarios 21–27 (six-destination
+navigation with Vision as a Premium sixth, Community Reels, Ascend Promote, Trainer Groups, sports
+scoring, expanded cardio activities, the Nutrition Library, Support access, companion tone
+evolution, and centralized pricing) — see `user-scenario-bible.md`'s Scenarios 21–27 addendum —
+and, unlike the 11–20 addendum, began real construction across most of these areas in the same
+session: live GPS cardio, a Health Connect/HealthKit foundation, a Community MVP (profiles, posts,
+reels), messaging and Trainer Groups, an optional Rankings/challenges MVP, a subscription/
+entitlement architecture, a Premium Vision shell, a provider-independent Ascend AI foundation, a
+support/admin foundation, and Ascend Promote's transparent-architecture layer. See
+`packages/docs/build-session-7.md` for exactly what shipped as real, tested code versus what
+remains an honest architecture-only extension point in each area. The product documents in
+[packages/docs/product/](product/) are now the authoritative source for what ships next and why —
+this file is kept for the pre-Session-3 modules that predate them.
 
 ## 1. Nutrition tracking — foundation shipped in Build Session 3
 

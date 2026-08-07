@@ -10,9 +10,22 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/cardio/presentation/screens/cardio_history_screen.dart';
 import '../../features/cardio/presentation/screens/cardio_log_screen.dart';
+import '../../features/cardio/presentation/screens/live_cardio_screen.dart';
+import '../../features/community/presentation/screens/community_feed_screen.dart';
+import '../../features/community/presentation/screens/community_profile_screen.dart';
+import '../../features/community/presentation/screens/create_post_screen.dart';
+import '../../features/community/presentation/screens/edit_community_profile_screen.dart';
+import '../../features/community/presentation/screens/post_detail_screen.dart';
+import '../../features/community/presentation/screens/saved_posts_screen.dart';
+import '../../features/challenges/presentation/screens/challenge_detail_screen.dart';
+import '../../features/challenges/presentation/screens/challenges_screen.dart';
+import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
-import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
+import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
+import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
+import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
+import '../../features/rankings/presentation/screens/rankings_screen.dart';
 import '../../features/nutrition/domain/meal_type.dart';
 import '../../features/nutrition/presentation/screens/custom_food_editor_screen.dart';
 import '../../features/nutrition/presentation/screens/food_search_screen.dart';
@@ -20,7 +33,17 @@ import '../../features/nutrition/presentation/screens/macro_target_editor_screen
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
-import '../../features/social/presentation/screens/social_screen.dart';
+import '../../features/promote/presentation/screens/campaign_detail_screen.dart';
+import '../../features/promote/presentation/screens/create_campaign_screen.dart';
+import '../../features/promote/presentation/screens/promote_screen.dart';
+import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
+import '../../features/support/presentation/screens/create_ticket_screen.dart';
+import '../../features/support/presentation/screens/support_screen.dart';
+import '../../features/support/presentation/screens/support_ticket_detail_screen.dart';
+import '../../features/vision/domain/vision_module.dart';
+import '../../features/vision/presentation/screens/vision_module_screen.dart';
+import '../../features/vision/presentation/screens/vision_screen.dart';
+import '../../features/wearables/presentation/screens/connected_health_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
 import '../../features/workout/presentation/screens/exercise_detail_screen.dart';
 import '../../features/workout/presentation/screens/exercise_library_screen.dart';
@@ -128,6 +151,35 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DashboardScreen(),
       ),
       GoRoute(
+        path: RoutePaths.subscription,
+        builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.support,
+        builder: (context, state) => const SupportScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.supportTicketCreate,
+        builder: (context, state) => const CreateTicketScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.supportTicketDetail,
+        builder: (context, state) =>
+            SupportTicketDetailScreen(ticketId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.visionModuleDetail,
+        builder: (context, state) {
+          final moduleId = state.pathParameters['moduleId']!;
+          final module = visionModuleFromId(moduleId) ?? VisionModule.formCoach;
+          return VisionModuleScreen(module: module);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.connectedHealth,
+        builder: (context, state) => const ConnectedHealthScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.achievements,
         builder: (context, state) => const AchievementsScreen(),
       ),
@@ -138,6 +190,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.cardioLog,
         builder: (context, state) => const CardioLogScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.liveCardio,
+        builder: (context, state) => const LiveCardioScreen(),
       ),
       GoRoute(
         path: RoutePaths.foodSearch,
@@ -151,6 +207,67 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.macroTargetEditor,
         builder: (context, state) => const MacroTargetEditorScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communityPostDetail,
+        builder: (context, state) =>
+            PostDetailScreen(postId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.communityCreatePost,
+        builder: (context, state) => const CreatePostScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communitySaved,
+        builder: (context, state) => const SavedPostsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communityProfile,
+        builder: (context, state) =>
+            CommunityProfileScreen(userId: state.pathParameters['userId']!),
+      ),
+      GoRoute(
+        path: RoutePaths.communityEditProfile,
+        builder: (context, state) => const EditCommunityProfileScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroups,
+        builder: (context, state) => const TrainerGroupsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroupCreate,
+        builder: (context, state) => const CreateTrainerGroupScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroupDetail,
+        builder: (context, state) =>
+            TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaigns,
+        builder: (context, state) => const PromoteScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaignCreate,
+        builder: (context, state) => const CreateCampaignScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaignDetail,
+        builder: (context, state) =>
+            CampaignDetailScreen(campaignId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.challenges,
+        builder: (context, state) => const ChallengesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.challengeCreate,
+        builder: (context, state) => const CreateChallengeScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.challengeDetail,
+        builder: (context, state) =>
+            ChallengeDetailScreen(challengeId: state.pathParameters['id']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -176,7 +293,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: RoutePaths.social,
-                builder: (context, state) => const SocialScreen(),
+                builder: (context, state) => const CommunityFeedScreen(),
               ),
             ],
           ),
@@ -192,7 +309,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: RoutePaths.leaderboards,
-                builder: (context, state) => const LeaderboardsScreen(),
+                builder: (context, state) => const RankingsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RoutePaths.vision,
+                builder: (context, state) => const VisionScreen(),
               ),
             ],
           ),
@@ -237,6 +362,7 @@ const _shellPaths = {
   RoutePaths.social,
   RoutePaths.assistant,
   RoutePaths.leaderboards,
+  RoutePaths.vision,
 };
 
 String? _redirect(Ref ref, GoRouterState state) {

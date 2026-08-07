@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { HealthMetricsService } from '../health-metrics/health-metrics.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
 
 @Injectable()
 export class DevicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly healthMetricsService: HealthMetricsService,
+  ) {}
 
   list(userId: string) {
     return this.prisma.deviceConnection.findMany({
@@ -71,9 +75,23 @@ export class DevicesService {
     });
   }
 
+  /**
+   * Revocation must also invalidate any Health Connect/HealthKit
+   * incremental-sync bookmark for this provider — disconnecting a device
+   * and having it silently resume syncing (because a stale cursor is
+   * still sitting there) would defeat the point of disconnecting it. See
+   * packages/docs/wearables.md's revocation requirement.
+   */
   async remove(userId: string, deviceId: string): Promise<void> {
-    await this.ensureOwnedByUser(userId, deviceId);
+    const device = await this.prisma.deviceConnection.findUnique({
+      where: { id: deviceId },
+    });
+    if (!device || device.userId !== userId) {
+      throw new NotFoundException('Device connection not found.');
+    }
+
     await this.prisma.deviceConnection.delete({ where: { id: deviceId } });
+    await this.healthMetricsService.clearCursorsForProvider(userId, device.provider);
   }
 
   private async ensureOwnedByUser(userId: string, deviceId: string): Promise<void> {

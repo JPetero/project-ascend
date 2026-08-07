@@ -30,6 +30,17 @@ enum AppCapability {
   profilePrivacyControls,
   blockAndReport,
   accessibleScheduling,
+  // Founder Scenarios 21-27 addendum — see
+  // packages/docs/product/user-scenario-bible.md. Community Reels,
+  // Trainer Groups (basic tier), expanded cardio activity types, manual
+  // sports scoring, the Nutrition Library, and Support access are all
+  // free at the core.
+  expandedCardioActivities,
+  nutritionLibrary,
+  supportAccess,
+  communityReels,
+  trainerGroupsBasic,
+  sportsScoringManual,
 
   // Premium-future — see free-premium-policy.md's Premium list. Not
   // implemented yet; listed so the boundary is explicit.
@@ -45,6 +56,14 @@ enum AppCapability {
   socialJointSessionHosting,
   profileCosmeticCustomization,
   deepAdaptiveScheduling,
+  // Founder Scenarios 21-27 addendum premium-future entries. Vision (the
+  // sixth nav destination) gates the whole camera-based feature set; the
+  // others are narrower depth-adds on top of a free core.
+  visionAccess,
+  cardioAdvancedAnalytics,
+  trainerGroupsExpanded,
+  ascendPromote,
+  sportsScoringAssisted,
 }
 
 const _freeCapabilities = {
@@ -65,6 +84,12 @@ const _freeCapabilities = {
   AppCapability.profilePrivacyControls,
   AppCapability.blockAndReport,
   AppCapability.accessibleScheduling,
+  AppCapability.expandedCardioActivities,
+  AppCapability.nutritionLibrary,
+  AppCapability.supportAccess,
+  AppCapability.communityReels,
+  AppCapability.trainerGroupsBasic,
+  AppCapability.sportsScoringManual,
 };
 
 /// True when [capability] is available at [tier]. Free capabilities are

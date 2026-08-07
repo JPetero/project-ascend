@@ -11,18 +11,41 @@ actually in scope for the current session.
   deeper sync (steps, sleep, recovery feeding the dashboard) is deferred
   until real device data sources are integrated. Never fabricate these
   values in the meantime.
-- **Community/Social** — the Social tab ships as an honest coming-soon
-  state this session. Posting, following, moderation, and real activity
-  feeds are future work.
-- **Leaderboards** — ships as an honest coming-soon state. Real ranking
-  requires a real activity/points model that doesn't exist yet.
-- **Subscriptions/payment processing** — the capability model
-  (`free-premium-policy.md`) is ready to receive a `PlanTier`, but no
-  billing integration, receipt validation, or store integration exists.
+- **Community/Social** — superseded by Build Session 7 Part 4: the
+  Community tab now has a real profiles/posts/Reels MVP (posting,
+  likes, comments, saves, follows, blocks, reports) — see
+  `build-session-7.md` Part 4. Still deferred: an in-app camera/photo/
+  video capture and upload pipeline (IMAGE/VIDEO posts currently require
+  an externally-hosted URL), a moderation review queue/admin UI (Part
+  10), and native device-share-sheet sharing of achievements/posts out
+  of the app.
+- **Leaderboards** — superseded by Build Session 7 Part 6: the Rankings
+  tab now has a real opt-in-only FRIENDS/REGION/GLOBAL leaderboard plus
+  time-boxed, join-by-choice Challenges — see `build-session-7.md` Part
+  6. Scoring is a non-gameable "active days" model (never raw volume,
+  never a streak alone), matching Scenario 16a's constraint. Still a
+  deliberate simplification: 3 scopes instead of Scenario 16a's full
+  local/city/region/state/national/global granularity, and no seasonal
+  rewards/badges beyond the season's point total.
+- **Subscriptions/payment processing** — superseded in part by Build
+  Session 7 Part 7: `CapabilityService.getPlanTier` now reads a real
+  per-user `UserSubscription` row (defaulting FREE) instead of a
+  hardcoded literal, centralized pricing exists
+  (`common/config/pricing.config.ts`), and the Student/Accessibility/
+  Senior/Regional Affordability application pipeline is live — see
+  `build-session-7.md` Part 7. Still deferred: no billing integration,
+  receipt validation, or store integration exists, so nothing can
+  actually write a PREMIUM row yet, and there is deliberately no
+  self-service "upgrade" endpoint (faking one would mean a fabricated
+  payment flow).
 - **Scanners** (food/body) — premium capability placeholder only.
-- **Live AI provider integration** — Atlas/Nova use deterministic local
-  dialogue. See `atlas-nova-bible.md` for the intended architecture when
-  this is picked up.
+- **Live AI provider integration** — Atlas/Nova still use deterministic
+  local dialogue; no live LLM call happens anywhere. Build Session 7
+  Part 9 added the provider-independent architecture that a live
+  integration will plug into (`AiProvider`, its shared safety gate, and
+  `LocalDeterministicAiProvider` as the only implementation so far) —
+  see `build-session-7.md` Part 9 and `atlas-nova-bible.md`'s "Future:
+  live AI" section for the intended architecture this now realizes.
 - **Voice integration** — not started; existing "coming soon" UI markers
   in the companion feature predate this session and remain accurate.
 - **Photos/videos gallery** — dashboard shows an honest unavailable state;
@@ -57,12 +80,19 @@ extension points exist.
   moment surfaced at the point an achievement is newly earned (rather
   than only visible next time the screen is opened), and Recovery-
   category achievements once deload has a countable trigger.
-- **GPS cardio tracking (12)** — manual/summary logging (activity type,
-  duration, distance/elevation/calorie estimate, privacy-flag model)
-  shipped in `build-session-4.md`. Still open: the actual location
-  permission flow, live route recording, conflict-with-scheduled-workout
-  handling, and wearable-sourced sessions — the `CardioSession` schema's
-  privacy flags are already shaped for when that lands.
+- **GPS cardio tracking (12)** — ✅ manual/summary logging shipped in
+  `build-session-4.md`; ✅ live GPS tracking (permission flow, start/
+  pause/resume/finish/abandon, live distance/duration/pace, route-point
+  capture with accuracy filtering and endpoint trimming, interrupted-
+  session recovery, offline operation) shipped in `build-session-7.md`
+  ("Implement live private GPS cardio"). Still open: conflict-with-
+  scheduled-workout handling, wearable-sourced sessions (the `source`
+  field already distinguishes `MANUAL`/`LIVE_GPS`/`WEARABLE` for when
+  that lands — see the Health Connect/HealthKit foundation), and
+  background/killed-app continuation of an active recording (today's
+  recovery restores progress up to the last point recorded while the app
+  was running, not points that would have been recorded while it wasn't
+  — a true background location service is a larger, separate scope).
 - **Stranger proximity matching (12)** — explicitly not to be built
   without re-reading the full restriction list in `user-scenario-bible.md`:
   coarse zones only, mutual opt-in, expiring matches, instant block/
@@ -87,9 +117,16 @@ extension points exist.
   (Meal Prep's existing balanced-guidance rules); the explicit budget/
   ingredient-availability prompt and anti-stereotyping copy review is
   still open.
-- **Premium camera and computer vision (17)** — explicitly deferred, full
-  safety-rail requirements documented in `user-scenario-bible.md` and
-  `wellness-ethics-bible.md` ahead of any build.
+- **Premium camera and computer vision (17)** — the camera/computer-
+  vision processing itself is still explicitly deferred per Scenario
+  17's "do not implement this milestone." Build Session 7 Part 8 added
+  the honest modular shell around that future work — a real capability
+  gate plus a real, single-source-of-truth list of the six future modes
+  (Form Coach, Rep Counter, Progress Scan, Food Scan, Sport Capture,
+  Outfit Guidance), each its own honest not-yet-built placeholder — see
+  `build-session-7.md` Part 8. Full safety-rail requirements remain
+  documented in `user-scenario-bible.md` and `wellness-ethics-bible.md`
+  ahead of any real camera build.
 - **Richer companion voice (18)** — premium voice conversation; free
   deterministic dialogue is what exists today and stays free.
 - **Assistant research mode with citations (19)** — live web-backed
@@ -98,6 +135,60 @@ extension points exist.
 - **Deep adaptive scheduling (20)** — advanced calendar automation,
   clinician/trainer collaboration tools; basic accessible scheduling
   stays free and is a smaller, nearer-term item.
+
+## Founder Scenarios 21–27 (addendum) — Major Product Expansion session
+
+Full requirements for all of these live in `user-scenario-bible.md`'s
+Scenarios 21–27 addendum. Unlike the 11–20 addendum, most of these are
+being actively built across this same session's later parts — this list
+is updated as each part actually lands (see `build-session-7.md` for the
+authoritative, verified record of what shipped vs. what's still
+architecture-only below).
+
+- **Six-destination navigation and Vision (21)** — label/route rename
+  (Train/Fuel/Community/Ascend AI/Rankings) plus a sixth, Premium-gated
+  Vision destination.
+- **Community Reels (22)** — **MVP implemented in Part 4**, moderation
+  queue **implemented in Part 10** (posts including Reels, captions,
+  likes, comments, saves, follows, reports, blocks, per-post
+  visibility, creator/trainer profiles, plus an admin queue that lists
+  OPEN reports and can mark a reported post REMOVED — see
+  `build-session-7.md` Part 10). Still pending: in-app capture/upload
+  for IMAGE/VIDEO posts and native external sharing.
+- **Ascend Promote (23)** — **MVP implemented in Part 11** (Premium
+  creators submit a campaign promoting one of their own Community
+  posts; every campaign starts PENDING_REVIEW and only an admin can
+  activate it; impressions/clicks are recorded into their own tables,
+  frequency-capped per viewer per day, and reported back to the
+  creator as a metrics view that is structurally separated from
+  organic likes/comments — never blended into one number, and proven
+  by both a unit test and an e2e test to have zero influence on
+  Rankings — see `build-session-7.md` Part 11). Still architecture-only:
+  no live billing, so `budgetAmount` is a non-final spend hypothesis,
+  never a real charge.
+- **Trainer groups (24)** — **free basic tier implemented in Part 5**
+  (one owned group per user, a centrally-configured member limit, text/
+  image chat, shared workout plans, invitations). Premium expanded tier
+  (more/larger groups, announcements, scheduled sessions, assignments,
+  distinct roles) is architecture-only until Premium billing exists —
+  `TrainerGroupMemberRole` only has OWNER/MEMBER so far.
+- **Sports scoring (25)** — manual match creation/confirmation/dispute
+  flow; camera-assisted suggestion depends on the Premium Vision Shell.
+- **Expanded cardio and Nutrition Library (26)** — new free activity
+  types on top of existing GPS cardio; a free educational nutrient
+  encyclopedia.
+- **Support, companion tone, and pricing (27)** — **Support implemented
+  in Part 10**: every user, on every tier, can create a help/bug-
+  report/safety-report/accessibility/account-recovery/billing-help/
+  moderation-appeal ticket and reply on the thread; an admin queue
+  lists and replies to tickets, gated by a new minimal `UserRole`
+  (MEMBER/ADMIN) foundation with no self-service promotion endpoint —
+  see `build-session-7.md` Part 10. Atlas/Nova tone-and-boundary rules
+  (no consciousness claims, no NSFW, no therapy replacement) were
+  already true of the existing deterministic dialogue and remain so.
+  Centralized, configurable pricing with Student/Accessibility/Senior/
+  Regional Affordability programs shipped in Part 7 — still no live
+  store billing.
 
 ## Ideas not yet scheduled
 

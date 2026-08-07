@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/core/entitlements/capability_provider.dart';
 import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
@@ -7,6 +8,16 @@ import 'package:mobile/features/achievements/presentation/providers/achievement_
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/cardio_session_controller.dart';
+import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
+import 'package:mobile/features/challenges/presentation/providers/challenges_controller.dart';
+import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
+import 'package:mobile/features/companion/data/ai_provider.dart';
+import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
+import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
+import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
+import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
+import 'package:mobile/features/support/presentation/providers/support_controller.dart';
+import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/meal_entry_controller.dart';
@@ -17,6 +28,8 @@ import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
+import 'package:mobile/features/promote/presentation/providers/promote_controller.dart';
+import 'package:mobile/features/trainer_groups/presentation/providers/trainer_groups_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/exercise_controller.dart';
@@ -29,8 +42,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
+import 'fake_challenges_repository.dart';
+import 'fake_community_repository.dart';
+import 'fake_health_adapter.dart';
+import 'fake_health_metrics_repository.dart';
+import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
+import 'fake_promote_repository.dart';
+import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
+import 'fake_subscription_status_repository.dart';
+import 'fake_subscriptions_repository.dart';
+import 'fake_support_repository.dart';
+import 'fake_trainer_groups_repository.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
 
@@ -56,6 +80,18 @@ Future<ProviderContainer> createTestContainer({
   FakeMacroTargetRepository? macroTargetRepository,
   FakeAchievementRepository? achievementRepository,
   FakeCardioSessionRepository? cardioSessionRepository,
+  FakeLiveLocationService? liveLocationService,
+  FakeHealthAdapter? healthAdapter,
+  FakeHealthMetricsRepository? healthMetricsRepository,
+  FakeCommunityRepository? communityRepository,
+  FakeTrainerGroupsRepository? trainerGroupsRepository,
+  FakeRankingsRepository? rankingsRepository,
+  FakeChallengesRepository? challengesRepository,
+  FakeSubscriptionStatusRepository? subscriptionStatusRepository,
+  FakeSubscriptionsRepository? subscriptionsRepository,
+  AiProvider? aiProvider,
+  FakeSupportRepository? supportRepository,
+  FakePromoteRepository? promoteRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -137,6 +173,42 @@ Future<ProviderContainer> createTestContainer({
       ),
       cardioSessionRepositoryProvider.overrideWithValue(
         cardioSessionRepository ?? FakeCardioSessionRepository(),
+      ),
+      liveLocationServiceProvider.overrideWithValue(
+        liveLocationService ?? FakeLiveLocationService(),
+      ),
+      healthAdapterProvider.overrideWithValue(
+        healthAdapter ?? FakeHealthAdapter(),
+      ),
+      healthMetricsRepositoryProvider.overrideWithValue(
+        healthMetricsRepository ?? FakeHealthMetricsRepository(),
+      ),
+      communityRepositoryProvider.overrideWithValue(
+        communityRepository ?? FakeCommunityRepository(),
+      ),
+      trainerGroupsRepositoryProvider.overrideWithValue(
+        trainerGroupsRepository ?? FakeTrainerGroupsRepository(),
+      ),
+      rankingsRepositoryProvider.overrideWithValue(
+        rankingsRepository ?? FakeRankingsRepository(),
+      ),
+      challengesRepositoryProvider.overrideWithValue(
+        challengesRepository ?? FakeChallengesRepository(),
+      ),
+      subscriptionStatusRepositoryProvider.overrideWithValue(
+        subscriptionStatusRepository ?? FakeSubscriptionStatusRepository(),
+      ),
+      subscriptionsRepositoryProvider.overrideWithValue(
+        subscriptionsRepository ?? FakeSubscriptionsRepository(),
+      ),
+      aiProviderProvider.overrideWithValue(
+        aiProvider ?? const LocalDeterministicAiProvider(),
+      ),
+      supportRepositoryProvider.overrideWithValue(
+        supportRepository ?? FakeSupportRepository(),
+      ),
+      promoteRepositoryProvider.overrideWithValue(
+        promoteRepository ?? FakePromoteRepository(),
       ),
     ],
   );

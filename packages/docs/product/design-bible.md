@@ -7,14 +7,21 @@ in product flows; it does not replace the design system itself.
 
 ## Navigation
 
-**Five primary tabs, in this exact order**: Workout, Meal Prep, Social,
-Assistant, Leaderboards. This is the authoritative order — do not
-reorder, rename, or add a sixth primary tab without a product-doc update
-here first. **The camera (Founder Scenario 17) is explicitly not a sixth
-tab** — when built, it launches from an existing surface (Assistant,
-Workout, Meal Prep, a central scan action) or a navigation redesign the
-Founder explicitly approves. Do not silently restructure the five-tab
-shell to make room for it.
+**Six primary destinations, in this exact order** (Founder Scenario 21,
+`user-scenario-bible.md`): Train, Fuel, Community, Ascend AI, Rankings —
+all free — plus Vision as a sixth, Premium-gated destination. This is the
+authoritative order — do not reorder or rename without a product-doc
+update here first. These are renames of the original five tabs (Train =
+formerly Workout, Fuel = formerly Meal Prep, Community = formerly Social,
+Ascend AI = formerly Assistant, Rankings = formerly Leaderboards); the
+underlying routes and screens are unchanged by the rename, only the
+visible label and icon. Vision is genuinely new — see Scenario 21 and the
+Premium Vision Shell build for its content. A Free user sees Vision exists
+(an honest, non-hidden sixth destination) but tapping it shows a real
+locked/upgrade state, never a faked preview of camera output. **Vision
+does not affect the free five**: Train, Fuel, Community, Ascend AI, and
+Rankings must keep working exactly as before for every user regardless of
+tier.
 
 **Profile is not a tab.** A profile icon appears in the upper-right of the
 primary app shell's app bar. Tapping it opens the Dashboard/Profile area as
@@ -24,9 +31,12 @@ a pushed route (not a shell branch), so:
 - returning goes to wherever the user came from, not a hardcoded location
 - no duplicate route entries accumulate on repeated open/close
 
-**Unavailable features** (Social, Leaderboards, and anything else not yet
-built) get a polished, honest coming-soon state: an icon, a one-line
-explanation of what's coming, and nothing fabricated — no fake users, fake
+**Unavailable features** (any destination or sub-feature not yet built —
+this applied to Community and Rankings before their MVPs shipped this
+session, and still applies to anything not yet built within them, plus
+Vision until the Premium Vision Shell exists) get a polished, honest
+coming-soon or locked state: an icon, a one-line explanation of what's
+coming or why it's locked, and nothing fabricated — no fake users, fake
 ranks, fake activity, fake photos. See `AscendEmptyState` for the existing
 component to build this from.
 

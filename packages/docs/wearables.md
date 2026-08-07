@@ -5,14 +5,31 @@ vendor integrations** — not a claim that every smartwatch exposes a direct pub
 that isn't true. Some devices sync through Apple Health or Android Health Connect with no
 vendor-specific work needed on our side; others require a dedicated, vendor-approved integration.
 
-## What exists in this sprint
+## What exists today
 
-Wearable connections are **simulated**. Tapping "connect" on a provider in the Wearables screen
-(`apps/mobile/lib/features/wearables`) creates a `DeviceConnection` row via the real
-`POST /devices` API with `status: CONNECTED` — the connection preference is genuinely persisted,
-but no OAuth flow, HealthKit/Health Connect permission prompt, or real data sync happens yet.
-This lets onboarding and the Profile screen's "manage devices" flow work end-to-end today, while
-keeping the door open to swap in real adapters later without changing the API contract.
+**Android Health Connect and Apple HealthKit are real, not simulated**, as of Build Session 7
+Part 3 — see `apps/mobile/lib/features/wearables/data/health_adapter.dart` and
+`services/api/src/modules/health-metrics/`. The `ConnectedHealthScreen` (reachable from the
+Wearables screen's "Connected Health" card) drives a genuine `package:health`-backed sync:
+availability detection, an OS permission request, an incremental per-metric read, upload to the
+backend's `/health-metrics/sync` endpoint, and per-metric last-synced status read back from
+`/health-metrics/sync-status`. Disconnecting revokes the platform permission, clears the local
+sync bookmark, and (via the existing `DELETE /devices/:id` flow) clears the backend's own sync
+cursor for that provider.
+
+This is architecturally complete and fully covered by unit/widget tests against a fake adapter
+(no platform channel required), but the actual OS permission dialog, a real Health Connect/
+HealthKit read, and the Android manifest / iOS `Info.plist` health-permission entries are
+**unverified at runtime** — see `packages/docs/build-session-7.md`'s Part 3 section for exactly
+what is and isn't confirmed working, and why.
+
+Every other provider category below (Samsung Health beyond what Health Connect already covers,
+Xiaomi's own APIs, Garmin, Fitbit, Polar, Suunto, COROS, Amazfit/Zepp, Oura, WHOOP) remains
+**simulated**: tapping "connect" on one of those in the Wearables screen creates a
+`DeviceConnection` row via the real `POST /devices` API with `status: CONNECTED` — the connection
+preference is genuinely persisted, but no OAuth flow or real vendor data sync happens yet. This
+lets onboarding and the Profile screen's "manage devices" flow work end-to-end today for every
+category, while the two OS-hub integrations above are the first to have a real sync behind them.
 
 ## Supported provider categories
 
@@ -38,8 +55,10 @@ one-line description of how it actually syncs:
 | Smart scales | Apple Health or Health Connect where supported |
 | Heart-rate straps | Apple Health, Health Connect, or a paired app |
 
-Xiaomi devices specifically are supported only through Xiaomi's own officially available
-platform/vendor paths — not through any unofficial or reverse-engineered protocol.
+Xiaomi devices specifically are supported only through whatever Xiaomi/Mi Fitness writes into
+Android Health Connect — never through Xiaomi's own private or reverse-engineered APIs. The
+Connected Health screen says this explicitly on Android rather than implying a direct Xiaomi
+integration exists.
 
 ## Backend model
 
@@ -51,24 +70,32 @@ OAuth refresh token reference, a Health Connect permission set). CRUD is exposed
 `GET/POST/PATCH/DELETE /devices`, scoped to the authenticated user (`DevicesService` checks
 ownership before any mutation).
 
-## Planned architecture for real integrations
+## Real architecture: Health Connect / HealthKit
 
-The following interfaces are the intended shape for real adapters (not yet implemented as
-production code — this section documents the target design referenced in the roadmap):
+For the two OS-hub providers, the design below is now implemented, not just planned:
 
-- **`WearableProvider`** — an enum/registry entry identifying a specific integration (mirrors the
-  `provider` string already stored on `DeviceConnection`).
-- **`WearableAdapter`** — the per-provider implementation: initiates the OS permission prompt or
-  vendor OAuth flow, and exposes a `sync(SyncCursor) -> WearableSyncResult` method.
-- **`HealthMetric`** — an enum of normalized metric types (steps, heart rate, sleep, weight, etc.)
-  that every adapter maps its provider-specific data into, so the rest of the app never needs to
-  know which provider a sample came from.
-- **`HealthSample`** — a normalized `{ metric, value, unit, recordedAt, sourceProvider }` record.
-- **`SyncCursor`** — an opaque, per-adapter, per-metric bookmark so incremental syncs don't
-  re-fetch the entire history every time.
-- **`WearableSyncResult`** — `{ samplesAdded, samplesSkipped, nextCursor, errors }`.
+- **`HealthAdapter`** (`apps/mobile/lib/features/wearables/data/health_adapter.dart`) — an
+  abstract class implemented by `PlatformHealthAdapter` (the real `package:health`-backed
+  adapter) and by a `FakeHealthAdapter` test double. Exposes `isAvailable()`,
+  `checkPermissions()`/`requestPermissions()`/`revokePermissions()`, `supportedMetrics`/
+  `unsupportedMetrics`, and `readSamples({metrics, since})`.
+- **`HealthMetric`** (`domain/health_metric.dart`) — the normalized metric enum: steps, heart
+  rate, resting heart rate, exercise sessions, active calories, distance, sleep, cycling distance.
+- **`HealthSample`** (`domain/health_sample.dart`) — a normalized `{metric, value, recordedAt,
+  sourceProvider, sourceId, sourceName}` record.
+- **`HealthSyncCursor`** (backend, `services/api/prisma/schema.prisma`) — the server's own
+  per-user/provider/metric bookmark of what's been stored, unique-constrained so a `disconnect`
+  clears exactly the right rows. The Flutter app additionally keeps its own local bookmark
+  (`CachedHealthSyncStatusRows`, Drift) of what it's already asked the platform for — the two are
+  intentionally independent: one is "what the server has," the other is "what the client already
+  fetched."
+- **`HealthMetricSample`** (backend) — the stored sample, unique-constrained on
+  `userId + metric + sourceProvider + recordedAt` so a repeated sync of the same underlying
+  platform record is silently absorbed (`createMany({skipDuplicates: true})`) rather than
+  duplicated.
 
-This design needs to handle, from day one of real implementation:
+The remaining thirteen vendor categories below still need this same shape built out per-vendor;
+this design needs to handle, for each of them:
 
 - **Duplicate sample detection** — the same step count can arrive from both Apple Health and a
   paired app; adapters need a stable dedup key (provider + metric + timestamp, at minimum).
@@ -91,5 +118,11 @@ This design needs to handle, from day one of real implementation:
 
 - No provider in the catalog is described as having a guaranteed public API — several
   (Garmin, Fitbit, Polar, etc.) require developer approval that isn't automatic.
-- Nothing here claims that connecting a device today actually syncs real health data — the UI
-  copy and this document are both explicit that Sprint 1 connections are simulated.
+- For the thirteen still-simulated categories, nothing here claims that connecting a device today
+  actually syncs real health data — the UI copy and this document are both explicit about that.
+- For Health Connect and HealthKit, the sync pipeline (adapter, controller, backend module,
+  storage, UI) is real and tested end-to-end against a fake platform adapter — but the actual OS
+  permission prompt, a real platform data read, and the required Android manifest / iOS
+  `Info.plist` health-permission entries are unverified at runtime in this environment (no
+  Android SDK, no Xcode). See `packages/docs/build-session-7.md` Part 3 for the exact boundary
+  between what's built and what's confirmed working on a device.

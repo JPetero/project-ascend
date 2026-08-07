@@ -19,8 +19,18 @@ class CardioHistoryScreen extends ConsumerWidget {
         title: const Text('Cardio'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.my_location_outlined),
+            tooltip: 'Start a live session',
+            onPressed: () async {
+              final saved = await context.push<bool>(RoutePaths.liveCardio);
+              if (saved ?? false) {
+                ref.invalidate(cardioSessionsProvider);
+              }
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Log cardio',
+            tooltip: 'Log cardio manually',
             onPressed: () async {
               final saved = await context.push<bool>(RoutePaths.cardioLog);
               if (saved ?? false) {
@@ -82,8 +92,12 @@ class _CardioSessionCard extends StatelessWidget {
 
   static const _icons = {
     CardioActivityType.walk: Icons.directions_walk,
+    CardioActivityType.jog: Icons.directions_run,
     CardioActivityType.run: Icons.directions_run,
+    CardioActivityType.sprint: Icons.bolt,
     CardioActivityType.cycle: Icons.directions_bike,
+    CardioActivityType.hike: Icons.terrain,
+    CardioActivityType.wheelchair: Icons.accessible,
     CardioActivityType.other: Icons.more_horiz,
   };
 
@@ -102,6 +116,9 @@ class _CardioSessionCard extends StatelessWidget {
     }
     if (session.regionLabel != null) {
       subtitleParts.add(session.regionLabel!);
+    }
+    if (session.source == CardioSessionSource.liveGps) {
+      subtitleParts.add(session.hasRoute ? 'Live · route recorded' : 'Live');
     }
 
     return AscendCard(

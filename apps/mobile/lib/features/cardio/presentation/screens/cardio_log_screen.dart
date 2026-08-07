@@ -105,33 +105,17 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: AscendSpacing.md),
-              SegmentedButton<CardioActivityType>(
-                segments: const [
-                  ButtonSegment(
-                    value: CardioActivityType.walk,
-                    label: Text('Walk'),
-                    icon: Icon(Icons.directions_walk),
-                  ),
-                  ButtonSegment(
-                    value: CardioActivityType.run,
-                    label: Text('Run'),
-                    icon: Icon(Icons.directions_run),
-                  ),
-                  ButtonSegment(
-                    value: CardioActivityType.cycle,
-                    label: Text('Cycle'),
-                    icon: Icon(Icons.directions_bike),
-                  ),
-                  ButtonSegment(
-                    value: CardioActivityType.other,
-                    label: Text('Other'),
-                    icon: Icon(Icons.more_horiz),
-                  ),
+              Wrap(
+                spacing: AscendSpacing.sm,
+                runSpacing: AscendSpacing.sm,
+                children: [
+                  for (final type in CardioActivityType.values)
+                    ChoiceChip(
+                      label: Text(cardioActivityTypeLabel(type)),
+                      selected: _activityType == type,
+                      onSelected: (_) => setState(() => _activityType = type),
+                    ),
                 ],
-                selected: {_activityType},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) =>
-                    setState(() => _activityType = selection.first),
               ),
               const SizedBox(height: AscendSpacing.md),
               AscendTextField(

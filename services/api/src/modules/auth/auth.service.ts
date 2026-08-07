@@ -81,7 +81,7 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokenPair(user.id, user.email);
-    return { user: { id: user.id, email: user.email }, tokens };
+    return { user: { id: user.id, email: user.email, role: user.role }, tokens };
   }
 
   async login(dto: LoginDto): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
@@ -105,7 +105,7 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokenPair(user.id, user.email, dto.deviceName);
-    return { user: { id: user.id, email: user.email }, tokens };
+    return { user: { id: user.id, email: user.email, role: user.role }, tokens };
   }
 
   async refresh(refreshToken: string): Promise<TokenPair> {
@@ -227,7 +227,7 @@ export class AuthService {
     if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
-    return { id: user.id, email: user.email };
+    return { id: user.id, email: user.email, role: user.role };
   }
 
   /**

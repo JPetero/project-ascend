@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../../domain/device_connection.dart';
 import '../../domain/wearable_provider_catalog.dart';
 import '../providers/device_controller.dart';
@@ -28,6 +30,36 @@ class WearableConnectionsScreen extends ConsumerWidget {
           'Health or Android Health Connect, while some vendors require their own approved '
           'integration.',
           style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: AscendSpacing.md),
+        AscendCard(
+          onTap: () => context.push(RoutePaths.connectedHealth),
+          child: Row(
+            children: [
+              Icon(
+                Icons.favorite_border,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: AscendSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Connected Health',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      'Real sync status, permissions, and metrics for '
+                      'Health Connect / HealthKit on this device.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
         const SizedBox(height: AscendSpacing.md),
         devicesAsync.when(

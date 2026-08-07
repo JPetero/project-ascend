@@ -198,6 +198,18 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
+                onTap: () => context.push(RoutePaths.support),
+                child: const Row(
+                  children: [
+                    Icon(Icons.support_agent_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Help & support')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
               _ShareAchievementLink(
                 streakDays: computeWorkoutStreak(
                   (historyAsync.value ?? const <WorkoutHistoryEntry>[])
@@ -277,6 +289,7 @@ class _SubscriptionStatusCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tier = ref.watch(planTierProvider);
     return AscendCard(
+      onTap: () => context.push(RoutePaths.subscription),
       child: Row(
         children: [
           Icon(
@@ -296,6 +309,7 @@ class _SubscriptionStatusCard extends ConsumerWidget {
               ],
             ),
           ),
+          const Icon(Icons.chevron_right),
         ],
       ),
     );

@@ -21,6 +21,15 @@ enum UserStatus {
   DELETED
 }
 
+// Minimal admin foundation — Founder Scenario 27's support/moderation
+// requirements (Build Session 7 Part 10). No self-service promotion
+// endpoint exists; granting ADMIN is an out-of-band operation this
+// session (see build-session-7.md Part 10's known scope decisions).
+enum UserRole {
+  MEMBER
+  ADMIN
+}
+
 enum SexForCalculations {
   MALE
   FEMALE
@@ -83,30 +92,57 @@ model User {
   email        String     @unique
   passwordHash String
   status       UserStatus @default(ACTIVE)
+  role         UserRole   @default(MEMBER)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens         RefreshToken[]
-  profile               Profile?
-  preference            Preference?
-  equipment             Equipment[]
-  workoutSchedule       WorkoutSchedule?
-  devices               DeviceConnection[]
-  auditEvents           AuditEvent[]
-  workoutPlans          WorkoutPlan[]
-  workoutSessions       WorkoutSession[]
-  personalRecords       PersonalRecord[]
-  syncOperations        SyncOperation[]
-  ownedFoods            Food[]
-  mealEntries           MealEntry[]
-  macroTarget           MacroTarget?
-  waterEntries          WaterEntry[]
-  authIdentities        AuthIdentity[]
-  legalAcceptances      LegalAcceptance[]
-  deloadRecommendations DeloadRecommendation[]
-  savedMeals            SavedMeal[]
-  achievementAwards     AchievementAward[]
-  cardioSessions        CardioSession[]
+  refreshTokens               RefreshToken[]
+  profile                     Profile?
+  preference                  Preference?
+  equipment                   Equipment[]
+  workoutSchedule             WorkoutSchedule?
+  devices                     DeviceConnection[]
+  auditEvents                 AuditEvent[]
+  workoutPlans                WorkoutPlan[]
+  workoutSessions             WorkoutSession[]
+  personalRecords             PersonalRecord[]
+  syncOperations              SyncOperation[]
+  ownedFoods                  Food[]
+  mealEntries                 MealEntry[]
+  macroTarget                 MacroTarget?
+  waterEntries                WaterEntry[]
+  authIdentities              AuthIdentity[]
+  legalAcceptances            LegalAcceptance[]
+  deloadRecommendations       DeloadRecommendation[]
+  savedMeals                  SavedMeal[]
+  achievementAwards           AchievementAward[]
+  cardioSessions              CardioSession[]
+  healthMetricSamples         HealthMetricSample[]
+  healthSyncCursors           HealthSyncCursor[]
+  communityProfile            CommunityProfile?
+  communityPosts              CommunityPost[]
+  communityLikes              CommunityLike[]
+  communityComments           CommunityComment[]
+  communitySaves              CommunitySave[]
+  communityReports            CommunityReport[]
+  communityFollowing          CommunityFollow[]         @relation("CommunityFollower")
+  communityFollowers          CommunityFollow[]         @relation("CommunityFollowing")
+  communityBlocksMade         CommunityBlock[]          @relation("CommunityBlocker")
+  communityBlocksAgainst      CommunityBlock[]          @relation("CommunityBlocked")
+  ownedTrainerGroups          TrainerGroup[]
+  trainerGroupMembers         TrainerGroupMember[]
+  trainerGroupMessages        TrainerGroupMessage[]
+  trainerGroupInvitesSent     TrainerGroupInvitation[]  @relation("TrainerGroupInviter")
+  trainerGroupInvitesReceived TrainerGroupInvitation[]  @relation("TrainerGroupInvitee")
+  trainerGroupSharedPlans     TrainerGroupSharedPlan[]
+  rankingOptIn                RankingOptIn?
+  createdChallenges           Challenge[]
+  challengeParticipations     ChallengeParticipant[]
+  subscription                UserSubscription?
+  affordabilityEligibility    AffordabilityEligibility?
+  supportTickets              SupportTicket[]
+  supportTicketReplies        SupportTicketReply[]
+  promotedCampaigns           PromotedCampaign[]
 
   @@index([status])
   @@map("users")
@@ -239,6 +275,73 @@ model DeviceConnection {
   @@index([userId])
   @@index([provider])
   @@map("device_connections")
+}
+
+// Normalized health-data types every adapter (Health Connect, HealthKit,
+// a future vendor adapter) maps its provider-specific data into — see
+// packages/docs/wearables.md's "Planned architecture for real
+// integrations" section, now implemented for Health Connect/HealthKit.
+enum HealthMetric {
+  STEPS
+  HEART_RATE
+  RESTING_HEART_RATE
+  EXERCISE_SESSION
+  ACTIVE_CALORIES
+  DISTANCE
+  SLEEP
+  CYCLING_DISTANCE
+}
+
+// One normalized sample from a connected health platform. `recordedAt` is
+// always stored in UTC; `recordedTimezone` preserves the originating IANA
+// timezone alongside it (e.g. "steps on Tuesday" depends on where the user
+// was) per wearables.md's timezone-handling requirement.
+model HealthMetricSample {
+  id               String       @id @default(uuid())
+  userId           String
+  metric           HealthMetric
+  value            Float
+  // Always the normalized unit for this metric (steps: count, heart
+  // rate: bpm, distance/cyclingDistance: meters, activeCalories: kcal,
+  // sleep: minutes) — never the platform's raw unit, which is converted
+  // at ingestion so nothing downstream needs to know which provider a
+  // sample came from.
+  unit             String
+  recordedAt       DateTime
+  recordedTimezone String?
+  // 'HEALTH_CONNECT' | 'APPLE_HEALTH' | a vendor string surfaced through
+  // one of those hubs (e.g. 'XIAOMI') — mirrors DeviceConnection.provider.
+  sourceProvider   String
+  sourceDeviceId   String?
+  // The platform's own record identifier, when it exposes one — kept
+  // for debugging/support, not used as the dedup key (see the unique
+  // constraint below, which is what actually prevents double-counting
+  // the same sample reported by two providers or re-synced twice).
+  externalId       String?
+  createdAt        DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric, sourceProvider, recordedAt])
+  @@index([userId, metric, recordedAt])
+  @@map("health_metric_samples")
+}
+
+// An opaque, per-(user, provider, metric) incremental-sync bookmark — see
+// wearables.md's SyncCursor design. Lets a sync call ask "anything new
+// since last time" instead of re-fetching a provider's entire history.
+model HealthSyncCursor {
+  id           String       @id @default(uuid())
+  userId       String
+  provider     String
+  metric       HealthMetric
+  cursor       String
+  lastSyncedAt DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, metric])
+  @@map("health_sync_cursors")
 }
 
 model AuditEvent {
@@ -495,10 +598,11 @@ model WorkoutPlan {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workout   Workout?              @relation(fields: [workoutId], references: [id], onDelete: SetNull)
-  exercises WorkoutPlanExercise[]
-  sessions  WorkoutSession[]
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout        Workout?                 @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercises      WorkoutPlanExercise[]
+  sessions       WorkoutSession[]
+  sharedInGroups TrainerGroupSharedPlan[]
 
   @@index([userId])
   @@map("workout_plans")
@@ -1012,15 +1116,31 @@ model AchievementAward {
 
 enum CardioActivityType {
   WALK
+  JOG
   RUN
+  SPRINT
   CYCLE
+  HIKE
+  WHEELCHAIR
   OTHER
 }
 
+// Distinguishes how a session's summary numbers were produced — matters
+// for privacy (only LIVE_GPS ever has route points to store) and, later,
+// for Rankings anti-cheat (a manual entry must never be silently treated
+// as GPS-verified). See packages/docs/product/user-scenario-bible.md
+// Scenario 12/25's manual-vs-verified distinction.
+enum CardioSessionSource {
+  MANUAL
+  LIVE_GPS
+  WEARABLE
+}
+
 model CardioSession {
-  id                  String             @id @default(uuid())
+  id                  String              @id @default(uuid())
   userId              String
   activityType        CardioActivityType
+  source              CardioSessionSource @default(MANUAL)
   startedAt           DateTime
   durationSeconds     Int
   distanceMeters      Float?
@@ -1034,18 +1154,598 @@ model CardioSession {
   // one.
   regionLabel         String?
   // Private-by-default route/location visibility, independent toggles
-  // per Scenario 12's "hide start / end / route" requirement — currently
-  // enforced because there is no route data to expose yet, and honored
-  // going forward once real route recording exists.
-  hideRoute           Boolean            @default(true)
-  hideStartLocation   Boolean            @default(true)
-  hideEndLocation     Boolean            @default(true)
+  // per Scenario 12's "hide start / end / route" requirement.
+  hideRoute           Boolean             @default(true)
+  hideStartLocation   Boolean             @default(true)
+  hideEndLocation     Boolean             @default(true)
+  // Google-style encoded polyline (see common/geo/polyline.util.ts) of a
+  // LIVE_GPS session's route, already endpoint-trimmed per
+  // hideStartLocation/hideEndLocation and entirely absent when
+  // hideRoute is true — trimmed/discarded points are never persisted in
+  // the first place, not merely filtered at read time. Null for MANUAL
+  // sessions (no coordinates were ever recorded) and for any session
+  // whose owner chose hideRoute.
+  encodedRoute        String?             @db.Text
+  // Point count of the route actually stored (post-trimming), kept
+  // alongside encodedRoute for display/debugging without decoding it.
+  routePointCount     Int?
   notes               String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, startedAt])
   @@map("cardio_sessions")
+}
+
+// --- Community — Founder Scenario 21's profiles/posts/Reels MVP. See
+// packages/docs/product/user-scenario-bible.md's Community Reels
+// requirements: captions, likes, comments, saves, follows, reports,
+// blocks, per-post visibility, creator/trainer profiles. No automatic
+// publishing to Instagram/Facebook/TikTok is implemented or claimed —
+// "native sharing" is device-share-sheet only (see the Flutter side).
+// Moderation here is a status field an admin tool can act on later, not
+// an automated content-classification pipeline.
+
+enum CommunityPostMediaType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
+// VIDEO + a caption is what the product spec calls a "Reel" — modeled as
+// a media type rather than a separate table, since a Reel is a post in
+// every other respect (likes/comments/saves/visibility/moderation).
+enum CommunityVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum CommunityModerationStatus {
+  APPROVED
+  PENDING
+  REMOVED
+}
+
+enum CommunityReportTargetType {
+  POST
+  COMMENT
+  PROFILE
+}
+
+enum CommunityReportStatus {
+  OPEN
+  REVIEWED
+  ACTIONED
+}
+
+// The public-facing identity shown on posts/comments/follow lists —
+// deliberately separate from `Profile`, which holds private onboarding
+// data (date of birth, height/weight, goals) that must never be exposed
+// through a Community endpoint.
+model CommunityProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  // A trainer/creator's own posts can be flagged as trainer content per
+  // post (CommunityPost.isTrainerContent); this flag controls whether a
+  // "Trainer" badge shows next to their name/profile at all.
+  isTrainer   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("community_profiles")
+}
+
+model CommunityPost {
+  id               String                    @id @default(uuid())
+  authorId         String
+  mediaType        CommunityPostMediaType    @default(TEXT)
+  // A device-local file reference or externally-hosted URL — this
+  // session has no media upload/transcoding pipeline, so the app is
+  // responsible for producing a URL before creating the post (see
+  // packages/docs/build-session-7.md Part 4's platform-limitations
+  // section). Required whenever mediaType isn't TEXT — enforced in the
+  // DTO/service, not the database.
+  mediaUrl         String?
+  caption          String?                   @db.Text
+  visibility       CommunityVisibility       @default(PUBLIC)
+  moderationStatus CommunityModerationStatus @default(APPROVED)
+  isTrainerContent Boolean                   @default(false)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  author            User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes             CommunityLike[]
+  comments          CommunityComment[]
+  saves             CommunitySave[]
+  promotedCampaigns PromotedCampaign[]
+
+  @@index([authorId, createdAt])
+  @@index([visibility, moderationStatus, createdAt])
+  @@map("community_posts")
+}
+
+model CommunityLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_likes")
+}
+
+model CommunityComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("community_comments")
+}
+
+model CommunitySave {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_saves")
+}
+
+model CommunityFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("CommunityFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("CommunityFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("community_follows")
+}
+
+model CommunityBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("CommunityBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("CommunityBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("community_blocks")
+}
+
+// A generic report — targetType + targetId lets one table cover
+// post/comment/profile reports without three near-identical models.
+// Never auto-actioned: status starts OPEN and only an admin workflow
+// (Part 10) moves it to REVIEWED/ACTIONED.
+model CommunityReport {
+  id         String                    @id @default(uuid())
+  reporterId String
+  targetType CommunityReportTargetType
+  targetId   String
+  reason     String                    @db.Text
+  status     CommunityReportStatus     @default(OPEN)
+  createdAt  DateTime                  @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@map("community_reports")
+}
+
+// --- Trainer groups — Founder Scenario 24. Free tier: one group owned
+// per user (see common/policy/trainer-group-policy.ts for the single
+// source of the owned-group and member-count limits — "not hard-coded
+// per-widget" per the scenario), text chat, safe image sharing (same
+// media policy as Community — see wellness-ethics-bible.md; no upload
+// pipeline or content scanning exists yet, matching Community's Reels),
+// shared workout plans, and invitations. Premium-future (more groups,
+// larger groups, announcements, scheduled sessions, assignments,
+// distinct roles) is not implemented — TrainerGroupMemberRole only has
+// OWNER/MEMBER for now, deliberately leaving room to add
+// MODERATOR/TRAINER later without a breaking migration.
+
+enum TrainerGroupMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum TrainerGroupInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
+model TrainerGroup {
+  id          String   @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TrainerGroupMember[]
+  messages    TrainerGroupMessage[]
+  invitations TrainerGroupInvitation[]
+  sharedPlans TrainerGroupSharedPlan[]
+
+  @@index([ownerId])
+  @@map("trainer_groups")
+}
+
+model TrainerGroupMember {
+  id       String                 @id @default(uuid())
+  groupId  String
+  userId   String
+  role     TrainerGroupMemberRole @default(MEMBER)
+  joinedAt DateTime               @default(now())
+
+  group TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("trainer_group_members")
+}
+
+// One row per group+invitee for all time — a re-invite after a decline/
+// cancel updates the existing row back to PENDING rather than creating a
+// second row, which keeps "has this person ever been invited" a simple
+// unique lookup.
+model TrainerGroupInvitation {
+  id        String                       @id @default(uuid())
+  groupId   String
+  inviterId String
+  inviteeId String
+  status    TrainerGroupInvitationStatus @default(PENDING)
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  group   TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  inviter User         @relation("TrainerGroupInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User         @relation("TrainerGroupInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, inviteeId])
+  @@index([inviteeId, status])
+  @@map("trainer_group_invitations")
+}
+
+// A text message, an image message, or both — never neither (enforced
+// in the DTO/service). imageUrl is an externally-hosted URL for the
+// same reason CommunityPost.mediaUrl is: no upload pipeline this session.
+model TrainerGroupMessage {
+  id        String   @id @default(uuid())
+  groupId   String
+  authorId  String
+  body      String?  @db.Text
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  group  TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
+  @@map("trainer_group_messages")
+}
+
+// A read-only reference to a member's own WorkoutPlan, shared into the
+// group — not a copy. If the sharer edits their plan, the group sees the
+// update; if they delete it, the share cascades away too.
+model TrainerGroupSharedPlan {
+  id            String   @id @default(uuid())
+  groupId       String
+  workoutPlanId String
+  sharedById    String
+  createdAt     DateTime @default(now())
+
+  group       TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  workoutPlan WorkoutPlan  @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  sharedBy    User         @relation(fields: [sharedById], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, workoutPlanId])
+  @@map("trainer_group_shared_plans")
+}
+
+// --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by
+// default: no RankingOptIn row at all means "private progress only",
+// the scenario's default state. This MVP simplifies the scenario's
+// full local/city/region/state/national/global granularity down to
+// three scopes (FRIENDS/REGION/GLOBAL) — see
+// packages/docs/build-session-7.md Part 6 for that scope decision.
+// Scoring deliberately never rewards raw volume (weight lifted,
+// calories burned) or an uninterrupted streak alone — see
+// RankingsService's activity-day scoring for how that's enforced.
+// `regionLabel` is the same coarse, user-typed, non-GPS field pattern
+// CardioSession.regionLabel already established — never an exact
+// coordinate.
+
+enum RankingScope {
+  FRIENDS
+  REGION
+  GLOBAL
+}
+
+model RankingOptIn {
+  id          String       @id @default(uuid())
+  userId      String       @unique
+  scope       RankingScope
+  regionLabel String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ranking_opt_ins")
+}
+
+// A season is just a scoring window — there is no reward/badge system
+// yet (Scenario 16a specifies none). `getOrCreateCurrentSeason` in
+// RankingsService lazily creates a rolling calendar-month season rather
+// than requiring an admin to schedule seasons ahead of time.
+model RankingSeason {
+  id        String   @id @default(uuid())
+  label     String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  @@index([startsAt, endsAt])
+  @@map("ranking_seasons")
+}
+
+// A simple, time-boxed, opt-in-by-joining challenge — any user may
+// create one. Progress is measured the same non-gameable "active days"
+// way as Rankings (see RankingsService.computeActivitySummary), not by
+// any raw-volume metric.
+model Challenge {
+  id          String   @id @default(uuid())
+  creatorId   String
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  createdAt   DateTime @default(now())
+
+  creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  participants ChallengeParticipant[]
+
+  @@index([creatorId])
+  @@index([endsAt])
+  @@map("challenges")
+}
+
+model ChallengeParticipant {
+  id          String   @id @default(uuid())
+  challengeId String
+  userId      String
+  joinedAt    DateTime @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([userId])
+  @@map("challenge_participants")
+}
+
+// Subscription/entitlement foundation — Founder Scenario 27. No billing
+// integration exists this session (see packages/docs/product/
+// parking-lot.md); this model exists so CapabilityService.getPlanTier
+// reads a real per-user row instead of a hardcoded literal, and so a
+// future payment-provider webhook has a single place to write to. No
+// row at all means FREE (CapabilityService's default), matching every
+// other "absence of a row = the private/free default" pattern already
+// established in this schema (RankingOptIn, etc).
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+model UserSubscription {
+  id        String           @id @default(uuid())
+  userId    String           @unique
+  tier      SubscriptionTier @default(FREE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_subscriptions")
+}
+
+// Affordability programs — Founder Scenario 27's Student/Accessibility/
+// Senior/Regional Affordability eligibility model, extending the
+// student/disability-access pattern from Scenario 13. Eligibility
+// status is deliberately never joined into any public-profile query —
+// see CommunityProfile, which has no relation to this model at all.
+enum AffordabilityProgram {
+  STUDENT
+  ACCESSIBILITY
+  SENIOR
+  REGIONAL
+}
+
+enum AffordabilityStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AffordabilityEligibility {
+  id          String               @id @default(uuid())
+  userId      String               @unique
+  program     AffordabilityProgram
+  status      AffordabilityStatus  @default(PENDING)
+  notes       String?
+  submittedAt DateTime             @default(now())
+  reviewedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("affordability_eligibilities")
+}
+
+// Support — Founder Scenario 27. Every category here is free on every
+// tier (AppCapability.SUPPORT_ACCESS); none of this is ever
+// Premium-gated. One table covers every category the scenario lists
+// (help center follow-up, bug reports, safety reports, accessibility
+// feedback, account recovery, billing help, moderation appeals) rather
+// than one model per category, since they only differ by `category`
+// and downstream handling, not by shape.
+enum SupportTicketCategory {
+  GENERAL
+  BUG_REPORT
+  SAFETY_REPORT
+  ACCESSIBILITY_FEEDBACK
+  ACCOUNT_RECOVERY
+  BILLING_HELP
+  MODERATION_APPEAL
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id         String                @id @default(uuid())
+  userId     String
+  category   SupportTicketCategory
+  subject    String
+  message    String                @db.Text
+  status     SupportTicketStatus   @default(OPEN)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  resolvedAt DateTime?
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies SupportTicketReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id        String   @id @default(uuid())
+  ticketId  String
+  authorId  String
+  // Distinguishes an admin/staff reply from the ticket owner's own
+  // follow-up message on the same thread.
+  isStaff   Boolean  @default(false)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_replies")
+}
+
+// Ascend Promote — Founder Scenario 23's transparent-promotion
+// architecture. Actual billing is future, store-compliant work (no
+// live payments this session — see build-session-7.md Part 11); this
+// is the architecture a payment integration plugs into. Every
+// non-negotiable rule from the scenario is enforced structurally, not
+// by convention: a campaign can never serve an impression before an
+// admin moves it out of PENDING_REVIEW (PromoteService.recordImpression
+// checks status === ACTIVE), paid metrics live in their own tables
+// entirely separate from CommunityLike/CommunityComment (so organic and
+// paid engagement can never be summed into one blended number by
+// accident), and nothing in RankingsService or
+// common/scoring/activity-scoring.util.ts ever reads from these tables
+// — a paid boost has zero code path into Ranking scoring.
+enum PromotedCampaignStatus {
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+  ENDED
+}
+
+model PromotedCampaign {
+  id             String                 @id @default(uuid())
+  creatorId      String
+  postId         String
+  status         PromotedCampaignStatus @default(PENDING_REVIEW)
+  // Non-final business hypothesis — a spend budget, not a live charge.
+  // Same "no live billing" pattern as Scenario 27's pricing config.
+  budgetAmount   Float
+  budgetCurrency String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  endedAt        DateTime?
+
+  creator     User                 @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  post        CommunityPost        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  impressions PromotedImpression[]
+  clicks      PromotedClick[]
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([postId])
+  @@map("promoted_campaigns")
+}
+
+// Deliberately its own table, never a column on CommunityPost or a
+// shared row with organic likes/views — see this section's header
+// comment on why paid and organic metrics must never be able to blend.
+model PromotedImpression {
+  id         String   @id @default(uuid())
+  campaignId String
+  viewerId   String
+  createdAt  DateTime @default(now())
+
+  campaign PromotedCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([viewerId, createdAt])
+  @@map("promoted_impressions")
+}
+
+model PromotedClick {
+  id         String   @id @default(uuid())
+  campaignId String
+  viewerId   String
+  createdAt  DateTime @default(now())
+
+  campaign PromotedCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("promoted_clicks")
 }

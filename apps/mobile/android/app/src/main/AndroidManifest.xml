@@ -1,4 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Live GPS cardio (Founder Scenario 12) — foreground-only location,
+         requested with an explanation before the OS prompt (see
+         apps/mobile/lib/features/cardio/data/live_location_service.dart).
+         No background/"always" location permission is requested: tracking
+         only runs while a session is active and the app is in the
+         foreground, per user-scenario-bible.md's "no location tracking
+         outside an active session" rule. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application
         android:label="mobile"
         android:name="${applicationName}"

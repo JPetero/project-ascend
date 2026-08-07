@@ -48,6 +48,13 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    // scrollUntilVisible only requires a single pixel on-screen, which
+    // can still leave the button's computed center just outside the
+    // viewport (as happened once a new dashboard card pushed this
+    // button further down) — ensureVisible scrolls it fully into view
+    // so tap()'s center-point hit test lands on it.
+    await tester.ensureVisible(signOutButton);
+    await tester.pumpAndSettle();
     await tester.tap(signOutButton);
     await tester.pumpAndSettle();
 

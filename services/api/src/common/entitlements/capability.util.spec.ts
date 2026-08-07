@@ -18,6 +18,12 @@ const FREE_CAPABILITIES: AppCapability[] = [
   AppCapability.PROFILE_PRIVACY_CONTROLS,
   AppCapability.BLOCK_AND_REPORT,
   AppCapability.ACCESSIBLE_SCHEDULING,
+  AppCapability.EXPANDED_CARDIO_ACTIVITIES,
+  AppCapability.NUTRITION_LIBRARY,
+  AppCapability.SUPPORT_ACCESS,
+  AppCapability.COMMUNITY_REELS,
+  AppCapability.TRAINER_GROUPS_BASIC,
+  AppCapability.SPORTS_SCORING_MANUAL,
 ];
 
 const PREMIUM_CAPABILITIES: AppCapability[] = [
@@ -32,6 +38,11 @@ const PREMIUM_CAPABILITIES: AppCapability[] = [
   AppCapability.SOCIAL_JOINT_SESSION_HOSTING,
   AppCapability.PROFILE_COSMETIC_CUSTOMIZATION,
   AppCapability.DEEP_ADAPTIVE_SCHEDULING,
+  AppCapability.VISION_ACCESS,
+  AppCapability.CARDIO_ADVANCED_ANALYTICS,
+  AppCapability.TRAINER_GROUPS_EXPANDED,
+  AppCapability.ASCEND_PROMOTE,
+  AppCapability.SPORTS_SCORING_ASSISTED,
 ];
 
 describe('resolveHasCapability', () => {

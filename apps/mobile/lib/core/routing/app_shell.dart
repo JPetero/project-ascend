@@ -5,10 +5,14 @@ import '../design_system/design_system.dart';
 import 'route_paths.dart';
 
 /// The main tabbed shell, in the authoritative product order (see
-/// packages/docs/product/design-bible.md): Workout, Meal Prep, Social,
-/// Assistant, Leaderboards. Profile/Dashboard is intentionally not a tab —
-/// see [ProfileIconAction], added to each tab screen's app bar instead.
-/// Each branch keeps its own navigation stack via [StatefulNavigationShell].
+/// packages/docs/product/design-bible.md, Founder Scenario 21): Train,
+/// Fuel, Community, Ascend AI, Rankings, and Vision (Premium — see
+/// [VisionScreen]). These are renamed labels over the original five tabs
+/// (Workout/Meal Prep/Social/Assistant/Leaderboards); Vision is the one
+/// genuinely new destination. Profile/Dashboard is intentionally not a
+/// destination — see [ProfileIconAction], added to each screen's app bar
+/// instead. Each branch keeps its own navigation stack via
+/// [StatefulNavigationShell].
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -18,27 +22,32 @@ class AppShell extends StatelessWidget {
     AscendNavItem(
       icon: Icons.fitness_center_outlined,
       activeIcon: Icons.fitness_center_rounded,
-      label: 'Workout',
+      label: 'Train',
     ),
     AscendNavItem(
       icon: Icons.restaurant_outlined,
       activeIcon: Icons.restaurant_rounded,
-      label: 'Meal Prep',
+      label: 'Fuel',
     ),
     AscendNavItem(
       icon: Icons.people_outline,
       activeIcon: Icons.people_rounded,
-      label: 'Social',
+      label: 'Community',
     ),
     AscendNavItem(
       icon: Icons.auto_awesome_outlined,
       activeIcon: Icons.auto_awesome,
-      label: 'Assistant',
+      label: 'Ascend AI',
     ),
     AscendNavItem(
       icon: Icons.leaderboard_outlined,
       activeIcon: Icons.leaderboard_rounded,
-      label: 'Leaderboards',
+      label: 'Rankings',
+    ),
+    AscendNavItem(
+      icon: Icons.camera_alt_outlined,
+      activeIcon: Icons.camera_alt_rounded,
+      label: 'Vision',
     ),
   ];
 

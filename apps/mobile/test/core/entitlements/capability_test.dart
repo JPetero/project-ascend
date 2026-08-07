@@ -19,6 +19,12 @@ const _freeCapabilities = [
   AppCapability.profilePrivacyControls,
   AppCapability.blockAndReport,
   AppCapability.accessibleScheduling,
+  AppCapability.expandedCardioActivities,
+  AppCapability.nutritionLibrary,
+  AppCapability.supportAccess,
+  AppCapability.communityReels,
+  AppCapability.trainerGroupsBasic,
+  AppCapability.sportsScoringManual,
 ];
 
 const _premiumCapabilities = [
@@ -33,6 +39,11 @@ const _premiumCapabilities = [
   AppCapability.socialJointSessionHosting,
   AppCapability.profileCosmeticCustomization,
   AppCapability.deepAdaptiveScheduling,
+  AppCapability.visionAccess,
+  AppCapability.cardioAdvancedAnalytics,
+  AppCapability.trainerGroupsExpanded,
+  AppCapability.ascendPromote,
+  AppCapability.sportsScoringAssisted,
 ];
 
 void main() {
