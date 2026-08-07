@@ -51,6 +51,11 @@ class CommunityFeedScreen extends ConsumerWidget {
             onPressed: () => context.push(RoutePaths.jointWorkouts),
           ),
           IconButton(
+            icon: const Icon(Icons.sports_tennis_outlined),
+            tooltip: 'Sports',
+            onPressed: () => context.push(RoutePaths.sportsMatches),
+          ),
+          IconButton(
             icon: const Icon(Icons.groups_2_outlined),
             tooltip: 'Trainer Groups',
             onPressed: () => context.push(RoutePaths.trainerGroups),

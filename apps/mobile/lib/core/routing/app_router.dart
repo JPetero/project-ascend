@@ -27,6 +27,8 @@ import '../../features/joint_workouts/presentation/screens/joint_workout_session
 import '../../features/joint_workouts/presentation/screens/joint_workout_sessions_screen.dart';
 import '../../features/messages/presentation/screens/conversation_detail_screen.dart';
 import '../../features/messages/presentation/screens/conversations_screen.dart';
+import '../../features/sports/presentation/screens/sport_match_detail_screen.dart';
+import '../../features/sports/presentation/screens/sports_matches_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
@@ -259,6 +261,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => JointWorkoutSessionDetailScreen(
           sessionId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: RoutePaths.sportsMatches,
+        builder: (context, state) => const SportsMatchesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.sportMatchDetail,
+        builder: (context, state) =>
+            SportMatchDetailScreen(matchId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.trainerGroups,
