@@ -41,6 +41,8 @@ import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/nutrition_library/presentation/screens/nutrient_article_screen.dart';
 import '../../features/nutrition_library/presentation/screens/nutrition_library_screen.dart';
 import '../../features/nutrition_library/presentation/screens/saved_nutrient_articles_screen.dart';
+import '../../features/notifications/presentation/screens/notification_preferences_screen.dart';
+import '../../features/notifications/presentation/screens/notifications_inbox_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/promote/presentation/screens/campaign_detail_screen.dart';
@@ -184,6 +186,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           final module = visionModuleFromId(moduleId) ?? VisionModule.formCoach;
           return VisionModuleScreen(module: module);
         },
+      ),
+      GoRoute(
+        path: RoutePaths.notificationsInbox,
+        builder: (context, state) => const NotificationsInboxScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.notificationPreferences,
+        builder: (context, state) => const NotificationPreferencesScreen(),
       ),
       GoRoute(
         path: RoutePaths.connectedHealth,

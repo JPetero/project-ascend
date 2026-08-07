@@ -36,6 +36,7 @@ class RankingsScreen extends ConsumerWidget {
               tooltip: 'Ranking settings',
               onPressed: () => _showOptOutSheet(context, controller),
             ),
+          const NotificationBellAction(),
           const ProfileIconAction(),
         ],
       ),

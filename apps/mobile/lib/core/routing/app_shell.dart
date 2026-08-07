@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/notifications/presentation/providers/notifications_controller.dart';
 import '../design_system/design_system.dart';
 import 'route_paths.dart';
 
@@ -64,6 +66,31 @@ class AppShell extends StatelessWidget {
           initialLocation: index == navigationShell.currentIndex,
         ),
       ),
+    );
+  }
+}
+
+/// The notification-bell app-bar action every primary tab screen includes,
+/// alongside [ProfileIconAction] — Build Session 8 Part 12. Tapping it
+/// pushes the notifications inbox; the badge reflects the same unread
+/// count shown there.
+class NotificationBellAction extends ConsumerWidget {
+  const NotificationBellAction({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(
+      notificationsInboxControllerProvider.select((s) => s.unreadCount),
+    );
+
+    return IconButton(
+      icon: Badge(
+        isLabelVisible: unreadCount > 0,
+        label: Text('$unreadCount'),
+        child: const Icon(Icons.notifications_none),
+      ),
+      tooltip: 'Notifications',
+      onPressed: () => context.push(RoutePaths.notificationsInbox),
     );
   }
 }

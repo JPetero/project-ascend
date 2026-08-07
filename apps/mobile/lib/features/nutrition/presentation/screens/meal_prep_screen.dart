@@ -75,6 +75,7 @@ class MealPrepScreen extends ConsumerWidget {
             tooltip: 'Achievements',
             onPressed: () => context.push(RoutePaths.achievements),
           ),
+          const NotificationBellAction(),
           const ProfileIconAction(),
         ],
       ),

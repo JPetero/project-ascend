@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/entitlements/capability_provider.dart';
 import 'package:mobile/core/entitlements/capability.dart';
+import 'package:mobile/features/notifications/presentation/providers/notifications_controller.dart';
 import 'package:mobile/features/vision/presentation/screens/vision_screen.dart';
+
+import '../../helpers/fake_notifications_repository.dart';
 
 void main() {
   testWidgets(
@@ -11,7 +14,12 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [planTierProvider.overrideWithValue(PlanTier.free)],
+          overrides: [
+            planTierProvider.overrideWithValue(PlanTier.free),
+            notificationsRepositoryProvider.overrideWithValue(
+              FakeNotificationsRepository(),
+            ),
+          ],
           child: const MaterialApp(home: VisionScreen()),
         ),
       );
@@ -27,7 +35,12 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [planTierProvider.overrideWithValue(PlanTier.premium)],
+          overrides: [
+            planTierProvider.overrideWithValue(PlanTier.premium),
+            notificationsRepositoryProvider.overrideWithValue(
+              FakeNotificationsRepository(),
+            ),
+          ],
           child: const MaterialApp(home: VisionScreen()),
         ),
       );

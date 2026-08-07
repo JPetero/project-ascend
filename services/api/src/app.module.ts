@@ -33,6 +33,7 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { MuscleGroupsModule } from './modules/muscle-groups/muscle-groups.module';
 import { NutritionLibraryModule } from './modules/nutrition-library/nutrition-library.module';
 import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PersonalRecordsModule } from './modules/personal-records/personal-records.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
@@ -107,6 +108,7 @@ import { PrismaModule } from './prisma/prisma.module';
     JointWorkoutSessionsModule,
     SportsModule,
     NutritionLibraryModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

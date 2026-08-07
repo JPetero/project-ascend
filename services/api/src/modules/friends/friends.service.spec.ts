@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { FriendsService } from './friends.service';
 
 describe('FriendsService', () => {
@@ -51,9 +52,14 @@ describe('FriendsService', () => {
       },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [FriendsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        FriendsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
+      ],
     }).compile();
 
     service = moduleRef.get(FriendsService);

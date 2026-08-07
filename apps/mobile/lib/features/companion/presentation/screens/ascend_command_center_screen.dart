@@ -76,7 +76,7 @@ class _AscendCommandCenterScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(companion == Companion.atlas ? 'Atlas' : 'Nova'),
-        actions: const [ProfileIconAction()],
+        actions: const [NotificationBellAction(), ProfileIconAction()],
       ),
       body: SafeArea(
         child: Column(
