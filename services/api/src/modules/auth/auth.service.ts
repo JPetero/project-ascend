@@ -377,6 +377,48 @@ export class AuthService {
     });
   }
 
+  /**
+   * Closes the account: requires the current password (the same
+   * confirmation bar as changePassword), revokes every session, and
+   * anonymizes the unique email so it can be reused by a future
+   * registration. This is a soft delete — status flips to DELETED,
+   * which every existing isActive() check already treats as
+   * unauthenticated (login/refresh/me all reject it) — not an immediate
+   * cascading purge of the user's other data. A scheduled hard-delete
+   * job is out of scope for this pass; see build-session-9.md.
+   */
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!this.usersService.isActive(user)) {
+      throw new UnauthorizedException('Session is no longer valid.');
+    }
+
+    const passwordValid = await argon2.verify(user.passwordHash, password);
+    if (!passwordValid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+
+    const anonymizedEmail = `deleted-${crypto.randomUUID()}@deleted.projectascend.invalid`;
+
+    await this.prisma.$transaction([
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { status: 'DELETED', email: anonymizedEmail },
+      }),
+    ]);
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.account_deleted',
+      entityType: 'User',
+      entityId: userId,
+    });
+  }
+
   async verifyEmail(dto: VerifyEmailDto): Promise<void> {
     const parsed = this.splitCompositeToken(dto.token);
     if (!parsed) {

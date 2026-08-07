@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/achievements/presentation/screens/achievements_screen.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
-import '../../features/auth/presentation/screens/change_password_screen.dart';
+import '../../features/auth/presentation/screens/account_security_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/reset_password_screen.dart';
@@ -121,8 +121,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: RoutePaths.changePassword,
-        builder: (context, state) => const ChangePasswordScreen(),
+        path: RoutePaths.accountSecurity,
+        builder: (context, state) => const AccountSecurityScreen(),
       ),
       GoRoute(
         path: RoutePaths.onboarding,

@@ -11,9 +11,7 @@ import '../../../../core/routing/route_paths.dart';
 import '../../../achievements/domain/achievement.dart';
 import '../../../achievements/presentation/providers/achievement_controller.dart';
 import '../../../achievements/presentation/widgets/achievement_icon.dart';
-import '../../../auth/domain/auth_identity.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
-import '../../../auth/presentation/providers/auth_identity_controller.dart';
 import '../../../cardio/presentation/providers/cardio_session_controller.dart';
 import '../../../companion/domain/companion_dialogue.dart';
 import '../../../companion/presentation/widgets/companion_quick_actions_sheet.dart';
@@ -60,7 +58,6 @@ class DashboardScreen extends ConsumerWidget {
     final historyAsync = ref.watch(workoutHistoryListProvider);
     final recordsAsync = ref.watch(personalRecordsProvider);
     final nutritionAsync = ref.watch(nutritionDashboardSummaryProvider);
-    final identitiesAsync = ref.watch(authIdentitiesProvider);
     final achievementsAsync = ref.watch(achievementsProvider);
     final cardioSessionsAsync = ref.watch(cardioSessionsProvider);
     final rankingsState = ref.watch(rankingsControllerProvider);
@@ -75,7 +72,6 @@ class DashboardScreen extends ConsumerWidget {
             ref.refresh(workoutHistoryListProvider.future),
             ref.refresh(personalRecordsProvider.future),
             ref.refresh(nutritionDashboardSummaryProvider.future),
-            ref.refresh(authIdentitiesProvider.future),
             ref.refresh(achievementsProvider.future),
             ref.refresh(cardioSessionsProvider.future),
             ref.read(rankingsControllerProvider.notifier).refresh(),
@@ -181,23 +177,13 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: AscendSpacing.lg),
               const AscendSectionHeader(title: 'Account'),
               const SizedBox(height: AscendSpacing.sm),
-              identitiesAsync.maybeWhen(
-                data: (identities) =>
-                    _AccountIdentityCard(identities: identities),
-                orElse: () => const SizedBox.shrink(),
-              ),
-              if (user != null && user.emailVerifiedAt == null) ...[
-                const SizedBox(height: AscendSpacing.sm),
-                const _VerifyEmailBanner(),
-              ],
-              const SizedBox(height: AscendSpacing.sm),
               AscendCard(
-                onTap: () => context.push(RoutePaths.changePassword),
+                onTap: () => context.push(RoutePaths.accountSecurity),
                 child: const Row(
                   children: [
-                    Icon(Icons.lock_outline),
+                    Icon(Icons.shield_outlined),
                     SizedBox(width: AscendSpacing.sm),
-                    Expanded(child: Text('Change password')),
+                    Expanded(child: Text('Account & Security')),
                     Icon(Icons.chevron_right_rounded),
                   ],
                 ),
@@ -1224,117 +1210,6 @@ class _ThemeModeRow extends ConsumerWidget {
               .update({'themeMode': selection.first.name.toUpperCase()}),
         ),
       ],
-    );
-  }
-}
-
-class _AccountIdentityCard extends StatelessWidget {
-  const _AccountIdentityCard({required this.identities});
-
-  final List<AuthIdentity> identities;
-
-  @override
-  Widget build(BuildContext context) {
-    return AscendCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Signed in with', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: AscendSpacing.xs),
-          for (final identity in identities)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(
-                '${_providerLabel(identity.provider)}'
-                '${identity.providerEmail != null ? ' · ${identity.providerEmail}' : ''}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          const SizedBox(height: AscendSpacing.xs),
-          Text(
-            'Linking Google and Apple accounts is coming soon.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _providerLabel(String provider) {
-    switch (provider) {
-      case 'GOOGLE':
-        return 'Google';
-      case 'APPLE':
-        return 'Apple';
-      default:
-        return 'Email';
-    }
-  }
-}
-
-/// Build Session 9 Part 4 — shown only while [AuthUser.emailVerifiedAt]
-/// is null. Resending never confirms whether the previous email arrived
-/// (the backend doesn't report delivery status), so the button always
-/// shows the same honest "on its way" confirmation.
-class _VerifyEmailBanner extends ConsumerStatefulWidget {
-  const _VerifyEmailBanner();
-
-  @override
-  ConsumerState<_VerifyEmailBanner> createState() => _VerifyEmailBannerState();
-}
-
-class _VerifyEmailBannerState extends ConsumerState<_VerifyEmailBanner> {
-  bool _isSending = false;
-
-  Future<void> _resend() async {
-    setState(() => _isSending = true);
-    try {
-      await ref.read(authControllerProvider.notifier).resendVerification();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'If your email is unverified, a new link is on its way.',
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isSending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AscendCard(
-      child: Row(
-        children: [
-          Icon(
-            Icons.mark_email_unread_outlined,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: AscendSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Verify your email', style: theme.textTheme.titleSmall),
-                Text(
-                  'Confirm your email address to secure your account.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AscendSpacing.sm),
-          AscendSecondaryButton(
-            label: 'Resend',
-            expand: false,
-            isLoading: _isSending,
-            onPressed: _isSending ? null : _resend,
-          ),
-        ],
-      ),
     );
   }
 }

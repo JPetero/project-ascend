@@ -485,6 +485,47 @@ describe('AuthService', () => {
     });
   });
 
+  describe('deleteAccount', () => {
+    it('rejects an incorrect password without touching the database', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        email: 'ada@example.com',
+        passwordHash: await argon2.hash('actual-current'),
+      });
+
+      await expect(authService.deleteAccount('user-1', 'wrong-password')).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('revokes every session and anonymizes the email on success', async () => {
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        status: 'ACTIVE',
+        email: 'ada@example.com',
+        passwordHash: await argon2.hash('actual-current'),
+      });
+
+      await authService.deleteAccount('user-1', 'actual-current');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      const updateArgs = prisma.user.update.mock.calls[0][0];
+      expect(updateArgs.where).toEqual({ id: 'user-1' });
+      expect(updateArgs.data.status).toBe('DELETED');
+      expect(updateArgs.data.email).toContain('@deleted.projectascend.invalid');
+      expect(updateArgs.data.email).not.toBe('ada@example.com');
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'auth.account_deleted' }),
+      );
+    });
+  });
+
   describe('logoutAll', () => {
     it('revokes every active token for the user and records an audit event distinct from reuse handling', async () => {
       prisma.refreshToken.updateMany.mockResolvedValue({ count: 3 });

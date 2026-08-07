@@ -1,10 +1,11 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Get } from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Post, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -109,5 +110,13 @@ export class AuthController {
   async resendVerification(@CurrentUser() user: AuthenticatedUser) {
     await this.authService.resendVerification(user.id);
     return { message: 'If your email is unverified, a new verification link is on its way.' };
+  }
+
+  @ApiBearerAuth()
+  @Delete('account')
+  @HttpCode(HttpStatus.OK)
+  async deleteAccount(@CurrentUser() user: AuthenticatedUser, @Body() dto: DeleteAccountDto) {
+    await this.authService.deleteAccount(user.id, dto.password);
+    return { message: 'Your account has been deleted.' };
   }
 }

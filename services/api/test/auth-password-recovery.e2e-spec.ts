@@ -240,4 +240,45 @@ describe('Password recovery & email verification (e2e)', () => {
       .send({ email: 'change-flow@example.com', password: 'ChangedPass1!' })
       .expect(200);
   });
+
+  it('delete-account requires the correct password, signs out every session, and frees the email for reuse', async () => {
+    const { tokens } = await register('delete-flow@example.com');
+    const auth = { Authorization: `Bearer ${tokens.accessToken}` };
+
+    await request(app.getHttpServer())
+      .delete('/auth/account')
+      .set(auth)
+      .send({ password: 'wrong-password' })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .delete('/auth/account')
+      .set(auth)
+      .send({ password: 'Str0ngPass!' })
+      .expect(200);
+
+    // The account can no longer log in...
+    await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'delete-flow@example.com', password: 'Str0ngPass!' })
+      .expect(401);
+
+    // ...and its pre-deletion access token is dead too (refresh revoked).
+    await request(app.getHttpServer())
+      .post('/auth/refresh')
+      .send({ refreshToken: tokens.refreshToken })
+      .expect(401);
+
+    // The now-anonymized email is free for a brand new registration.
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Ada',
+        email: 'delete-flow@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+  });
 });
