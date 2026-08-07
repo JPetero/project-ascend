@@ -7,12 +7,20 @@ import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthenticatedUser, JwtPayload, TokenPair } from './types/jwt-payload.type';
 
 const REFRESH_SECRET_BYTES = 32;
+const RESET_SECRET_BYTES = 32;
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Thrown internally when a rotation transaction loses the race to revoke a
@@ -38,6 +46,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly usersService: UsersService,
+    private readonly emailService: EmailService,
   ) {
     this.jwtConfig = this.configService.get<AppConfig>('app')!.jwt;
   }
@@ -80,8 +89,21 @@ export class AuthService {
       entityId: user.id,
     });
 
+    // Best-effort — a failed/unconfigured email provider must never block
+    // account creation. The user can always request a fresh verification
+    // email later via resendVerification().
+    await this.issueAndSendVerificationEmail(user.id, user.email).catch(() => undefined);
+
     const tokens = await this.issueTokenPair(user.id, user.email);
-    return { user: { id: user.id, email: user.email, role: user.role }, tokens };
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+      tokens,
+    };
   }
 
   async login(dto: LoginDto): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
@@ -105,7 +127,15 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokenPair(user.id, user.email, dto.deviceName);
-    return { user: { id: user.id, email: user.email, role: user.role }, tokens };
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+      tokens,
+    };
   }
 
   async refresh(refreshToken: string): Promise<TokenPair> {
@@ -227,7 +257,208 @@ export class AuthService {
     if (!this.usersService.isActive(user)) {
       throw new UnauthorizedException('Session is no longer valid.');
     }
-    return { id: user.id, email: user.email, role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      emailVerifiedAt: user.emailVerifiedAt,
+    };
+  }
+
+  /**
+   * Always resolves the same way regardless of whether the email belongs
+   * to an account — the same no-enumeration philosophy as login()'s
+   * collapsed "invalid email or password" message. Only internally
+   * branches on whether to actually generate and send a token.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<void> {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(normalizedEmail);
+    if (!user || !this.usersService.isActive(user)) {
+      return;
+    }
+
+    // Invalidate any prior outstanding reset token for this user before
+    // issuing a new one — the same compare-and-swap-flavored "only one
+    // live token at a time" spirit as refresh-token rotation.
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const secret = crypto.randomBytes(RESET_SECRET_BYTES).toString('hex');
+    const tokenHash = await argon2.hash(secret);
+    const record = await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
+
+    await this.auditService.record({
+      userId: user.id,
+      action: 'auth.password_reset_requested',
+      entityType: 'User',
+      entityId: user.id,
+    });
+
+    await this.emailService.sendPasswordResetEmail(user.email, `${record.id}.${secret}`);
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    if (dto.newPassword !== dto.confirmNewPassword) {
+      throw new ConflictException('Passwords do not match.');
+    }
+
+    const parsed = this.splitCompositeToken(dto.token);
+    if (!parsed) {
+      throw new UnauthorizedException('This reset link is invalid or has expired.');
+    }
+
+    const stored = await this.prisma.passwordResetToken.findUnique({ where: { id: parsed.id } });
+    if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('This reset link is invalid or has expired.');
+    }
+
+    const secretValid = await argon2.verify(stored.tokenHash, parsed.secret);
+    if (!secretValid) {
+      throw new UnauthorizedException('This reset link is invalid or has expired.');
+    }
+
+    const passwordHash = await argon2.hash(dto.newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.update({
+        where: { id: stored.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: stored.userId },
+        data: { passwordHash },
+      }),
+    ]);
+
+    await this.auditService.record({
+      userId: stored.userId,
+      action: 'auth.password_reset_completed',
+      entityType: 'User',
+      entityId: stored.userId,
+    });
+
+    // A password reset should end every other session — the same
+    // "sign out everywhere" logoutAll() used for the explicit user action.
+    await this.logoutAll(stored.userId);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    if (dto.newPassword !== dto.confirmNewPassword) {
+      throw new ConflictException('Passwords do not match.');
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!this.usersService.isActive(user)) {
+      throw new UnauthorizedException('Session is no longer valid.');
+    }
+
+    const currentValid = await argon2.verify(user.passwordHash, dto.currentPassword);
+    if (!currentValid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+
+    const passwordHash = await argon2.hash(dto.newPassword);
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.password_changed',
+      entityType: 'User',
+      entityId: userId,
+    });
+  }
+
+  async verifyEmail(dto: VerifyEmailDto): Promise<void> {
+    const parsed = this.splitCompositeToken(dto.token);
+    if (!parsed) {
+      throw new UnauthorizedException('This verification link is invalid or has expired.');
+    }
+
+    const stored = await this.prisma.emailVerificationToken.findUnique({
+      where: { id: parsed.id },
+    });
+    if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('This verification link is invalid or has expired.');
+    }
+
+    const secretValid = await argon2.verify(stored.tokenHash, parsed.secret);
+    if (!secretValid) {
+      throw new UnauthorizedException('This verification link is invalid or has expired.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.emailVerificationToken.update({
+        where: { id: stored.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: stored.userId },
+        data: { emailVerifiedAt: new Date() },
+      }),
+    ]);
+
+    await this.auditService.record({
+      userId: stored.userId,
+      action: 'auth.email_verified',
+      entityType: 'User',
+      entityId: stored.userId,
+    });
+  }
+
+  async resendVerification(userId: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!this.usersService.isActive(user) || user.emailVerifiedAt) {
+      return;
+    }
+
+    await this.issueAndSendVerificationEmail(user.id, user.email);
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.verification_email_resent',
+      entityType: 'User',
+      entityId: userId,
+    });
+  }
+
+  private async issueAndSendVerificationEmail(userId: string, email: string): Promise<void> {
+    await this.prisma.emailVerificationToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const secret = crypto.randomBytes(RESET_SECRET_BYTES).toString('hex');
+    const tokenHash = await argon2.hash(secret);
+    const record = await this.prisma.emailVerificationToken.create({
+      data: {
+        userId,
+        tokenHash,
+        expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+      },
+    });
+
+    await this.emailService.sendVerificationEmail(email, `${record.id}.${secret}`);
+  }
+
+  /** Same composite `id.secret` shape as refresh tokens, but returns null
+   * on malformed input instead of throwing — callers of reset/verification
+   * flows all collapse this into their own generic "invalid or expired"
+   * message rather than a parsing-specific one. */
+  private splitCompositeToken(raw: string): { id: string; secret: string } | null {
+    const separatorIndex = raw.indexOf('.');
+    if (separatorIndex <= 0 || separatorIndex === raw.length - 1) {
+      return null;
+    }
+    return { id: raw.slice(0, separatorIndex), secret: raw.slice(separatorIndex + 1) };
   }
 
   /**

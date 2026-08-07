@@ -10,6 +10,9 @@ const _publicPaths = [
   '/auth/register',
   '/auth/login',
   '/auth/refresh',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
   '/health',
 ];
 

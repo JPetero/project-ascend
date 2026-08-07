@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/achievements/presentation/screens/achievements_screen.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
+import '../../features/auth/presentation/screens/change_password_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/welcome_screen.dart';
@@ -106,6 +109,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.signIn,
         builder: (context, state) => const SignInScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.resetPassword,
+        builder: (context, state) => ResetPasswordScreen(
+          initialToken: state.uri.queryParameters['token'],
+        ),
+      ),
+      GoRoute(
+        path: RoutePaths.changePassword,
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
       GoRoute(
         path: RoutePaths.onboarding,
@@ -434,6 +451,8 @@ const _unauthenticatedPaths = {
   RoutePaths.welcome,
   RoutePaths.register,
   RoutePaths.signIn,
+  RoutePaths.forgotPassword,
+  RoutePaths.resetPassword,
 };
 const _shellPaths = {
   RoutePaths.workout,

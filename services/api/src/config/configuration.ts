@@ -21,7 +21,18 @@ export interface MediaConfig {
   s3PublicBaseUrl?: string;
 }
 
-export default (): { app: AppConfig; media: MediaConfig } => ({
+export interface EmailConfig {
+  provider: 'console' | 'smtp';
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPassword?: string;
+  fromAddress?: string;
+  fromName?: string;
+  appPublicUrl: string;
+}
+
+export default (): { app: AppConfig; media: MediaConfig; email: EmailConfig } => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
@@ -42,5 +53,15 @@ export default (): { app: AppConfig; media: MediaConfig } => ({
     s3AccessKeyId: process.env.MEDIA_S3_ACCESS_KEY_ID,
     s3SecretAccessKey: process.env.MEDIA_S3_SECRET_ACCESS_KEY,
     s3PublicBaseUrl: process.env.MEDIA_S3_PUBLIC_BASE_URL,
+  },
+  email: {
+    provider: (process.env.EMAIL_PROVIDER as 'console' | 'smtp') ?? 'console',
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined,
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+    fromAddress: process.env.EMAIL_FROM_ADDRESS,
+    fromName: process.env.EMAIL_FROM_NAME,
+    appPublicUrl: process.env.APP_PUBLIC_URL ?? 'https://app.projectascend.com',
   },
 });

@@ -186,6 +186,22 @@ class DashboardScreen extends ConsumerWidget {
                     _AccountIdentityCard(identities: identities),
                 orElse: () => const SizedBox.shrink(),
               ),
+              if (user != null && user.emailVerifiedAt == null) ...[
+                const SizedBox(height: AscendSpacing.sm),
+                const _VerifyEmailBanner(),
+              ],
+              const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
+                onTap: () => context.push(RoutePaths.changePassword),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock_outline),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Change password')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
               const SizedBox(height: AscendSpacing.sm),
               AscendCard(
                 onTap: () => Navigator.of(context).push(
@@ -1253,6 +1269,73 @@ class _AccountIdentityCard extends StatelessWidget {
       default:
         return 'Email';
     }
+  }
+}
+
+/// Build Session 9 Part 4 — shown only while [AuthUser.emailVerifiedAt]
+/// is null. Resending never confirms whether the previous email arrived
+/// (the backend doesn't report delivery status), so the button always
+/// shows the same honest "on its way" confirmation.
+class _VerifyEmailBanner extends ConsumerStatefulWidget {
+  const _VerifyEmailBanner();
+
+  @override
+  ConsumerState<_VerifyEmailBanner> createState() => _VerifyEmailBannerState();
+}
+
+class _VerifyEmailBannerState extends ConsumerState<_VerifyEmailBanner> {
+  bool _isSending = false;
+
+  Future<void> _resend() async {
+    setState(() => _isSending = true);
+    try {
+      await ref.read(authControllerProvider.notifier).resendVerification();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'If your email is unverified, a new link is on its way.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AscendCard(
+      child: Row(
+        children: [
+          Icon(
+            Icons.mark_email_unread_outlined,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Verify your email', style: theme.textTheme.titleSmall),
+                Text(
+                  'Confirm your email address to secure your account.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AscendSpacing.sm),
+          AscendSecondaryButton(
+            label: 'Resend',
+            expand: false,
+            isLoading: _isSending,
+            onPressed: _isSending ? null : _resend,
+          ),
+        ],
+      ),
+    );
   }
 }
 

@@ -13,6 +13,9 @@ export interface AuthenticatedUser {
   // suspension) takes effect on the very next request instead of
   // waiting for the token to expire.
   role: UserRole;
+  // Null until EmailVerificationToken confirmation (Build Session 9 Part
+  // 4) — lets the client show a "verify your email" prompt.
+  emailVerifiedAt: Date | null;
 }
 
 export interface TokenPair {
