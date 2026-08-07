@@ -78,6 +78,23 @@ const visionModules = [
 VisionModuleInfo visionModuleInfo(VisionModule module) =>
     visionModules.firstWhere((m) => m.module == module);
 
+/// Whether this mode's eventual analysis would need motion (video) or a
+/// single frame (photo) — Build Session 8 Part 16's camera foundation
+/// uses this to decide which capture flow to offer. Purely about what
+/// gets captured; still no analysis runs on the result.
+bool visionModuleCapturesVideo(VisionModule module) {
+  switch (module) {
+    case VisionModule.formCoach:
+    case VisionModule.repCounter:
+    case VisionModule.sportCapture:
+      return true;
+    case VisionModule.progressScan:
+    case VisionModule.foodScan:
+    case VisionModule.outfitGuidance:
+      return false;
+  }
+}
+
 String visionModuleIdOf(VisionModule module) => module.name;
 
 VisionModule? visionModuleFromId(String id) {
