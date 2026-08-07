@@ -4,9 +4,11 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
+import { AppleSignInDto } from './dto/apple-sign-in.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GoogleSignInDto } from './dto/google-sign-in.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -118,5 +120,21 @@ export class AuthController {
   async deleteAccount(@CurrentUser() user: AuthenticatedUser, @Body() dto: DeleteAccountDto) {
     await this.authService.deleteAccount(user.id, dto.password);
     return { message: 'Your account has been deleted.' };
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  signInWithGoogle(@Body() dto: GoogleSignInDto) {
+    return this.authService.signInWithGoogle(dto);
+  }
+
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post('apple')
+  @HttpCode(HttpStatus.OK)
+  signInWithApple(@Body() dto: AppleSignInDto) {
+    return this.authService.signInWithApple(dto);
   }
 }

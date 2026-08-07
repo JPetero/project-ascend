@@ -32,7 +32,23 @@ export interface EmailConfig {
   appPublicUrl: string;
 }
 
-export default (): { app: AppConfig; media: MediaConfig; email: EmailConfig } => ({
+export interface SocialAuthConfig {
+  // The OAuth client id issued to this app in Google Cloud Console — used
+  // to validate an incoming Google ID token's `aud` claim. Undefined
+  // means Google sign-in is not configured this environment.
+  googleClientId?: string;
+  // The Services ID / bundle id registered with Apple — used to validate
+  // an incoming Apple ID token's `aud` claim. Undefined means Apple
+  // sign-in is not configured this environment.
+  appleClientId?: string;
+}
+
+export default (): {
+  app: AppConfig;
+  media: MediaConfig;
+  email: EmailConfig;
+  socialAuth: SocialAuthConfig;
+} => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3000', 10),
@@ -63,5 +79,9 @@ export default (): { app: AppConfig; media: MediaConfig; email: EmailConfig } =>
     fromAddress: process.env.EMAIL_FROM_ADDRESS,
     fromName: process.env.EMAIL_FROM_NAME,
     appPublicUrl: process.env.APP_PUBLIC_URL ?? 'https://app.projectascend.com',
+  },
+  socialAuth: {
+    googleClientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
+    appleClientId: process.env.APPLE_CLIENT_ID,
   },
 });
