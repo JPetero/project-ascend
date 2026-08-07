@@ -28,6 +28,7 @@ import { HealthMetricsModule } from './modules/health-metrics/health-metrics.mod
 import { LegalModule } from './modules/legal/legal.module';
 import { MacroTargetsModule } from './modules/macro-targets/macro-targets.module';
 import { MediaModule } from './modules/media/media.module';
+import { MessagesModule } from './modules/messages/messages.module';
 import { MuscleGroupsModule } from './modules/muscle-groups/muscle-groups.module';
 import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module';
 import { PersonalRecordsModule } from './modules/personal-records/personal-records.module';
@@ -99,6 +100,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AdminModule,
     PromoteModule,
     MediaModule,
+    MessagesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

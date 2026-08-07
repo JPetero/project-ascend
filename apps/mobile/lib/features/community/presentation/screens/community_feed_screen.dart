@@ -6,6 +6,7 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../messages/presentation/providers/conversations_controller.dart';
 import '../providers/community_feed_controller.dart';
 import '../widgets/community_post_list_view.dart';
 
@@ -22,11 +23,23 @@ class CommunityFeedScreen extends ConsumerWidget {
     final state = ref.watch(communityFeedControllerProvider(null));
     final controller = ref.read(communityFeedControllerProvider(null).notifier);
     final userId = ref.watch(authControllerProvider.select((s) => s.user?.id));
+    final unreadMessages = ref.watch(
+      conversationsControllerProvider.select((s) => s.unreadCount),
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
         actions: [
+          IconButton(
+            icon: Badge(
+              isLabelVisible: unreadMessages > 0,
+              label: Text('$unreadMessages'),
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+            tooltip: 'Messages',
+            onPressed: () => context.push(RoutePaths.conversations),
+          ),
           IconButton(
             icon: const Icon(Icons.people_alt_outlined),
             tooltip: 'Friends',

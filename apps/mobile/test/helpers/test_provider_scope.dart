@@ -26,6 +26,7 @@ import 'package:mobile/features/nutrition/presentation/providers/saved_meal_cont
 import 'package:mobile/features/nutrition/presentation/providers/water_controller.dart';
 import 'package:mobile/core/media/presentation/providers/media_upload_controller.dart';
 import 'package:mobile/features/friends/presentation/providers/friends_controller.dart';
+import 'package:mobile/features/messages/presentation/providers/conversations_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
@@ -52,6 +53,7 @@ import 'fake_live_location_service.dart';
 import 'fake_friends_repository.dart';
 import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
+import 'fake_messages_repository.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_promote_repository.dart';
 import 'fake_rankings_repository.dart';
@@ -100,6 +102,7 @@ Future<ProviderContainer> createTestContainer({
   FakeMediaRepository? mediaRepository,
   FakeMediaPickerService? mediaPickerService,
   FakeFriendsRepository? friendsRepository,
+  FakeMessagesRepository? messagesRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -227,6 +230,9 @@ Future<ProviderContainer> createTestContainer({
       mediaFileReaderProvider.overrideWithValue(FakeMediaFileReader()),
       friendsRepositoryProvider.overrideWithValue(
         friendsRepository ?? FakeFriendsRepository(),
+      ),
+      messagesRepositoryProvider.overrideWithValue(
+        messagesRepository ?? FakeMessagesRepository(),
       ),
     ],
   );

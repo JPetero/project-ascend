@@ -23,6 +23,8 @@ import '../../features/challenges/presentation/screens/create_challenge_screen.d
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/messages/presentation/screens/conversation_detail_screen.dart';
+import '../../features/messages/presentation/screens/conversations_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
@@ -234,6 +236,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.friends,
         builder: (context, state) => const FriendsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.conversations,
+        builder: (context, state) => const ConversationsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.conversationDetail,
+        builder: (context, state) => ConversationDetailScreen(
+          conversationId: state.pathParameters['id']!,
+          otherUserId: state.extra as String?,
+        ),
       ),
       GoRoute(
         path: RoutePaths.trainerGroups,

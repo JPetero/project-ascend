@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../community/domain/community_profile.dart';
+import '../../../messages/presentation/providers/conversations_controller.dart';
 import '../providers/friends_controller.dart';
 import '../providers/user_search_controller.dart';
 
@@ -99,6 +102,12 @@ class _FriendsTab extends ConsumerWidget {
                     friend.displayName,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  tooltip: 'Message',
+                  onPressed: () =>
+                      _openConversation(context, ref, friend.userId),
                 ),
                 IconButton(
                   icon: const Icon(Icons.person_remove_outlined),
@@ -276,6 +285,21 @@ class _FindTabState extends ConsumerState<_FindTab> {
       ),
     );
   }
+}
+
+Future<void> _openConversation(
+  BuildContext context,
+  WidgetRef ref,
+  String friendUserId,
+) async {
+  final conversation = await ref
+      .read(conversationsControllerProvider.notifier)
+      .startConversation(friendUserId);
+  if (!context.mounted) return;
+  context.push(
+    RoutePaths.conversationDetailPath(conversation.id),
+    extra: friendUserId,
+  );
 }
 
 class _Avatar extends StatelessWidget {
