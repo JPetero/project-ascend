@@ -96,58 +96,63 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens               RefreshToken[]
-  profile                     Profile?
-  preference                  Preference?
-  equipment                   Equipment[]
-  workoutSchedule             WorkoutSchedule?
-  devices                     DeviceConnection[]
-  auditEvents                 AuditEvent[]
-  workoutPlans                WorkoutPlan[]
-  workoutSessions             WorkoutSession[]
-  personalRecords             PersonalRecord[]
-  syncOperations              SyncOperation[]
-  ownedFoods                  Food[]
-  mealEntries                 MealEntry[]
-  macroTarget                 MacroTarget?
-  waterEntries                WaterEntry[]
-  authIdentities              AuthIdentity[]
-  legalAcceptances            LegalAcceptance[]
-  deloadRecommendations       DeloadRecommendation[]
-  savedMeals                  SavedMeal[]
-  achievementAwards           AchievementAward[]
-  cardioSessions              CardioSession[]
-  healthMetricSamples         HealthMetricSample[]
-  healthSyncCursors           HealthSyncCursor[]
-  communityProfile            CommunityProfile?
-  communityPosts              CommunityPost[]
-  communityLikes              CommunityLike[]
-  communityComments           CommunityComment[]
-  communitySaves              CommunitySave[]
-  communityReports            CommunityReport[]
-  communityFollowing          CommunityFollow[]         @relation("CommunityFollower")
-  communityFollowers          CommunityFollow[]         @relation("CommunityFollowing")
-  communityBlocksMade         CommunityBlock[]          @relation("CommunityBlocker")
-  communityBlocksAgainst      CommunityBlock[]          @relation("CommunityBlocked")
-  ownedTrainerGroups          TrainerGroup[]
-  trainerGroupMembers         TrainerGroupMember[]
-  trainerGroupMessages        TrainerGroupMessage[]
-  trainerGroupInvitesSent     TrainerGroupInvitation[]  @relation("TrainerGroupInviter")
-  trainerGroupInvitesReceived TrainerGroupInvitation[]  @relation("TrainerGroupInvitee")
-  trainerGroupSharedPlans     TrainerGroupSharedPlan[]
-  rankingOptIn                RankingOptIn?
-  createdChallenges           Challenge[]
-  challengeParticipations     ChallengeParticipant[]
-  subscription                UserSubscription?
-  affordabilityEligibility    AffordabilityEligibility?
-  supportTickets              SupportTicket[]
-  supportTicketReplies        SupportTicketReply[]
-  promotedCampaigns           PromotedCampaign[]
-  mediaAssets                 MediaAsset[]
-  friendRequestsSent          FriendRequest[]           @relation("FriendRequestSender")
-  friendRequestsReceived      FriendRequest[]           @relation("FriendRequestRecipient")
-  friendshipsAsUserA          Friendship[]              @relation("FriendshipUserA")
-  friendshipsAsUserB          Friendship[]              @relation("FriendshipUserB")
+  refreshTokens                    RefreshToken[]
+  profile                          Profile?
+  preference                       Preference?
+  equipment                        Equipment[]
+  workoutSchedule                  WorkoutSchedule?
+  devices                          DeviceConnection[]
+  auditEvents                      AuditEvent[]
+  workoutPlans                     WorkoutPlan[]
+  workoutSessions                  WorkoutSession[]
+  personalRecords                  PersonalRecord[]
+  syncOperations                   SyncOperation[]
+  ownedFoods                       Food[]
+  mealEntries                      MealEntry[]
+  macroTarget                      MacroTarget?
+  waterEntries                     WaterEntry[]
+  authIdentities                   AuthIdentity[]
+  legalAcceptances                 LegalAcceptance[]
+  deloadRecommendations            DeloadRecommendation[]
+  savedMeals                       SavedMeal[]
+  achievementAwards                AchievementAward[]
+  cardioSessions                   CardioSession[]
+  healthMetricSamples              HealthMetricSample[]
+  healthSyncCursors                HealthSyncCursor[]
+  communityProfile                 CommunityProfile?
+  communityPosts                   CommunityPost[]
+  communityLikes                   CommunityLike[]
+  communityComments                CommunityComment[]
+  communitySaves                   CommunitySave[]
+  communityReports                 CommunityReport[]
+  communityFollowing               CommunityFollow[]               @relation("CommunityFollower")
+  communityFollowers               CommunityFollow[]               @relation("CommunityFollowing")
+  communityBlocksMade              CommunityBlock[]                @relation("CommunityBlocker")
+  communityBlocksAgainst           CommunityBlock[]                @relation("CommunityBlocked")
+  ownedTrainerGroups               TrainerGroup[]
+  trainerGroupMembers              TrainerGroupMember[]
+  trainerGroupMessages             TrainerGroupMessage[]
+  trainerGroupInvitesSent          TrainerGroupInvitation[]        @relation("TrainerGroupInviter")
+  trainerGroupInvitesReceived      TrainerGroupInvitation[]        @relation("TrainerGroupInvitee")
+  trainerGroupSharedPlans          TrainerGroupSharedPlan[]
+  rankingOptIn                     RankingOptIn?
+  createdChallenges                Challenge[]
+  challengeParticipations          ChallengeParticipant[]
+  subscription                     UserSubscription?
+  affordabilityEligibility         AffordabilityEligibility?
+  supportTickets                   SupportTicket[]
+  supportTicketReplies             SupportTicketReply[]
+  promotedCampaigns                PromotedCampaign[]
+  mediaAssets                      MediaAsset[]
+  friendRequestsSent               FriendRequest[]                 @relation("FriendRequestSender")
+  friendRequestsReceived           FriendRequest[]                 @relation("FriendRequestRecipient")
+  friendshipsAsUserA               Friendship[]                    @relation("FriendshipUserA")
+  friendshipsAsUserB               Friendship[]                    @relation("FriendshipUserB")
+  directConversationsStarted       DirectConversation[]            @relation("DirectConversationInitiator")
+  directConversationParticipations DirectConversationParticipant[]
+  directMessagesSent               DirectMessage[]
+  messageReceipts                  MessageReceipt[]
+  messageReports                   MessageReport[]
 
   @@index([status])
   @@map("users")
@@ -1860,11 +1865,12 @@ model MediaAsset {
   deletedAt           DateTime?
   retentionState      MediaRetentionState  @default(ACTIVE)
 
-  owner             User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  upload            MediaUpload?
-  variants          MediaVariant[]
-  usages            MediaUsage[]
-  moderationResults MediaModerationResult[]
+  owner              User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  upload             MediaUpload?
+  variants           MediaVariant[]
+  usages             MediaUsage[]
+  moderationResults  MediaModerationResult[]
+  messageAttachments MessageAttachment[]
 
   @@index([ownerId, createdAt])
   @@index([moderationState])
@@ -1986,4 +1992,134 @@ model Friendship {
   @@unique([userAId, userBId])
   @@index([userBId])
   @@map("friendships")
+}
+
+// --- Direct Messaging (Build Session 8 Part 8). Database-first — a
+// message is durable the moment it's written; a realtime WebSocket
+// gateway (see modules/messages/messages.gateway.ts) pushes new-message
+// events to connected clients as a convenience layer, never a
+// requirement (the Flutter client also polls, per the "do not require
+// realtime transport for messages to remain durable" rule). A
+// conversation with someone the caller isn't friends with starts as a
+// PENDING "message request" — the initiator may send exactly one
+// message before the recipient explicitly accepts/declines, which is
+// how "no unrestricted attachment spam" is actually enforced.
+
+enum DirectConversationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model DirectConversation {
+  id            String                   @id @default(uuid())
+  status        DirectConversationStatus @default(ACCEPTED)
+  initiatorId   String
+  createdAt     DateTime                 @default(now())
+  lastMessageAt DateTime?
+
+  initiator    User                            @relation("DirectConversationInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  participants DirectConversationParticipant[]
+  messages     DirectMessage[]
+
+  @@map("direct_conversations")
+}
+
+model DirectConversationParticipant {
+  id             String    @id @default(uuid())
+  conversationId String
+  userId         String
+  mutedAt        DateTime?
+  // "Delete for self" — hides the conversation for this participant
+  // only; a new incoming message clears it so the thread reappears
+  // rather than silently vanishing forever.
+  deletedAt      DateTime?
+  lastReadAt     DateTime?
+
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("direct_conversation_participants")
+}
+
+enum DirectMessageType {
+  TEXT
+  IMAGE
+  WORKOUT_SHARE
+  MEAL_SHARE
+  ACHIEVEMENT_SHARE
+  CARDIO_SHARE
+}
+
+model DirectMessage {
+  id                String            @id @default(uuid())
+  conversationId    String
+  senderId          String
+  type              DirectMessageType @default(TEXT)
+  body              String?           @db.Text
+  replyToId         String?
+  // For a *_SHARE type — the id of the WorkoutSession/MealEntry/
+  // AchievementAward/CardioSession being shared. The recipient's client
+  // resolves it through that module's own read endpoint; nothing here
+  // duplicates the shared record's data.
+  sharedReferenceId String?
+  createdAt         DateTime          @default(now())
+  deletedAt         DateTime?
+
+  conversation DirectConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      DirectMessage?      @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      DirectMessage[]     @relation("MessageReply")
+  attachments  MessageAttachment[]
+  receipts     MessageReceipt[]
+  reports      MessageReport[]
+
+  @@index([conversationId, createdAt])
+  @@map("direct_messages")
+}
+
+model MessageAttachment {
+  id           String   @id @default(uuid())
+  messageId    String
+  mediaAssetId String
+  createdAt    DateTime @default(now())
+
+  message    DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mediaAsset MediaAsset    @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@map("message_attachments")
+}
+
+enum MessageReceiptStatus {
+  DELIVERED
+  READ
+}
+
+model MessageReceipt {
+  id        String               @id @default(uuid())
+  messageId String
+  userId    String
+  status    MessageReceiptStatus
+  at        DateTime             @default(now())
+
+  message DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, status])
+  @@map("message_receipts")
+}
+
+model MessageReport {
+  id         String   @id @default(uuid())
+  messageId  String
+  reporterId String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  message  DirectMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporter User          @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@map("message_reports")
 }

@@ -72,6 +72,10 @@ abstract final class RoutePaths {
   // distinct from Community Follow (see Friendship's own doc comment on
   // the backend schema).
   static const friends = '/social/friends';
+  // Direct Messaging — Build Session 8 Part 8.
+  static const conversations = '/messages';
+  static const conversationDetail = '/messages/:id';
+  static String conversationDetailPath(String id) => '/messages/$id';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
