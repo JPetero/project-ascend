@@ -9,7 +9,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthIdentitiesModule } from './modules/auth-identities/auth-identities.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { CardioModule } from './modules/cardio/cardio.module';
+import { ChallengesModule } from './modules/challenges/challenges.module';
 import { CommunityModule } from './modules/community/community.module';
+import { RankingsModule } from './modules/rankings/rankings.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { DeloadModule } from './modules/deload/deload.module';
@@ -83,6 +85,8 @@ import { PrismaModule } from './prisma/prisma.module';
     CardioModule,
     CommunityModule,
     TrainerGroupsModule,
+    RankingsModule,
+    ChallengesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

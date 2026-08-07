@@ -807,3 +807,154 @@ reachable, so `docker compose build`/`up -d`/`ps` were not attempted.
   has only OWNER/MEMBER; announcements, scheduled sessions, assignments,
   and a MODERATOR/TRAINER role are Scenario 24's explicitly-deferred
   Premium-future list.
+
+## Part 6 — Rankings seasons and Challenges MVP
+
+Commit: `Implement optional Rankings seasons and challenges MVP`
+
+### What this part is
+
+Opt-in-only Rankings leaderboards and time-boxed, join-by-choice
+Challenges — Founder Scenario 16a. Off by default: with no opt-in row,
+a user appears on zero leaderboards and no leaderboard is fetchable at
+all. Scoring is deliberately never a raw-volume or streak-only metric —
+Scenario 16a's explicit constraint — so it can't reward one dangerous,
+oversized session or punish a single missed day after a long streak.
+
+### Backend: a shared non-gameable scoring utility
+
+`common/scoring/activity-scoring.util.ts`'s `computeActivitySummary`
+is the single source of truth both Rankings and Challenges score
+against. It buckets a user's completed workout sessions, cardio
+sessions, and meal entries into UTC calendar days over a date range,
+then awards 1 point per active day, plus a variety bonus (capped at 2
+points/day total) for logging in 2+ of the 3 domains the same day.
+Ten workouts in one day still count as exactly one active day — this
+is asserted directly in `activity-scoring.util.spec.ts` (7 tests) so
+the non-gameable guarantee has a named, permanent test rather than
+living only in a docstring.
+
+### Backend: `rankings` module
+
+New Prisma models: `RankingOptIn` (unique on `userId` — one row per
+user, `scope` FRIENDS/REGION/GLOBAL, an optional user-typed
+`regionLabel` — never an exact coordinate) and `RankingSeason`
+(`getOrCreateCurrentSeason` lazily creates a season spanning the
+current UTC calendar month the first time anyone asks — no admin
+scheduling UI needed for this MVP). `RankingsService.getLeaderboard`
+throws `ForbiddenException` if the viewer has no opt-in row at all,
+and `BadRequestException` for a REGION request unless the viewer's own
+opt-in is REGION-scoped with a `regionLabel` set — a viewer can only
+see a regional board they're actually part of. FRIENDS resolves
+against the existing Community `CommunityFollow` graph (one-way, not
+mutual) rather than a new parallel friend model. This MVP simplifies
+Scenario 16a's local/city/region/state/national/global granularity
+down to three scopes — an explicit, documented scope reduction, not an
+oversight.
+
+### Backend: `challenges` module
+
+New Prisma models: `Challenge` (creator, title, description, a
+startsAt/endsAt window) and `ChallengeParticipant` (unique on
+`challengeId + userId`). Creating a challenge auto-joins the creator.
+`listDiscoverable` excludes challenges already joined and any that
+have ended. `getById` gates per-participant progress the same way
+Community gates blocked-user visibility: a non-participant gets
+`participants: null` rather than an error, so the endpoint's shape
+never leaks who's ahead to someone who hasn't joined. `join` is
+idempotent (joining twice is a no-op, not an error) and rejects a
+challenge that has already ended; `delete` is creator-only. Progress
+per participant is `activeDays`/`totalDays` computed via the same
+`computeActivitySummary`, over the challenge's own window (clamped to
+"now" if the challenge is still running) — identical non-gameable
+guarantee as Rankings.
+
+### Flutter: `rankings` and `challenges` features
+
+`RankingsScreen` replaces the Leaderboards tab's coming-soon
+placeholder (`RoutePaths.leaderboards`, path unchanged from the
+pre-rename tab per the existing route-stability convention). With no
+opt-in, it shows an honest opt-in prompt — a `SegmentedButton` for
+FRIENDS/REGION/GLOBAL plus a region text field gated to REGION — never
+a leaderboard. Once opted in, a `SegmentedButton` scope switcher (with
+REGION disabled unless the viewer actually opted in with REGION) drives
+`RankingsController`, which lazily fetches the leaderboard only for
+the selected scope. `ChallengesScreen` (Mine/Discover tabs, reachable
+via a "Challenges" icon in the Rankings app bar, matching the Trainer
+Groups entry-point pattern from Part 5) and `ChallengeDetailScreen`
+(join/leave/delete, per-participant progress once joined) round out
+the feature. `CreateChallengeScreen` uses Flutter's built-in
+`showDateRangePicker` rather than two separate date fields.
+
+### Integration points
+
+Reachable from the Rankings tab (already the sixth bottom-nav
+destination since the Scenario 21 rename — no new nav item added).
+FRIENDS scope reuses Community's follow graph; leaderboard and
+challenge-progress entries reuse `CommunityProfile` for display
+name/avatar, the same pattern Trainer Groups used in Part 5. Scoring
+itself is shared code, not reimplemented per module.
+
+### Tests
+
+Backend: `activity-scoring.util.spec.ts` (7 tests),
+`rankings.service.spec.ts` (9 tests), `challenges.service.spec.ts` (10
+tests), `rankings.e2e-spec.ts` (9 tests over real HTTP — default-off
+status, 403 before opting in, region-requires-regionLabel validation,
+a real logged cardio session contributing exactly one activity-day
+point, the GLOBAL board excluding a never-opted-in user and never
+containing a lat/lng/latitude/longitude match anywhere in the response
+body, REGION rejected for a non-REGION viewer, FRIENDS including a
+followed+opted-in user, and opting out revoking leaderboard access
+again), `challenges.e2e-spec.ts` (8 tests — window validation,
+auto-join on create, the discover/mine split from both the creator's
+and a stranger's point of view, progress hidden from a non-participant
+plus a 404 for a made-up id, join-idempotency and the discover→mine
+transition, join rejected on an already-ended challenge, leave, and
+delete permission plus the 404 after).
+
+Flutter: `rankings_controller_test.dart` (4 tests — default-off with no
+fetch, opt-in loading the chosen scope's board, opt-out clearing it,
+and a REGION switch without a region opt-in surfacing an error rather
+than crashing), `rankings_screen_test.dart` (2 widget tests — the
+opt-in prompt, and a populated leaderboard), `challenges_controller_test.dart`
+(2 tests — initial mine/discover load, join moving a challenge between
+lists), `challenge_detail_controller_test.dart` (2 tests — load with
+participant progress, leave), `challenges_screen_test.dart` (2 widget
+tests — empty state, a listed challenge's participant count).
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name rankings_seasons_challenges_mvp` applied against the
+same local Postgres used for Parts 3–5 (the daemon had stopped again
+between parts in this environment and was restarted with `sudo service
+postgresql start`), `npx tsc --noEmit` clean, `npx eslint
+"{src,test}/**/*.ts" --max-warnings=0` clean, `npx jest --silent` → 269
+tests passed (was 243), `npx jest --config ./test/jest-e2e.json
+--silent` → 110 tests passed (was 93), `npx nest build` clean.
+
+Flutter: `dart format --set-exit-if-changed .` clean, `flutter analyze`
+→ "No issues found!", `flutter test` → 284 tests passed (was 272).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. No Docker
+daemon reachable, so `docker compose build`/`up -d`/`ps` were not
+attempted.
+
+### Known scope decisions
+
+- **Three ranking scopes, not six.** FRIENDS/REGION/GLOBAL instead of
+  Scenario 16a's full local/city/region/state/national/global
+  granularity — an explicit MVP simplification, documented in
+  `parking-lot.md`.
+- **No seasonal rewards or badges.** A season tracks a label and a
+  points/active-days total only; cosmetic season-end rewards are not
+  implemented.
+- **No challenge invitations.** Challenges are discoverable and
+  joinable by anyone, not invite-only — there is no
+  "invite a friend to this challenge" affordance yet.
+- **No push notifications for challenge milestones or leaderboard rank
+  changes.** Both screens are pull/refresh-based only in this MVP.

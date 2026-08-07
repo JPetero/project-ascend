@@ -125,6 +125,9 @@ model User {
   trainerGroupInvitesSent     TrainerGroupInvitation[] @relation("TrainerGroupInviter")
   trainerGroupInvitesReceived TrainerGroupInvitation[] @relation("TrainerGroupInvitee")
   trainerGroupSharedPlans     TrainerGroupSharedPlan[]
+  rankingOptIn                RankingOptIn?
+  createdChallenges           Challenge[]
+  challengeParticipations     ChallengeParticipant[]
 
   @@index([status])
   @@map("users")
@@ -1456,4 +1459,86 @@ model TrainerGroupSharedPlan {
 
   @@unique([groupId, workoutPlanId])
   @@map("trainer_group_shared_plans")
+}
+
+// --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by
+// default: no RankingOptIn row at all means "private progress only",
+// the scenario's default state. This MVP simplifies the scenario's
+// full local/city/region/state/national/global granularity down to
+// three scopes (FRIENDS/REGION/GLOBAL) — see
+// packages/docs/build-session-7.md Part 6 for that scope decision.
+// Scoring deliberately never rewards raw volume (weight lifted,
+// calories burned) or an uninterrupted streak alone — see
+// RankingsService's activity-day scoring for how that's enforced.
+// `regionLabel` is the same coarse, user-typed, non-GPS field pattern
+// CardioSession.regionLabel already established — never an exact
+// coordinate.
+
+enum RankingScope {
+  FRIENDS
+  REGION
+  GLOBAL
+}
+
+model RankingOptIn {
+  id          String       @id @default(uuid())
+  userId      String       @unique
+  scope       RankingScope
+  regionLabel String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ranking_opt_ins")
+}
+
+// A season is just a scoring window — there is no reward/badge system
+// yet (Scenario 16a specifies none). `getOrCreateCurrentSeason` in
+// RankingsService lazily creates a rolling calendar-month season rather
+// than requiring an admin to schedule seasons ahead of time.
+model RankingSeason {
+  id        String   @id @default(uuid())
+  label     String
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  @@index([startsAt, endsAt])
+  @@map("ranking_seasons")
+}
+
+// A simple, time-boxed, opt-in-by-joining challenge — any user may
+// create one. Progress is measured the same non-gameable "active days"
+// way as Rankings (see RankingsService.computeActivitySummary), not by
+// any raw-volume metric.
+model Challenge {
+  id          String   @id @default(uuid())
+  creatorId   String
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  createdAt   DateTime @default(now())
+
+  creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  participants ChallengeParticipant[]
+
+  @@index([creatorId])
+  @@index([endsAt])
+  @@map("challenges")
+}
+
+model ChallengeParticipant {
+  id          String   @id @default(uuid())
+  challengeId String
+  userId      String
+  joinedAt    DateTime @default(now())
+
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+  @@index([userId])
+  @@map("challenge_participants")
 }

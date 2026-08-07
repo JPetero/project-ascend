@@ -8,7 +8,9 @@ import 'package:mobile/features/auth/presentation/providers/auth_controller.dart
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/cardio_session_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
+import 'package:mobile/features/challenges/presentation/providers/challenges_controller.dart';
 import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
+import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
@@ -33,11 +35,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
+import 'fake_challenges_repository.dart';
 import 'fake_community_repository.dart';
 import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
+import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
 import 'fake_trainer_groups_repository.dart';
 import 'fake_workout_repositories.dart';
@@ -70,6 +74,8 @@ Future<ProviderContainer> createTestContainer({
   FakeHealthMetricsRepository? healthMetricsRepository,
   FakeCommunityRepository? communityRepository,
   FakeTrainerGroupsRepository? trainerGroupsRepository,
+  FakeRankingsRepository? rankingsRepository,
+  FakeChallengesRepository? challengesRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -166,6 +172,12 @@ Future<ProviderContainer> createTestContainer({
       ),
       trainerGroupsRepositoryProvider.overrideWithValue(
         trainerGroupsRepository ?? FakeTrainerGroupsRepository(),
+      ),
+      rankingsRepositoryProvider.overrideWithValue(
+        rankingsRepository ?? FakeRankingsRepository(),
+      ),
+      challengesRepositoryProvider.overrideWithValue(
+        challengesRepository ?? FakeChallengesRepository(),
       ),
     ],
   );

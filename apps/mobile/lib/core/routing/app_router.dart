@@ -17,12 +17,15 @@ import '../../features/community/presentation/screens/create_post_screen.dart';
 import '../../features/community/presentation/screens/edit_community_profile_screen.dart';
 import '../../features/community/presentation/screens/post_detail_screen.dart';
 import '../../features/community/presentation/screens/saved_posts_screen.dart';
+import '../../features/challenges/presentation/screens/challenge_detail_screen.dart';
+import '../../features/challenges/presentation/screens/challenges_screen.dart';
+import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
-import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
+import '../../features/rankings/presentation/screens/rankings_screen.dart';
 import '../../features/nutrition/domain/meal_type.dart';
 import '../../features/nutrition/presentation/screens/custom_food_editor_screen.dart';
 import '../../features/nutrition/presentation/screens/food_search_screen.dart';
@@ -206,6 +209,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) =>
             TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
       ),
+      GoRoute(
+        path: RoutePaths.challenges,
+        builder: (context, state) => const ChallengesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.challengeCreate,
+        builder: (context, state) => const CreateChallengeScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.challengeDetail,
+        builder: (context, state) =>
+            ChallengeDetailScreen(challengeId: state.pathParameters['id']!),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -246,7 +262,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: RoutePaths.leaderboards,
-                builder: (context, state) => const LeaderboardsScreen(),
+                builder: (context, state) => const RankingsScreen(),
               ),
             ],
           ),

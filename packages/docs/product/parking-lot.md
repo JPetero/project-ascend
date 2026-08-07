@@ -19,8 +19,14 @@ actually in scope for the current session.
   an externally-hosted URL), a moderation review queue/admin UI (Part
   10), and native device-share-sheet sharing of achievements/posts out
   of the app.
-- **Leaderboards** — ships as an honest coming-soon state. Real ranking
-  requires a real activity/points model that doesn't exist yet.
+- **Leaderboards** — superseded by Build Session 7 Part 6: the Rankings
+  tab now has a real opt-in-only FRIENDS/REGION/GLOBAL leaderboard plus
+  time-boxed, join-by-choice Challenges — see `build-session-7.md` Part
+  6. Scoring is a non-gameable "active days" model (never raw volume,
+  never a streak alone), matching Scenario 16a's constraint. Still a
+  deliberate simplification: 3 scopes instead of Scenario 16a's full
+  local/city/region/state/national/global granularity, and no seasonal
+  rewards/badges beyond the season's point total.
 - **Subscriptions/payment processing** — the capability model
   (`free-premium-policy.md`) is ready to receive a `PlanTier`, but no
   billing integration, receipt validation, or store integration exists.

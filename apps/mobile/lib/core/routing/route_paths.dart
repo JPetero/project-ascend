@@ -36,6 +36,13 @@ abstract final class RoutePaths {
   static const trainerGroupCreate = '/social/groups/new';
   static const trainerGroupDetail = '/social/groups/:id';
 
+  // Challenges — Founder Scenario 21, reachable from the Rankings tab.
+  // Opt-in Rankings itself lives at [leaderboards] with no separate push
+  // route (it's the tab body).
+  static const challenges = '/leaderboards/challenges';
+  static const challengeCreate = '/leaderboards/challenges/new';
+  static const challengeDetail = '/leaderboards/challenges/:id';
+
   static const dashboard = '/dashboard';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
@@ -67,6 +74,8 @@ abstract final class RoutePaths {
   static String communityProfilePath(String userId) =>
       '/social/profile/$userId';
   static String trainerGroupDetailPath(String id) => '/social/groups/$id';
+  static String challengeDetailPath(String id) =>
+      '/leaderboards/challenges/$id';
 
   static String exerciseDetailPath(String id) => '/exercise-library/$id';
   static String workoutDetailPath(String id) => '/workout-catalog/$id';
