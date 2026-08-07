@@ -124,6 +124,23 @@ class AuthRepository {
     await _tokenStorage.clear();
   }
 
+  /// Revokes every refresh token for this account, including this
+  /// device's — the server-side effect ends every session at once, so
+  /// the caller must treat this exactly like [logout] locally too.
+  Future<void> logoutAllSessions() async {
+    await _apiClient.post('/auth/logout-all', (data) => data);
+    await _tokenStorage.clear();
+  }
+
+  Future<void> deleteAccount(String password) async {
+    await _apiClient.delete(
+      '/auth/account',
+      (data) => data,
+      data: {'password': password},
+    );
+    await _tokenStorage.clear();
+  }
+
   Future<AuthUser> _persistSessionAndReturnUser(
     Map<String, dynamic> payload,
   ) async {

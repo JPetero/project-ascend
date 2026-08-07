@@ -166,6 +166,35 @@ class AuthController extends StateNotifier<AuthState> {
     await _repository.resendVerification();
   }
 
+  /// Revokes every session, including this device's — the server-side
+  /// effect signs this device out too, so treat it exactly like [logout].
+  Future<void> signOutEverywhere() async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      await _repository.logoutAllSessions();
+      await _database.clearAll();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    } catch (_) {
+      state = state.copyWith(isSubmitting: false);
+      rethrow;
+    }
+  }
+
+  /// Closes the account and signs out locally. Rethrows on failure (e.g.
+  /// an incorrect password) so the caller can show the error — the local
+  /// session must stay intact until the server confirms deletion.
+  Future<void> deleteAccount(String password) async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      await _repository.deleteAccount(password);
+      await _database.clearAll();
+      state = const AuthState(status: AuthStatus.unauthenticated);
+    } catch (_) {
+      state = state.copyWith(isSubmitting: false);
+      rethrow;
+    }
+  }
+
   /// Called when [ApiClient] reports a failed token refresh.
   Future<void> handleSessionExpired() async {
     if (state.status != AuthStatus.authenticated) return;

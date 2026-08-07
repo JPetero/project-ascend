@@ -6,7 +6,11 @@ abstract final class RoutePaths {
   // Password recovery / email verification — Build Session 9 Part 4.
   static const forgotPassword = '/forgot-password';
   static const resetPassword = '/reset-password';
-  static const changePassword = '/account/change-password';
+  // Account & Security Center — Build Session 9 Part 5/6. ChangePassword/
+  // DeleteAccount are reached by a plain Navigator.push from this screen
+  // (WearableConnectionsScreen's established pattern), not separate
+  // go_router paths.
+  static const accountSecurity = '/account/security';
   static const onboarding = '/onboarding';
 
   // Primary six-destination navigation (product order — see

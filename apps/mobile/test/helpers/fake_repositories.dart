@@ -35,6 +35,8 @@ class FakeAuthRepository extends AuthRepository {
   String? lastResetPasswordToken;
   bool changePasswordCalled = false;
   bool resendVerificationCalled = false;
+  bool signOutEverywhereCalled = false;
+  String? lastDeleteAccountPassword;
   bool throwOnNextCall = false;
 
   @override
@@ -121,6 +123,30 @@ class FakeAuthRepository extends AuthRepository {
   @override
   Future<void> resendVerification() async {
     resendVerificationCalled = true;
+  }
+
+  @override
+  Future<void> logoutAllSessions() async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Something went wrong.',
+        code: 'UNKNOWN',
+      );
+    }
+    signOutEverywhereCalled = true;
+    await _tokenStorage.clear();
+  }
+
+  @override
+  Future<void> deleteAccount(String password) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Current password is incorrect.',
+        code: 'UNKNOWN',
+      );
+    }
+    lastDeleteAccountPassword = password;
+    await _tokenStorage.clear();
   }
 }
 

@@ -154,9 +154,10 @@ class ApiClient {
 
   Future<ResponseEnvelope<T>> delete<T>(
     String path,
-    T Function(dynamic) fromData,
-  ) {
-    return _request(() => _dio.delete(path), fromData);
+    T Function(dynamic) fromData, {
+    Object? data,
+  }) {
+    return _request(() => _dio.delete(path, data: data), fromData);
   }
 
   Future<ResponseEnvelope<T>> _request<T>(
