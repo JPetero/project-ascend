@@ -7,8 +7,10 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// Renders a widget (an [AchievementShareCard], wrapped in a
+/// Renders a widget (a [ShareCardRenderer], wrapped in a
 /// [RepaintBoundary]) to a PNG and hands it to the native OS share sheet.
+/// Generalized in Build Session 9 Part 3 — this has never been
+/// achievement-specific; only the caller decides what to render.
 ///
 /// Not implemented: automated posting directly to Instagram. Meta's
 /// Content Publishing API requires a Business/Creator account and app
@@ -46,7 +48,7 @@ class DefaultAscendShareService implements AscendShareService {
   Future<File> _writeTempFile(Uint8List bytes) async {
     final dir = await getTemporaryDirectory();
     final file = File(
-      '${dir.path}/ascend-achievement-${DateTime.now().millisecondsSinceEpoch}.png',
+      '${dir.path}/ascend-share-${DateTime.now().millisecondsSinceEpoch}.png',
     );
     return file.writeAsBytes(bytes);
   }

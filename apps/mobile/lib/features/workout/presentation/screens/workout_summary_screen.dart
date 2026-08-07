@@ -6,6 +6,8 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/progress/progress_util.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../profile/presentation/providers/profile_controller.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/personal_record.dart';
 import '../providers/workout_history_controller.dart';
 import '../providers/workout_session_controller.dart';
@@ -163,6 +165,33 @@ class _WorkoutSummaryScreenState extends ConsumerState<WorkoutSummaryScreen> {
               ),
             ),
             const SizedBox(height: AscendSpacing.md),
+            AscendSecondaryButton(
+              label: 'Share this workout',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => ShareContentScreen(
+                    content: ShareContent(
+                      type: ShareContentType.workoutSummary,
+                      title: 'Workout complete',
+                      subtitle:
+                          '$exerciseCount exercises · ${nonWarmupSets.length} sets',
+                      statLines: [
+                        ShareStatLine(
+                          label: 'Duration',
+                          value: _formatDuration(session.activeDurationSeconds),
+                        ),
+                        ShareStatLine(
+                          label: 'Volume',
+                          value: '${totalVolume.toStringAsFixed(0)} kg',
+                          sensitive: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AscendSpacing.sm),
             AscendSecondaryButton(
               label: 'View my progress',
               onPressed: () => context.push(RoutePaths.dashboard),
