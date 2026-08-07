@@ -33,6 +33,16 @@
 	     an active session, per user-scenario-bible.md. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ascend uses your location only while you're recording a live cardio session, to track your route, distance, and pace. Your route stays private by default.</string>
+	<!-- Media Platform (Build Session 8 Part 3) — requested only when you
+	     choose to take a photo/video (a Community post, profile photo,
+	     meal photo, progress photo, or Vision capture). Never runs in the
+	     background. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Ascend uses your camera only when you choose to take a photo or video — for a Community post, your profile, a meal or progress photo, or a Vision capture.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ascend uses your microphone only when you choose to record a video with sound, such as a Community Reel.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ascend uses your photo library only when you choose to select an existing photo or video to attach.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

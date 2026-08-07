@@ -8,6 +8,11 @@
          outside an active session" rule. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Media Platform (Build Session 8 Part 3) — requested only when the
+         user chooses to take a photo/video via image_picker. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="mobile"
         android:name="${applicationName}"
