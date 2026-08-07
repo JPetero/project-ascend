@@ -22,7 +22,8 @@ void main() {
   );
 
   testWidgets(
-    'a Premium-tier user sees the honest coming-soon state, not a fake preview',
+    'a Premium-tier user sees the modular shell listing every future mode, '
+    'not a fake preview',
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
@@ -31,7 +32,12 @@ void main() {
         ),
       );
 
-      expect(find.text('Vision is on its way'), findsOneWidget);
+      expect(find.text('Form Coach'), findsOneWidget);
+      expect(find.text('Rep Counter'), findsOneWidget);
+      expect(find.text('Progress Scan'), findsOneWidget);
+      expect(find.text('Food Scan'), findsOneWidget);
+      expect(find.text('Sport Capture'), findsOneWidget);
+      expect(find.text('Outfit Guidance'), findsOneWidget);
       expect(find.text('Vision is a Premium destination'), findsNothing);
     },
   );

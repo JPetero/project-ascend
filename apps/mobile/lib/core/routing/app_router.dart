@@ -34,6 +34,8 @@ import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
+import '../../features/vision/domain/vision_module.dart';
+import '../../features/vision/presentation/screens/vision_module_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
 import '../../features/wearables/presentation/screens/connected_health_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
@@ -145,6 +147,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.subscription,
         builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.visionModuleDetail,
+        builder: (context, state) {
+          final moduleId = state.pathParameters['moduleId']!;
+          final module = visionModuleFromId(moduleId) ?? VisionModule.formCoach;
+          return VisionModuleScreen(module: module);
+        },
       ),
       GoRoute(
         path: RoutePaths.connectedHealth,

@@ -113,9 +113,16 @@ extension points exist.
   (Meal Prep's existing balanced-guidance rules); the explicit budget/
   ingredient-availability prompt and anti-stereotyping copy review is
   still open.
-- **Premium camera and computer vision (17)** — explicitly deferred, full
-  safety-rail requirements documented in `user-scenario-bible.md` and
-  `wellness-ethics-bible.md` ahead of any build.
+- **Premium camera and computer vision (17)** — the camera/computer-
+  vision processing itself is still explicitly deferred per Scenario
+  17's "do not implement this milestone." Build Session 7 Part 8 added
+  the honest modular shell around that future work — a real capability
+  gate plus a real, single-source-of-truth list of the six future modes
+  (Form Coach, Rep Counter, Progress Scan, Food Scan, Sport Capture,
+  Outfit Guidance), each its own honest not-yet-built placeholder — see
+  `build-session-7.md` Part 8. Full safety-rail requirements remain
+  documented in `user-scenario-bible.md` and `wellness-ethics-bible.md`
+  ahead of any real camera build.
 - **Richer companion voice (18)** — premium voice conversation; free
   deterministic dialogue is what exists today and stays free.
 - **Assistant research mode with citations (19)** — live web-backed

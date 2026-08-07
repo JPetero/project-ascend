@@ -45,6 +45,13 @@ abstract final class RoutePaths {
 
   static const dashboard = '/dashboard';
   static const subscription = '/subscription';
+
+  // Premium Vision modular shell — Founder Scenario 21/free-premium-
+  // policy.md. Pushed on top of the Vision tab, same "pushed, not a
+  // nested tab route" pattern as Workout Engine/Meal Prep above.
+  static const visionModuleDetail = '/vision/modules/:moduleId';
+  static String visionModuleDetailPath(String moduleId) =>
+      '/vision/modules/$moduleId';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

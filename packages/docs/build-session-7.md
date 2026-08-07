@@ -1083,3 +1083,91 @@ attempted.
 - **Pricing is read-only display, not a checkout flow.** The Membership
   screen shows the centralized non-final numbers; it does not attempt
   any store integration.
+
+## Part 8 — Premium Vision modular shell
+
+Commit: `Build Premium Vision modular shell`
+
+### What this part is
+
+Scenario 17 ("Premium camera and computer vision") is explicit: **"do
+not implement this milestone"** — full safety-rail requirements are
+documented ahead of any real build, precisely so a future
+implementation doesn't retrofit them. This part respects that boundary
+literally: it builds the honest navigation architecture — a modular
+shell — around the six future camera-based modes, without a single
+line of camera capture, ML inference, or image-processing code
+anywhere in it. Flutter-only; no backend endpoint was warranted since
+there is no dynamic data behind the shell yet (the module list is
+static config, the same category of "single source of truth, never a
+literal" file as `pricing.config.ts`, just client-side since nothing
+server-side reads or writes it).
+
+### Flutter: `vision` feature
+
+`features/vision/domain/vision_module.dart` defines the `VisionModule`
+enum and a `visionModules` list — id, title, one-line summary, and icon
+for each of Form Coach, Rep Counter, Progress Scan, Food Scan, Sport
+Capture, and Outfit Guidance, mapped directly from Scenario 17's
+"potential future scanner modes" (exercise-form estimation, repetition
+counting, body-region visualization/progress comparison, food
+recognition/ingredient confirmation, fashion analysis) plus Scenario
+25's camera-assisted sports-scoring suggestion. `VisionScreen` keeps its
+existing capability gate (`AppCapability.visionAccess`) exactly as
+before — a Free account still sees the honest locked state, unchanged.
+A Premium account now sees a list of all six modes instead of one
+generic "on its way" message, each an `AscendCard` that pushes
+`VisionModuleScreen(module: ...)`. That screen is a per-mode honest
+placeholder: it names the mode, restates its one-line summary, states
+plainly that no camera capture or analysis runs yet, and previews two
+of Scenario 17's actual hard requirements (confidence/limitations on
+every result, explicit consent every time) as a forward commitment —
+never phrased as something already happening.
+
+### Integration points
+
+Reachable only through the existing Vision tab's capability gate — no
+new nav destination, no new route outside the already-established
+"pushed on top of the shell" pattern (`RoutePaths.visionModuleDetail =
+'/vision/modules/:moduleId'`, alongside Trainer Groups/Challenges/
+Subscription's same pattern). `visionModuleFromId` gracefully falls
+back to `VisionModule.formCoach` for an unrecognized id rather than
+crashing on a stale or malformed deep link, consistent with the app's
+existing `_RouteNotFoundScreen` philosophy of never crashing on bad
+navigation state.
+
+### Tests
+
+Flutter: `vision_screen_test.dart` updated (2 tests — the Free-tier
+locked state is unchanged; the Premium-tier test now asserts all six
+mode titles render and the old single-message copy does not),
+`vision_module_screen_test.dart` (2 tests — a mode's honest not-yet-
+built copy renders, and `visionModuleFromId` resolves a known id and
+returns null for an unknown one).
+
+### Commands run and results
+
+No backend changes this part — the existing backend suite (279 unit
+/ 115 e2e / clean build) is unaffected and was not re-run standalone;
+it's covered again in the Final verification pass.
+
+Flutter: `dart format --set-exit-if-changed .` clean, `flutter analyze`
+→ "No issues found!", `flutter test` → 290 tests passed (was 288).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted.
+
+### Known scope decisions
+
+- **Zero camera code.** No `camera` package dependency, no image
+  capture, no on-device or server-side inference anywhere in this part
+  — fully consistent with Scenario 17's explicit deferral.
+- **Static module list, no backend endpoint.** Nothing server-side
+  governs which modes exist or their availability yet; if that ever
+  needs to be admin-configurable, it becomes real backend work at that
+  point, not now.
+- **No per-mode entitlement granularity.** All six modes share the
+  single `AppCapability.visionAccess` gate; Scenario 17 doesn't call
+  for finer-grained gating and none was invented.
