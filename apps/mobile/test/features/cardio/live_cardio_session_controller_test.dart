@@ -189,6 +189,56 @@ void main() {
     expect(repository.list(), completion(isEmpty));
   });
 
+  test('pause() leaves pausedForBackground false', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await controller.start(CardioActivityType.run);
+
+    await controller.pause();
+
+    expect(controller.state!.isTracking, isFalse);
+    expect(controller.state!.pausedForBackground, isFalse);
+  });
+
+  test(
+    'pauseForBackground() stops the GPS subscription and marks the reason honestly',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await controller.start(CardioActivityType.run);
+
+      await controller.pauseForBackground();
+
+      expect(controller.state!.isTracking, isFalse);
+      expect(controller.state!.pausedForBackground, isTrue);
+
+      // A fix emitted while backgrounded must not be recorded either.
+      locationService.emit(
+        LiveLocationFix(
+          latitude: 14.6,
+          longitude: 121.0,
+          accuracyMeters: 5,
+          timestamp: DateTime.now(),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state!.routePoints, isEmpty);
+    },
+  );
+
+  test('resume() clears pausedForBackground once tracking resumes', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await controller.start(CardioActivityType.run);
+    await controller.pauseForBackground();
+    expect(controller.state!.pausedForBackground, isTrue);
+
+    await controller.resume();
+
+    expect(controller.state!.isTracking, isTrue);
+    expect(controller.state!.pausedForBackground, isFalse);
+  });
+
   test(
     'interrupted-session recovery — a session never finished before the app restarted is restored, paused',
     () async {
@@ -222,6 +272,9 @@ void main() {
       // Recovered sessions always land paused — never silently resume
       // tracking on app launch.
       expect(afterRestart.state!.isTracking, isFalse);
+      // The process dying stops tracking just as much as backgrounding
+      // does, so it gets the same honest messaging on recovery.
+      expect(afterRestart.state!.pausedForBackground, isTrue);
     },
   );
 

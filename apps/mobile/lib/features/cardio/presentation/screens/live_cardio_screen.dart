@@ -23,7 +23,8 @@ class LiveCardioScreen extends ConsumerStatefulWidget {
   ConsumerState<LiveCardioScreen> createState() => _LiveCardioScreenState();
 }
 
-class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen> {
+class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen>
+    with WidgetsBindingObserver {
   CardioActivityType _activityType = CardioActivityType.run;
   bool _starting = false;
   Timer? _ticker;
@@ -31,6 +32,7 @@ class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Live duration/pace are derived from wall-clock time, not a stored
     // counter — this just forces a rebuild once a second so they visibly
     // tick while tracking.
@@ -41,8 +43,27 @@ class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     super.dispose();
+  }
+
+  // Location is never tracked in the background (see
+  // GeolocatorLiveLocationService's doc comment) — Build Session 8 Part
+  // 13 makes leaving the app honest instead of silent: a tracking
+  // session auto-pauses the moment the app is backgrounded, and
+  // LiveCardioSessionState.pausedForBackground carries that reason
+  // through to the UI so the user finds out why their run stopped
+  // recording rather than discovering a shorter route than expected.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.paused) return;
+    final session = ref.read(liveCardioSessionControllerProvider);
+    if (session != null && session.isTracking) {
+      ref
+          .read(liveCardioSessionControllerProvider.notifier)
+          .pauseForBackground();
+    }
   }
 
   Future<void> _start() async {
@@ -279,6 +300,24 @@ class _TrackingView extends StatelessWidget {
             ],
           ),
         ),
+        if (!session.isTracking && session.pausedForBackground) ...[
+          const SizedBox(height: AscendSpacing.md),
+          AscendCard(
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                const SizedBox(width: AscendSpacing.sm),
+                const Expanded(
+                  child: Text(
+                    "Paused because Ascend was in the background — "
+                    'location is never tracked while the app is closed. '
+                    'Tap Resume to keep going.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: AscendSpacing.lg),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
