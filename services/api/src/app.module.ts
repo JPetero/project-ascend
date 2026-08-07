@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { CardioModule } from './modules/cardio/cardio.module';
 import { ChallengesModule } from './modules/challenges/challenges.module';
 import { CommunityModule } from './modules/community/community.module';
+import { DataExportModule } from './modules/data-export/data-export.module';
 import { RankingsModule } from './modules/rankings/rankings.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
@@ -109,6 +110,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SportsModule,
     NutritionLibraryModule,
     NotificationsModule,
+    DataExportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

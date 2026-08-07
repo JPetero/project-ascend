@@ -43,6 +43,7 @@ import '../../features/nutrition_library/presentation/screens/nutrition_library_
 import '../../features/nutrition_library/presentation/screens/saved_nutrient_articles_screen.dart';
 import '../../features/notifications/presentation/screens/notification_preferences_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_inbox_screen.dart';
+import '../../features/data_export/presentation/screens/data_export_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/promote/presentation/screens/campaign_detail_screen.dart';
@@ -194,6 +195,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.notificationPreferences,
         builder: (context, state) => const NotificationPreferencesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.dataExport,
+        builder: (context, state) => const DataExportScreen(),
       ),
       GoRoute(
         path: RoutePaths.connectedHealth,

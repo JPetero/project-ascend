@@ -88,6 +88,8 @@ abstract final class RoutePaths {
   // Notifications and reminders — Build Session 8 Part 12.
   static const notificationsInbox = '/notifications';
   static const notificationPreferences = '/notifications/preferences';
+  // Data export — Build Session 8 Part 14.
+  static const dataExport = '/account/data-export';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
