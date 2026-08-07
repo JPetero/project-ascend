@@ -68,6 +68,45 @@ void main() {
   });
 
   test(
+    'setFollowingOnly switches to the Following feed mode and refreshes',
+    () async {
+      repository.posts.addAll([
+        samplePost(id: 'mine', authorId: 'me', isOwnPost: true),
+        samplePost(id: 'followed', authorId: 'followed-author'),
+        samplePost(id: 'stranger', authorId: 'stranger-author'),
+      ]);
+      repository.followedUserIds.add('followed-author');
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.posts, hasLength(3));
+
+      await controller.setFollowingOnly(true);
+
+      expect(repository.lastFollowingOnly, isTrue);
+      expect(controller.state.posts.map((p) => p.id).toSet(), {
+        'mine',
+        'followed',
+      });
+    },
+  );
+
+  test(
+    'setFollowingOnly is a no-op when already at the requested value',
+    () async {
+      repository.posts.add(samplePost(id: 'a'));
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      repository.lastFollowingOnly = null;
+
+      await controller.setFollowingOnly(false);
+
+      expect(repository.lastFollowingOnly, isNull);
+    },
+  );
+
+  test(
     'toggleLike applies optimistically and matches the repository afterward',
     () async {
       repository.posts.add(

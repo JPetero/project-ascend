@@ -62,11 +62,26 @@ class CommunityFeedController extends StateNotifier<CommunityFeedState> {
   final bool savedOnly;
   static const _limit = 20;
   int _page = 1;
+  bool followingOnly = false;
 
   Future<List<CommunityPost>> _fetch(int page) {
     return savedOnly
         ? _repository.listSaved(page: page, limit: _limit)
-        : _repository.listFeed(page: page, limit: _limit, authorId: authorId);
+        : _repository.listFeed(
+            page: page,
+            limit: _limit,
+            authorId: authorId,
+            followingOnly: followingOnly,
+          );
+  }
+
+  /// Switches between "Discover" (own + any PUBLIC + followed
+  /// FOLLOWERS-only posts) and "Following" (own + followed-author posts
+  /// only) — Build Session 8 Part 4.
+  Future<void> setFollowingOnly(bool value) async {
+    if (followingOnly == value) return;
+    followingOnly = value;
+    await refresh();
   }
 
   Future<void> refresh() async {
@@ -158,6 +173,14 @@ class CommunityFeedController extends StateNotifier<CommunityFeedState> {
     } catch (error) {
       state = state.copyWith(posts: previous, error: error.toString());
     }
+  }
+
+  Future<void> reportPost(String postId, String reason) async {
+    await _repository.report(
+      targetType: 'POST',
+      targetId: postId,
+      reason: reason,
+    );
   }
 
   void _replace(CommunityPost updated) {

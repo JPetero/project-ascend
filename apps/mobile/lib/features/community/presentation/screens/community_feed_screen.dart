@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
@@ -57,17 +58,49 @@ class CommunityFeedScreen extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
       body: SafeArea(
-        child: CommunityPostListView(
-          state: state,
-          onRefresh: controller.refresh,
-          onLoadMore: controller.loadMore,
-          onLike: (post) => controller.toggleLike(post.id),
-          onSave: (post) => controller.toggleSave(post.id),
-          onDelete: (post) => controller.removePost(post.id),
-          onTapPost: (post) =>
-              context.push(RoutePaths.communityPostDetailPath(post.id)),
-          onTapAuthor: (post) =>
-              context.push(RoutePaths.communityProfilePath(post.authorId)),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AscendSpacing.md,
+                AscendSpacing.sm,
+                AscendSpacing.md,
+                0,
+              ),
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Discover')),
+                  ButtonSegment(value: true, label: Text('Following')),
+                ],
+                selected: {controller.followingOnly},
+                onSelectionChanged: (selected) =>
+                    controller.setFollowingOnly(selected.first),
+              ),
+            ),
+            Expanded(
+              child: CommunityPostListView(
+                state: state,
+                onRefresh: controller.refresh,
+                onLoadMore: controller.loadMore,
+                onLike: (post) => controller.toggleLike(post.id),
+                onSave: (post) => controller.toggleSave(post.id),
+                onDelete: (post) => controller.removePost(post.id),
+                onReport: (post, reason) =>
+                    controller.reportPost(post.id, reason),
+                onTapPost: (post) =>
+                    context.push(RoutePaths.communityPostDetailPath(post.id)),
+                onTapAuthor: (post) => context.push(
+                  RoutePaths.communityProfilePath(post.authorId),
+                ),
+                emptyTitle: controller.followingOnly
+                    ? 'Nobody you follow has posted yet'
+                    : 'No posts yet',
+                emptyMessage: controller.followingOnly
+                    ? 'Follow more members to see their posts here, or switch to Discover.'
+                    : 'Follow other members or share your own workout, progress, or a quick Reel to get started.',
+              ),
+            ),
+          ],
         ),
       ),
     );

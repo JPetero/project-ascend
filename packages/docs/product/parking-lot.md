@@ -153,8 +153,14 @@ architecture-only below).
   likes, comments, saves, follows, reports, blocks, per-post
   visibility, creator/trainer profiles, plus an admin queue that lists
   OPEN reports and can mark a reported post REMOVED — see
-  `build-session-7.md` Part 10). Still pending: in-app capture/upload
-  for IMAGE/VIDEO posts and native external sharing.
+  `build-session-7.md` Part 10). **In-app capture/upload, real
+  playback, a Following/Discover feed toggle, and reporting a post
+  from the feed implemented in Build Session 8 Part 4** — posts now
+  attach a real uploaded `MediaAsset` (Media Platform, Part 2) instead
+  of requiring an externally-hosted URL, and a VIDEO/"Reel" post plays
+  through a real video player in the feed. Still pending: native
+  external sharing (Build Session 8 Part 5) and a dedicated full-screen
+  vertical swipe Reel viewer (today Reels play inline in the feed).
 - **Ascend Promote (23)** — **MVP implemented in Part 11** (Premium
   creators submit a campaign promoting one of their own Community
   posts; every campaign starts PENDING_REVIEW and only an admin can

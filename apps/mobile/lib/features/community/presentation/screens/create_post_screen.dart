@@ -3,15 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/media/domain/media_type.dart';
+import '../../../../core/media/presentation/widgets/media_attachment_picker.dart';
 import '../../domain/community_post.dart';
 import '../providers/community_feed_controller.dart';
 
 /// Creates a post, including a Reel (VIDEO media type + a caption — see
-/// CommunityPostMediaType's doc comment). There is no in-app camera/photo
-/// picker or upload pipeline yet (see
-/// packages/docs/build-session-7.md Part 4's platform-limitations
-/// section) — IMAGE/VIDEO posts require an already-hosted URL, which this
-/// screen says plainly rather than pretending to offer a capture flow.
+/// CommunityPostMediaType's doc comment). Build Session 8 Part 4 wires
+/// real in-app capture/upload through the shared Media Platform
+/// ([MediaAttachmentPicker]) instead of requiring an externally-hosted
+/// URL — see build-session-7.md Part 4 for the prior, honest
+/// URL-only state this replaces.
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
 
@@ -21,23 +23,26 @@ class CreatePostScreen extends ConsumerStatefulWidget {
 
 class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _captionController = TextEditingController();
-  final _mediaUrlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   CommunityPostMediaType _mediaType = CommunityPostMediaType.text;
   CommunityVisibility _visibility = CommunityVisibility.public;
   bool _isTrainerContent = false;
   bool _isSubmitting = false;
   String? _submitError;
+  String? _mediaAssetId;
 
   @override
   void dispose() {
     _captionController.dispose();
-    _mediaUrlController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_mediaType != CommunityPostMediaType.text && _mediaAssetId == null) {
+      setState(() => _submitError = 'Attach a photo or video first.');
+      return;
+    }
     setState(() {
       _isSubmitting = true;
       _submitError = null;
@@ -47,9 +52,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           .read(communityRepositoryProvider)
           .createPost(
             mediaType: _mediaType,
-            mediaUrl: _mediaType == CommunityPostMediaType.text
+            mediaAssetId: _mediaType == CommunityPostMediaType.text
                 ? null
-                : _mediaUrlController.text.trim(),
+                : _mediaAssetId,
             caption: _captionController.text.trim().isEmpty
                 ? null
                 : _captionController.text.trim(),
@@ -102,31 +107,25 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     ),
                   ],
                   selected: {_mediaType},
-                  onSelectionChanged: (selected) =>
-                      setState(() => _mediaType = selected.first),
+                  onSelectionChanged: (selected) => setState(() {
+                    _mediaType = selected.first;
+                    _mediaAssetId = null;
+                  }),
                 ),
                 if (_mediaType != CommunityPostMediaType.text) ...[
                   const SizedBox(height: AscendSpacing.md),
-                  AscendTextField(
-                    controller: _mediaUrlController,
-                    label: isReel ? 'Video URL' : 'Photo URL',
-                    keyboardType: TextInputType.url,
-                    validator: (value) {
-                      final uri = Uri.tryParse(value?.trim() ?? '');
-                      if (value == null ||
-                          value.trim().isEmpty ||
-                          uri == null ||
-                          !uri.hasScheme) {
-                        return 'Enter a valid URL — there is no in-app upload yet';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: AscendSpacing.xs),
-                  Text(
-                    'Ascend has no in-app camera or upload flow yet — paste a URL from your own '
-                    'hosting for now.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  MediaAttachmentPicker(
+                    key: ValueKey(_mediaType),
+                    mediaType: isReel
+                        ? AscendMediaType.communityReel
+                        : AscendMediaType.communityImage,
+                    allowVideo: isReel,
+                    maxVideoDuration: isReel
+                        ? const Duration(seconds: 90)
+                        : null,
+                    onCompleted: (mediaAssetId) =>
+                        setState(() => _mediaAssetId = mediaAssetId),
+                    onRemoved: () => setState(() => _mediaAssetId = null),
                   ),
                 ],
                 const SizedBox(height: AscendSpacing.md),

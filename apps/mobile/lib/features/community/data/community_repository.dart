@@ -46,6 +46,7 @@ class CommunityRepository {
   Future<CommunityPost> createPost({
     CommunityPostMediaType mediaType = CommunityPostMediaType.text,
     String? mediaUrl,
+    String? mediaAssetId,
     String? caption,
     CommunityVisibility visibility = CommunityVisibility.public,
     bool isTrainerContent = false,
@@ -56,6 +57,7 @@ class CommunityRepository {
       data: {
         'mediaType': communityPostMediaTypeToJson(mediaType),
         'mediaUrl': ?mediaUrl,
+        'mediaAssetId': ?mediaAssetId,
         'caption': ?caption,
         'visibility': communityVisibilityToJson(visibility),
         'isTrainerContent': isTrainerContent,
@@ -68,11 +70,17 @@ class CommunityRepository {
     int page = 1,
     int limit = 20,
     String? authorId,
+    bool followingOnly = false,
   }) async {
     final envelope = await _apiClient.get(
       '/community/posts',
       (data) => data as Map<String, dynamic>,
-      query: {'page': page, 'limit': limit, 'authorId': ?authorId},
+      query: {
+        'page': page,
+        'limit': limit,
+        'authorId': ?authorId,
+        if (followingOnly) 'followingOnly': true,
+      },
     );
     final items = envelope.data!['data'] as List<dynamic>;
     return items
