@@ -25,6 +25,7 @@ import 'package:mobile/features/nutrition/presentation/providers/nutrition_summa
 import 'package:mobile/features/nutrition/presentation/providers/saved_meal_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/water_controller.dart';
 import 'package:mobile/core/media/presentation/providers/media_upload_controller.dart';
+import 'package:mobile/features/friends/presentation/providers/friends_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
@@ -48,6 +49,7 @@ import 'fake_community_repository.dart';
 import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
+import 'fake_friends_repository.dart';
 import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
 import 'fake_nutrition_repositories.dart';
@@ -97,6 +99,7 @@ Future<ProviderContainer> createTestContainer({
   FakePromoteRepository? promoteRepository,
   FakeMediaRepository? mediaRepository,
   FakeMediaPickerService? mediaPickerService,
+  FakeFriendsRepository? friendsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -222,6 +225,9 @@ Future<ProviderContainer> createTestContainer({
         mediaPickerService ?? FakeMediaPickerService(),
       ),
       mediaFileReaderProvider.overrideWithValue(FakeMediaFileReader()),
+      friendsRepositoryProvider.overrideWithValue(
+        friendsRepository ?? FakeFriendsRepository(),
+      ),
     ],
   );
 

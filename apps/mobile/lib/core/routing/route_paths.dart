@@ -68,6 +68,10 @@ abstract final class RoutePaths {
   static const promoteCampaignCreate = '/social/promote/new';
   static const promoteCampaignDetail = '/social/promote/:id';
   static String promoteCampaignDetailPath(String id) => '/social/promote/$id';
+  // Friends — Build Session 8 Part 7. Reachable from the Community tab;
+  // distinct from Community Follow (see Friendship's own doc comment on
+  // the backend schema).
+  static const friends = '/social/friends';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

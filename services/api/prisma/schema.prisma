@@ -144,6 +144,10 @@ model User {
   supportTicketReplies        SupportTicketReply[]
   promotedCampaigns           PromotedCampaign[]
   mediaAssets                 MediaAsset[]
+  friendRequestsSent          FriendRequest[]           @relation("FriendRequestSender")
+  friendRequestsReceived      FriendRequest[]           @relation("FriendRequestRecipient")
+  friendshipsAsUserA          Friendship[]              @relation("FriendshipUserA")
+  friendshipsAsUserB          Friendship[]              @relation("FriendshipUserB")
 
   @@index([status])
   @@map("users")
@@ -1934,4 +1938,52 @@ model MediaModerationResult {
 
   @@index([mediaAssetId, createdAt])
   @@map("media_moderation_results")
+}
+
+// --- Friendship system (Build Session 8 Part 7). Deliberately separate
+// from CommunityFollow — following is one-directional and public-facing
+// (a creator/audience relationship); a Friendship is mutual, gates
+// direct messaging without a message request (Part 8), and gates
+// friend-only joint workout invites (Part 9). Nothing here
+// auto-converts a follow into a friendship.
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
+}
+
+model FriendRequest {
+  id          String              @id @default(uuid())
+  senderId    String
+  recipientId String
+  status      FriendRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  respondedAt DateTime?
+
+  sender    User @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("FriendRequestRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, status])
+  @@index([senderId, status])
+  @@map("friend_requests")
+}
+
+// Undirected — always stored with userAId < userBId (see
+// common/friendship/friendship-pair.util.ts) so a unique constraint on
+// the pair actually prevents a duplicate row in either direction.
+model Friendship {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+
+  userA User @relation("FriendshipUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("FriendshipUserB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+  @@map("friendships")
 }

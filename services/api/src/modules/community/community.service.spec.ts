@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { Test } from '@nestjs/testing';
 import { CommunityReportTargetType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FriendsService } from '../friends/friends.service';
 import { MediaService } from '../media/media.service';
 import { CommunityService } from './community.service';
 
@@ -39,6 +40,7 @@ describe('CommunityService', () => {
     getObjectUrl: jest.Mock;
     attachUsage: jest.Mock;
   };
+  let friendsService: { severTies: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -56,12 +58,14 @@ describe('CommunityService', () => {
       getObjectUrl: jest.fn().mockReturnValue('/media/objects/key.jpg'),
       attachUsage: jest.fn(),
     };
+    friendsService = { severTies: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         CommunityService,
         { provide: PrismaService, useValue: prisma },
         { provide: MediaService, useValue: mediaService },
+        { provide: FriendsService, useValue: friendsService },
       ],
     }).compile();
 
