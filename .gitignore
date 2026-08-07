@@ -23,6 +23,13 @@ services/api/prisma/migrations/dev/
 # Local media storage (LocalDevelopmentStorageProvider) — never commit uploads
 services/api/storage/
 
+# Admin web app (Vite)
+apps/admin/dist/
+apps/admin/node_modules/
+apps/admin/coverage/
+apps/admin/.env
+apps/admin/*.tsbuildinfo
+
 # Flutter / Dart
 apps/mobile/.dart_tool/
 apps/mobile/.flutter-plugins

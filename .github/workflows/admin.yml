@@ -1,0 +1,38 @@
+name: Admin CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --filter @project-ascend/admin... --frozen-lockfile
+
+      - name: Lint
+        run: pnpm admin:lint
+
+      - name: Tests
+        run: pnpm admin:test
+
+      - name: Build
+        run: pnpm admin:build

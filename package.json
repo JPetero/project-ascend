@@ -12,6 +12,10 @@
     "api:lint": "pnpm --filter @project-ascend/api lint",
     "api:prisma:generate": "pnpm --filter @project-ascend/api prisma:generate",
     "api:prisma:migrate": "pnpm --filter @project-ascend/api prisma:migrate",
+    "admin:dev": "pnpm --filter @project-ascend/admin dev",
+    "admin:build": "pnpm --filter @project-ascend/admin build",
+    "admin:test": "pnpm --filter @project-ascend/admin test",
+    "admin:lint": "pnpm --filter @project-ascend/admin lint",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
