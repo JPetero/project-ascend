@@ -8,6 +8,7 @@ import 'package:mobile/features/auth/presentation/providers/auth_controller.dart
 import 'package:mobile/features/auth/presentation/providers/auth_identity_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/cardio_session_controller.dart';
 import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
+import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
@@ -31,6 +32,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
+import 'fake_community_repository.dart';
 import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
@@ -64,6 +66,7 @@ Future<ProviderContainer> createTestContainer({
   FakeLiveLocationService? liveLocationService,
   FakeHealthAdapter? healthAdapter,
   FakeHealthMetricsRepository? healthMetricsRepository,
+  FakeCommunityRepository? communityRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -154,6 +157,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       healthMetricsRepositoryProvider.overrideWithValue(
         healthMetricsRepository ?? FakeHealthMetricsRepository(),
+      ),
+      communityRepositoryProvider.overrideWithValue(
+        communityRepository ?? FakeCommunityRepository(),
       ),
     ],
   );

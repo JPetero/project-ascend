@@ -1,0 +1,534 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  CommunityComment,
+  CommunityModerationStatus,
+  CommunityPost,
+  CommunityVisibility,
+  Prisma,
+} from '@prisma/client';
+import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateCommunityCommentDto } from './dto/create-community-comment.dto';
+import { CreateCommunityPostDto } from './dto/create-community-post.dto';
+import { CreateCommunityReportDto } from './dto/create-community-report.dto';
+import { QueryCommunityPostsDto } from './dto/query-community-posts.dto';
+import { UpsertCommunityProfileDto } from './dto/upsert-community-profile.dto';
+
+const PROFILE_SELECT = {
+  userId: true,
+  displayName: true,
+  bio: true,
+  avatarUrl: true,
+  isTrainer: true,
+} as const;
+
+type ProfileSummary = Prisma.CommunityProfileGetPayload<{ select: typeof PROFILE_SELECT }>;
+
+/**
+ * Community profiles, posts (including Reels — a VIDEO post is just a
+ * post, see CommunityPostMediaType), likes, comments, saves, follows,
+ * blocks, and reports — Founder Scenario 21's MVP. See
+ * packages/docs/build-session-7.md Part 4 and
+ * packages/docs/product/user-scenario-bible.md for the full policy this
+ * implements: no fake engagement, no automatic external-platform
+ * publishing, moderation-before-promotion (Ascend Promote is a later
+ * part; this module only carries the moderationStatus field it will
+ * need), and blocking severs any existing follow in both directions.
+ */
+@Injectable()
+export class CommunityService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  // --- Profiles ---------------------------------------------------------
+
+  async upsertOwnProfile(userId: string, dto: UpsertCommunityProfileDto) {
+    const profile = await this.prisma.communityProfile.upsert({
+      where: { userId },
+      update: {
+        displayName: dto.displayName,
+        bio: dto.bio,
+        avatarUrl: dto.avatarUrl,
+        ...(dto.isTrainer !== undefined ? { isTrainer: dto.isTrainer } : {}),
+      },
+      create: {
+        userId,
+        displayName: dto.displayName,
+        bio: dto.bio,
+        avatarUrl: dto.avatarUrl,
+        isTrainer: dto.isTrainer ?? false,
+      },
+      select: PROFILE_SELECT,
+    });
+    return profile;
+  }
+
+  async getProfile(viewerId: string, targetUserId: string) {
+    await this.assertNotBlockedEitherWay(viewerId, targetUserId);
+
+    const profile = await this.prisma.communityProfile.findUnique({
+      where: { userId: targetUserId },
+      select: PROFILE_SELECT,
+    });
+    if (!profile) {
+      throw new NotFoundException('Community profile not found.');
+    }
+
+    const [postCount, followerCount, followingCount, isFollowedByViewer] = await Promise.all([
+      this.prisma.communityPost.count({
+        where: { authorId: targetUserId, moderationStatus: CommunityModerationStatus.APPROVED },
+      }),
+      this.prisma.communityFollow.count({ where: { followingId: targetUserId } }),
+      this.prisma.communityFollow.count({ where: { followerId: targetUserId } }),
+      viewerId === targetUserId
+        ? Promise.resolve(false)
+        : this.prisma.communityFollow
+            .findUnique({
+              where: {
+                followerId_followingId: { followerId: viewerId, followingId: targetUserId },
+              },
+            })
+            .then((f) => f != null),
+    ]);
+
+    return { ...profile, postCount, followerCount, followingCount, isFollowedByViewer };
+  }
+
+  // --- Posts --------------------------------------------------------------
+
+  async createPost(userId: string, dto: CreateCommunityPostDto) {
+    const post = await this.prisma.communityPost.create({
+      data: {
+        authorId: userId,
+        mediaType: dto.mediaType ?? undefined,
+        mediaUrl: dto.mediaUrl,
+        caption: dto.caption,
+        visibility: dto.visibility ?? undefined,
+        isTrainerContent: dto.isTrainerContent ?? false,
+      },
+    });
+    return this.hydratePost(post, userId);
+  }
+
+  async listFeed(viewerId: string, query: QueryCommunityPostsDto) {
+    const where = await this.buildVisibleWhere(viewerId, query.authorId);
+
+    const [posts, total] = await Promise.all([
+      this.prisma.communityPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...paginationArgs(query),
+      }),
+      this.prisma.communityPost.count({ where }),
+    ]);
+
+    const hydrated = await this.hydratePosts(posts, viewerId);
+    return { data: hydrated, meta: paginationMeta(query, total) };
+  }
+
+  async getPost(viewerId: string, postId: string) {
+    const post = await this.findVisiblePost(viewerId, postId);
+    return this.hydratePost(post, viewerId);
+  }
+
+  async deletePost(userId: string, postId: string): Promise<void> {
+    const post = await this.prisma.communityPost.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found.');
+    if (post.authorId !== userId) {
+      throw new ForbiddenException('Only the author can delete this post.');
+    }
+    await this.prisma.communityPost.delete({ where: { id: postId } });
+  }
+
+  // --- Likes ----------------------------------------------------------------
+
+  async like(userId: string, postId: string): Promise<void> {
+    await this.findVisiblePost(userId, postId);
+    await this.prisma.communityLike.upsert({
+      where: { postId_userId: { postId, userId } },
+      update: {},
+      create: { postId, userId },
+    });
+  }
+
+  async unlike(userId: string, postId: string): Promise<void> {
+    await this.prisma.communityLike
+      .delete({ where: { postId_userId: { postId, userId } } })
+      .catch(ignoreNotFound);
+  }
+
+  // --- Saves ------------------------------------------------------------
+
+  async save(userId: string, postId: string): Promise<void> {
+    await this.findVisiblePost(userId, postId);
+    await this.prisma.communitySave.upsert({
+      where: { postId_userId: { postId, userId } },
+      update: {},
+      create: { postId, userId },
+    });
+  }
+
+  async unsave(userId: string, postId: string): Promise<void> {
+    await this.prisma.communitySave
+      .delete({ where: { postId_userId: { postId, userId } } })
+      .catch(ignoreNotFound);
+  }
+
+  async listSaved(userId: string, query: QueryCommunityPostsDto) {
+    const [saves, total] = await Promise.all([
+      this.prisma.communitySave.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        ...paginationArgs(query),
+        include: { post: true },
+      }),
+      this.prisma.communitySave.count({ where: { userId } }),
+    ]);
+    const hydrated = await this.hydratePosts(
+      saves.map((s) => s.post),
+      userId,
+    );
+    return { data: hydrated, meta: paginationMeta(query, total) };
+  }
+
+  // --- Comments ---------------------------------------------------------
+
+  async addComment(userId: string, postId: string, dto: CreateCommunityCommentDto) {
+    await this.findVisiblePost(userId, postId);
+    const comment = await this.prisma.communityComment.create({
+      data: { postId, authorId: userId, body: dto.body },
+    });
+    return this.serializeComment(comment, await this.authorSummary(comment.authorId));
+  }
+
+  async listComments(viewerId: string, postId: string, query: QueryCommunityPostsDto) {
+    await this.findVisiblePost(viewerId, postId);
+    const [comments, total] = await Promise.all([
+      this.prisma.communityComment.findMany({
+        where: { postId },
+        orderBy: { createdAt: 'asc' },
+        ...paginationArgs(query),
+      }),
+      this.prisma.communityComment.count({ where: { postId } }),
+    ]);
+    const authorIds = [...new Set(comments.map((c) => c.authorId))];
+    const profiles = await this.prisma.communityProfile.findMany({
+      where: { userId: { in: authorIds } },
+      select: PROFILE_SELECT,
+    });
+    const byAuthor = new Map(profiles.map((p) => [p.userId, p]));
+    return {
+      data: comments.map((c) => this.serializeComment(c, byAuthor.get(c.authorId) ?? null)),
+      meta: paginationMeta(query, total),
+    };
+  }
+
+  async deleteComment(userId: string, commentId: string): Promise<void> {
+    const comment = await this.prisma.communityComment.findUnique({ where: { id: commentId } });
+    if (!comment) throw new NotFoundException('Comment not found.');
+    const post = await this.prisma.communityPost.findUnique({ where: { id: comment.postId } });
+    // The comment's own author, or the post's author moderating their
+    // own post, may remove it — matches ordinary social-app behavior.
+    const canDelete = comment.authorId === userId || post?.authorId === userId;
+    if (!canDelete) {
+      throw new ForbiddenException(
+        'Only the comment author or post author can delete this comment.',
+      );
+    }
+    await this.prisma.communityComment.delete({ where: { id: commentId } });
+  }
+
+  // --- Follows ------------------------------------------------------------
+
+  async follow(followerId: string, followingId: string): Promise<void> {
+    if (followerId === followingId) {
+      throw new BadRequestException('You cannot follow yourself.');
+    }
+    await this.assertNotBlockedEitherWay(followerId, followingId);
+    await this.prisma.communityFollow.upsert({
+      where: { followerId_followingId: { followerId, followingId } },
+      update: {},
+      create: { followerId, followingId },
+    });
+  }
+
+  async unfollow(followerId: string, followingId: string): Promise<void> {
+    await this.prisma.communityFollow
+      .delete({ where: { followerId_followingId: { followerId, followingId } } })
+      .catch(ignoreNotFound);
+  }
+
+  async listFollowers(targetUserId: string, query: QueryCommunityPostsDto) {
+    return this.listConnections({ followingId: targetUserId }, (f) => f.followerId, query);
+  }
+
+  async listFollowing(targetUserId: string, query: QueryCommunityPostsDto) {
+    return this.listConnections({ followerId: targetUserId }, (f) => f.followingId, query);
+  }
+
+  private async listConnections(
+    where: Prisma.CommunityFollowWhereInput,
+    pickUserId: (f: { followerId: string; followingId: string }) => string,
+    query: QueryCommunityPostsDto,
+  ) {
+    const [rows, total] = await Promise.all([
+      this.prisma.communityFollow.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...paginationArgs(query),
+      }),
+      this.prisma.communityFollow.count({ where }),
+    ]);
+    const userIds = rows.map(pickUserId);
+    const profiles = await this.prisma.communityProfile.findMany({
+      where: { userId: { in: userIds } },
+      select: PROFILE_SELECT,
+    });
+    const byUser = new Map(profiles.map((p) => [p.userId, p]));
+    return {
+      data: userIds.map((id) => byUser.get(id) ?? { userId: id, displayName: null }),
+      meta: paginationMeta(query, total),
+    };
+  }
+
+  // --- Blocks -------------------------------------------------------------
+
+  async block(blockerId: string, blockedId: string): Promise<void> {
+    if (blockerId === blockedId) {
+      throw new BadRequestException('You cannot block yourself.');
+    }
+    await this.prisma.$transaction([
+      this.prisma.communityBlock.upsert({
+        where: { blockerId_blockedId: { blockerId, blockedId } },
+        update: {},
+        create: { blockerId, blockedId },
+      }),
+      // Blocking severs any existing follow relationship in either
+      // direction — a blocked user should not remain a "follower" of
+      // record, and blocking must not leave the blocker still followed.
+      this.prisma.communityFollow.deleteMany({
+        where: {
+          OR: [
+            { followerId: blockerId, followingId: blockedId },
+            { followerId: blockedId, followingId: blockerId },
+          ],
+        },
+      }),
+    ]);
+  }
+
+  async unblock(blockerId: string, blockedId: string): Promise<void> {
+    await this.prisma.communityBlock
+      .delete({ where: { blockerId_blockedId: { blockerId, blockedId } } })
+      .catch(ignoreNotFound);
+  }
+
+  // --- Reports --------------------------------------------------------
+
+  async report(reporterId: string, dto: CreateCommunityReportDto) {
+    await this.assertReportTargetExists(dto.targetType, dto.targetId);
+    const report = await this.prisma.communityReport.create({
+      data: {
+        reporterId,
+        targetType: dto.targetType,
+        targetId: dto.targetId,
+        reason: dto.reason,
+      },
+    });
+    return { id: report.id, status: report.status, createdAt: report.createdAt };
+  }
+
+  private async assertReportTargetExists(targetType: string, targetId: string): Promise<void> {
+    const exists =
+      targetType === 'POST'
+        ? await this.prisma.communityPost.findUnique({ where: { id: targetId } })
+        : targetType === 'COMMENT'
+          ? await this.prisma.communityComment.findUnique({ where: { id: targetId } })
+          : await this.prisma.communityProfile.findUnique({ where: { userId: targetId } });
+    if (!exists) {
+      throw new NotFoundException('Report target not found.');
+    }
+  }
+
+  // --- Shared helpers -----------------------------------------------------
+
+  private async assertNotBlockedEitherWay(userId: string, otherUserId: string): Promise<void> {
+    if (userId === otherUserId) return;
+    const block = await this.prisma.communityBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: otherUserId },
+          { blockerId: otherUserId, blockedId: userId },
+        ],
+      },
+    });
+    if (block) {
+      // Deliberately the same NotFoundException a nonexistent target
+      // would raise — a block must not reveal to the blocked party that
+      // they've been blocked (matches ordinary social-app behavior).
+      throw new NotFoundException('Not found.');
+    }
+  }
+
+  private async buildVisibleWhere(
+    viewerId: string,
+    authorIdFilter?: string,
+  ): Promise<Prisma.CommunityPostWhereInput> {
+    const [blockedByViewer, blockingViewer, following] = await Promise.all([
+      this.prisma.communityBlock.findMany({
+        where: { blockerId: viewerId },
+        select: { blockedId: true },
+      }),
+      this.prisma.communityBlock.findMany({
+        where: { blockedId: viewerId },
+        select: { blockerId: true },
+      }),
+      this.prisma.communityFollow.findMany({
+        where: { followerId: viewerId },
+        select: { followingId: true },
+      }),
+    ]);
+    const excludedAuthorIds = [
+      ...blockedByViewer.map((b) => b.blockedId),
+      ...blockingViewer.map((b) => b.blockerId),
+    ];
+    const followingIds = following.map((f) => f.followingId);
+
+    const visibilityOr: Prisma.CommunityPostWhereInput[] = [
+      { authorId: viewerId },
+      {
+        visibility: CommunityVisibility.PUBLIC,
+        moderationStatus: CommunityModerationStatus.APPROVED,
+      },
+    ];
+    if (followingIds.length > 0) {
+      visibilityOr.push({
+        visibility: CommunityVisibility.FOLLOWERS,
+        moderationStatus: CommunityModerationStatus.APPROVED,
+        authorId: { in: followingIds },
+      });
+    }
+
+    return {
+      AND: [
+        excludedAuthorIds.length > 0 ? { authorId: { notIn: excludedAuthorIds } } : {},
+        { OR: visibilityOr },
+        ...(authorIdFilter ? [{ authorId: authorIdFilter }] : []),
+      ],
+    };
+  }
+
+  private async findVisiblePost(viewerId: string, postId: string): Promise<CommunityPost> {
+    const post = await this.prisma.communityPost.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found.');
+    if (post.authorId === viewerId) return post;
+
+    await this.assertNotBlockedEitherWay(viewerId, post.authorId);
+
+    if (post.moderationStatus !== CommunityModerationStatus.APPROVED) {
+      throw new NotFoundException('Post not found.');
+    }
+    if (post.visibility === CommunityVisibility.PRIVATE) {
+      throw new NotFoundException('Post not found.');
+    }
+    if (post.visibility === CommunityVisibility.FOLLOWERS) {
+      const follows = await this.prisma.communityFollow.findUnique({
+        where: { followerId_followingId: { followerId: viewerId, followingId: post.authorId } },
+      });
+      if (!follows) throw new NotFoundException('Post not found.');
+    }
+    return post;
+  }
+
+  private async authorSummary(userId: string) {
+    return this.prisma.communityProfile.findUnique({ where: { userId }, select: PROFILE_SELECT });
+  }
+
+  private async hydratePost(post: CommunityPost, viewerId: string) {
+    return (await this.hydratePosts([post], viewerId))[0];
+  }
+
+  private async hydratePosts(posts: CommunityPost[], viewerId: string) {
+    if (posts.length === 0) return [];
+    const postIds = posts.map((p) => p.id);
+    const authorIds = [...new Set(posts.map((p) => p.authorId))];
+
+    const [likeCounts, commentCounts, saveCounts, likedByViewer, savedByViewer, authorProfiles] =
+      await Promise.all([
+        this.prisma.communityLike.groupBy({
+          by: ['postId'],
+          where: { postId: { in: postIds } },
+          _count: true,
+        }),
+        this.prisma.communityComment.groupBy({
+          by: ['postId'],
+          where: { postId: { in: postIds } },
+          _count: true,
+        }),
+        this.prisma.communitySave.groupBy({
+          by: ['postId'],
+          where: { postId: { in: postIds } },
+          _count: true,
+        }),
+        this.prisma.communityLike.findMany({
+          where: { postId: { in: postIds }, userId: viewerId },
+        }),
+        this.prisma.communitySave.findMany({
+          where: { postId: { in: postIds }, userId: viewerId },
+        }),
+        this.prisma.communityProfile.findMany({
+          where: { userId: { in: authorIds } },
+          select: PROFILE_SELECT,
+        }),
+      ]);
+
+    const likeCountByPost = new Map(likeCounts.map((c) => [c.postId, c._count]));
+    const commentCountByPost = new Map(commentCounts.map((c) => [c.postId, c._count]));
+    const saveCountByPost = new Map(saveCounts.map((c) => [c.postId, c._count]));
+    const likedPostIds = new Set(likedByViewer.map((l) => l.postId));
+    const savedPostIds = new Set(savedByViewer.map((s) => s.postId));
+    const profileByAuthor = new Map(authorProfiles.map((p) => [p.userId, p]));
+
+    return posts.map((post) => ({
+      id: post.id,
+      authorId: post.authorId,
+      author: profileByAuthor.get(post.authorId) ?? null,
+      mediaType: post.mediaType,
+      mediaUrl: post.mediaUrl,
+      caption: post.caption,
+      visibility: post.visibility,
+      moderationStatus: post.moderationStatus,
+      isTrainerContent: post.isTrainerContent,
+      likeCount: likeCountByPost.get(post.id) ?? 0,
+      commentCount: commentCountByPost.get(post.id) ?? 0,
+      saveCount: saveCountByPost.get(post.id) ?? 0,
+      isLikedByViewer: likedPostIds.has(post.id),
+      isSavedByViewer: savedPostIds.has(post.id),
+      isOwnPost: post.authorId === viewerId,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+    }));
+  }
+
+  private serializeComment(comment: CommunityComment, author: ProfileSummary | null) {
+    return {
+      id: comment.id,
+      postId: comment.postId,
+      authorId: comment.authorId,
+      author,
+      body: comment.body,
+      createdAt: comment.createdAt,
+    };
+  }
+}
+
+function ignoreNotFound(error: unknown): void {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+    return;
+  }
+  throw error;
+}

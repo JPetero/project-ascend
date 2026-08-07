@@ -21,6 +21,14 @@ abstract final class RoutePaths {
   static const leaderboards = '/leaderboards';
   static const vision = '/vision';
 
+  // Community — pushed on top of the shell, same pattern as Workout
+  // Engine/Meal Prep above.
+  static const communityPostDetail = '/social/posts/:id';
+  static const communityCreatePost = '/social/new';
+  static const communitySaved = '/social/saved';
+  static const communityProfile = '/social/profile/:userId';
+  static const communityEditProfile = '/social/profile/edit';
+
   static const dashboard = '/dashboard';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
@@ -47,6 +55,10 @@ abstract final class RoutePaths {
   static const customFoodEditorNew = '/meal-prep/custom-food/new';
   static const customFoodEditorEdit = '/meal-prep/custom-food/:id/edit';
   static const macroTargetEditor = '/meal-prep/targets';
+
+  static String communityPostDetailPath(String id) => '/social/posts/$id';
+  static String communityProfilePath(String userId) =>
+      '/social/profile/$userId';
 
   static String exerciseDetailPath(String id) => '/exercise-library/$id';
   static String workoutDetailPath(String id) => '/workout-catalog/$id';

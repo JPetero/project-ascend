@@ -86,29 +86,39 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens         RefreshToken[]
-  profile               Profile?
-  preference            Preference?
-  equipment             Equipment[]
-  workoutSchedule       WorkoutSchedule?
-  devices               DeviceConnection[]
-  auditEvents           AuditEvent[]
-  workoutPlans          WorkoutPlan[]
-  workoutSessions       WorkoutSession[]
-  personalRecords       PersonalRecord[]
-  syncOperations        SyncOperation[]
-  ownedFoods            Food[]
-  mealEntries           MealEntry[]
-  macroTarget           MacroTarget?
-  waterEntries          WaterEntry[]
-  authIdentities        AuthIdentity[]
-  legalAcceptances      LegalAcceptance[]
-  deloadRecommendations DeloadRecommendation[]
-  savedMeals            SavedMeal[]
-  achievementAwards     AchievementAward[]
-  cardioSessions        CardioSession[]
-  healthMetricSamples   HealthMetricSample[]
-  healthSyncCursors     HealthSyncCursor[]
+  refreshTokens          RefreshToken[]
+  profile                Profile?
+  preference             Preference?
+  equipment              Equipment[]
+  workoutSchedule        WorkoutSchedule?
+  devices                DeviceConnection[]
+  auditEvents            AuditEvent[]
+  workoutPlans           WorkoutPlan[]
+  workoutSessions        WorkoutSession[]
+  personalRecords        PersonalRecord[]
+  syncOperations         SyncOperation[]
+  ownedFoods             Food[]
+  mealEntries            MealEntry[]
+  macroTarget            MacroTarget?
+  waterEntries           WaterEntry[]
+  authIdentities         AuthIdentity[]
+  legalAcceptances       LegalAcceptance[]
+  deloadRecommendations  DeloadRecommendation[]
+  savedMeals             SavedMeal[]
+  achievementAwards      AchievementAward[]
+  cardioSessions         CardioSession[]
+  healthMetricSamples    HealthMetricSample[]
+  healthSyncCursors      HealthSyncCursor[]
+  communityProfile       CommunityProfile?
+  communityPosts         CommunityPost[]
+  communityLikes         CommunityLike[]
+  communityComments      CommunityComment[]
+  communitySaves         CommunitySave[]
+  communityReports       CommunityReport[]
+  communityFollowing     CommunityFollow[]      @relation("CommunityFollower")
+  communityFollowers     CommunityFollow[]      @relation("CommunityFollowing")
+  communityBlocksMade    CommunityBlock[]       @relation("CommunityBlocker")
+  communityBlocksAgainst CommunityBlock[]       @relation("CommunityBlocked")
 
   @@index([status])
   @@map("users")
@@ -1142,4 +1152,186 @@ model CardioSession {
 
   @@index([userId, startedAt])
   @@map("cardio_sessions")
+}
+
+// --- Community — Founder Scenario 21's profiles/posts/Reels MVP. See
+// packages/docs/product/user-scenario-bible.md's Community Reels
+// requirements: captions, likes, comments, saves, follows, reports,
+// blocks, per-post visibility, creator/trainer profiles. No automatic
+// publishing to Instagram/Facebook/TikTok is implemented or claimed —
+// "native sharing" is device-share-sheet only (see the Flutter side).
+// Moderation here is a status field an admin tool can act on later, not
+// an automated content-classification pipeline.
+
+enum CommunityPostMediaType {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
+// VIDEO + a caption is what the product spec calls a "Reel" — modeled as
+// a media type rather than a separate table, since a Reel is a post in
+// every other respect (likes/comments/saves/visibility/moderation).
+enum CommunityVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum CommunityModerationStatus {
+  APPROVED
+  PENDING
+  REMOVED
+}
+
+enum CommunityReportTargetType {
+  POST
+  COMMENT
+  PROFILE
+}
+
+enum CommunityReportStatus {
+  OPEN
+  REVIEWED
+  ACTIONED
+}
+
+// The public-facing identity shown on posts/comments/follow lists —
+// deliberately separate from `Profile`, which holds private onboarding
+// data (date of birth, height/weight, goals) that must never be exposed
+// through a Community endpoint.
+model CommunityProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  // A trainer/creator's own posts can be flagged as trainer content per
+  // post (CommunityPost.isTrainerContent); this flag controls whether a
+  // "Trainer" badge shows next to their name/profile at all.
+  isTrainer   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("community_profiles")
+}
+
+model CommunityPost {
+  id               String                    @id @default(uuid())
+  authorId         String
+  mediaType        CommunityPostMediaType    @default(TEXT)
+  // A device-local file reference or externally-hosted URL — this
+  // session has no media upload/transcoding pipeline, so the app is
+  // responsible for producing a URL before creating the post (see
+  // packages/docs/build-session-7.md Part 4's platform-limitations
+  // section). Required whenever mediaType isn't TEXT — enforced in the
+  // DTO/service, not the database.
+  mediaUrl         String?
+  caption          String?                   @db.Text
+  visibility       CommunityVisibility       @default(PUBLIC)
+  moderationStatus CommunityModerationStatus @default(APPROVED)
+  isTrainerContent Boolean                   @default(false)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  author   User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes    CommunityLike[]
+  comments CommunityComment[]
+  saves    CommunitySave[]
+
+  @@index([authorId, createdAt])
+  @@index([visibility, moderationStatus, createdAt])
+  @@map("community_posts")
+}
+
+model CommunityLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_likes")
+}
+
+model CommunityComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@map("community_comments")
+}
+
+model CommunitySave {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@map("community_saves")
+}
+
+model CommunityFollow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("CommunityFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("CommunityFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("community_follows")
+}
+
+model CommunityBlock {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("CommunityBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("CommunityBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("community_blocks")
+}
+
+// A generic report — targetType + targetId lets one table cover
+// post/comment/profile reports without three near-identical models.
+// Never auto-actioned: status starts OPEN and only an admin workflow
+// (Part 10) moves it to REVIEWED/ACTIONED.
+model CommunityReport {
+  id         String                    @id @default(uuid())
+  reporterId String
+  targetType CommunityReportTargetType
+  targetId   String
+  reason     String                    @db.Text
+  status     CommunityReportStatus     @default(OPEN)
+  createdAt  DateTime                  @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@map("community_reports")
 }

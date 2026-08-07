@@ -14,6 +14,8 @@ class AscendTextField extends StatelessWidget {
     this.suffixIcon,
     this.onChanged,
     this.enabled = true,
+    this.maxLines = 1,
+    this.maxLength,
   });
 
   final String label;
@@ -26,6 +28,8 @@ class AscendTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final ValueChanged<String>? onChanged;
   final bool enabled;
+  final int? maxLines;
+  final int? maxLength;
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +42,8 @@ class AscendTextField extends StatelessWidget {
       autofillHints: autofillHints,
       onChanged: onChanged,
       enabled: enabled,
+      maxLines: maxLines,
+      maxLength: maxLength,
       decoration: InputDecoration(labelText: label, suffixIcon: suffixIcon),
     );
   }

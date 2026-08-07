@@ -11,6 +11,12 @@ import '../../features/auth/presentation/screens/welcome_screen.dart';
 import '../../features/cardio/presentation/screens/cardio_history_screen.dart';
 import '../../features/cardio/presentation/screens/cardio_log_screen.dart';
 import '../../features/cardio/presentation/screens/live_cardio_screen.dart';
+import '../../features/community/presentation/screens/community_feed_screen.dart';
+import '../../features/community/presentation/screens/community_profile_screen.dart';
+import '../../features/community/presentation/screens/create_post_screen.dart';
+import '../../features/community/presentation/screens/edit_community_profile_screen.dart';
+import '../../features/community/presentation/screens/post_detail_screen.dart';
+import '../../features/community/presentation/screens/saved_posts_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
@@ -21,7 +27,6 @@ import '../../features/nutrition/presentation/screens/macro_target_editor_screen
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
-import '../../features/social/presentation/screens/social_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
 import '../../features/wearables/presentation/screens/connected_health_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
@@ -163,6 +168,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.macroTargetEditor,
         builder: (context, state) => const MacroTargetEditorScreen(),
       ),
+      GoRoute(
+        path: RoutePaths.communityPostDetail,
+        builder: (context, state) =>
+            PostDetailScreen(postId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.communityCreatePost,
+        builder: (context, state) => const CreatePostScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communitySaved,
+        builder: (context, state) => const SavedPostsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communityProfile,
+        builder: (context, state) =>
+            CommunityProfileScreen(userId: state.pathParameters['userId']!),
+      ),
+      GoRoute(
+        path: RoutePaths.communityEditProfile,
+        builder: (context, state) => const EditCommunityProfileScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
@@ -187,7 +214,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: RoutePaths.social,
-                builder: (context, state) => const SocialScreen(),
+                builder: (context, state) => const CommunityFeedScreen(),
               ),
             ],
           ),

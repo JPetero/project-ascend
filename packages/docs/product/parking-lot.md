@@ -11,9 +11,14 @@ actually in scope for the current session.
   deeper sync (steps, sleep, recovery feeding the dashboard) is deferred
   until real device data sources are integrated. Never fabricate these
   values in the meantime.
-- **Community/Social** — the Social tab ships as an honest coming-soon
-  state this session. Posting, following, moderation, and real activity
-  feeds are future work.
+- **Community/Social** — superseded by Build Session 7 Part 4: the
+  Community tab now has a real profiles/posts/Reels MVP (posting,
+  likes, comments, saves, follows, blocks, reports) — see
+  `build-session-7.md` Part 4. Still deferred: an in-app camera/photo/
+  video capture and upload pipeline (IMAGE/VIDEO posts currently require
+  an externally-hosted URL), a moderation review queue/admin UI (Part
+  10), and native device-share-sheet sharing of achievements/posts out
+  of the app.
 - **Leaderboards** — ships as an honest coming-soon state. Real ranking
   requires a real activity/points model that doesn't exist yet.
 - **Subscriptions/payment processing** — the capability model
@@ -118,9 +123,11 @@ architecture-only below).
 - **Six-destination navigation and Vision (21)** — label/route rename
   (Train/Fuel/Community/Ascend AI/Rankings) plus a sixth, Premium-gated
   Vision destination.
-- **Community Reels (22)** — reels, captions, likes, comments, saves,
-  follows, reports, blocks, visibility, native external sharing,
-  moderation, creator profiles, trainer content.
+- **Community Reels (22)** — **MVP implemented in Part 4** (posts
+  including Reels, captions, likes, comments, saves, follows, reports,
+  blocks, per-post visibility, creator/trainer profiles). Still pending:
+  in-app capture/upload for IMAGE/VIDEO posts, native external sharing,
+  and a moderation review queue (Part 10).
 - **Ascend Promote (23)** — transparent paid distribution architecture;
   no live billing.
 - **Trainer groups (24)** — free basic tier (one group, small configurable

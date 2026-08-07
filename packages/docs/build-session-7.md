@@ -513,3 +513,157 @@ daemon at unix:///var/run/docker.sock").
   Fitness writes into Health Connect is visible; there is no direct
   Xiaomi integration and none is planned outside an explicitly
   Xiaomi-approved future vendor SDK.
+
+---
+
+## Part 4 — Community profiles, posts, and Reels MVP
+
+Commit: `Implement Community profiles posts and reels MVP`
+
+### What this part is
+
+A real Community tab — profiles, posts (including Reels: a VIDEO post
+with a caption, per Scenario 21/22's spec), likes, comments, saves,
+follows, blocks, and reports — replacing the Social tab's previous
+honest coming-soon placeholder. `COMMUNITY_REELS` was already a FREE
+capability from Part 1's addendum; this part is the real implementation
+behind it.
+
+### Backend: `community` module
+
+Seven new Prisma models: `CommunityProfile` (the public-facing identity
+— deliberately separate from `Profile`, which holds private onboarding
+data that must never leak through a Community endpoint), `CommunityPost`
+(`mediaType` TEXT/IMAGE/VIDEO, `visibility` PUBLIC/FOLLOWERS/PRIVATE,
+`moderationStatus` defaulting to APPROVED with PENDING/REMOVED already
+modeled for Part 10's moderation queue, `isTrainerContent`),
+`CommunityLike`/`CommunitySave` (both unique on `postId + userId`),
+`CommunityComment`, `CommunityFollow` (unique on `followerId +
+followingId`), `CommunityBlock` (unique on `blockerId + blockedId`), and
+`CommunityReport` (a generic `targetType`/`targetId` row covering
+POST/COMMENT/PROFILE reports in one table, always created `OPEN` —
+never auto-actioned).
+
+`CommunityService` centralizes every visibility rule in one place
+(`buildVisibleWhere` for the feed, `findVisiblePost` for a single post):
+a post is visible to its own author unconditionally; otherwise only if
+`moderationStatus` is APPROVED, `visibility` is PUBLIC, or `visibility`
+is FOLLOWERS and the viewer follows the author — and never at all if
+either party has blocked the other. Blocking is a transaction that both
+creates the block row and deletes any existing follow in either
+direction (`$transaction([blockUpsert, followDeleteMany])`) — a blocked
+user should not remain "following" the person who blocked them, or vice
+versa. A block check that fails returns the same `NotFoundException` a
+nonexistent post/profile would — deliberately not a `ForbiddenException`
+— so a blocked user can't distinguish "doesn't exist" from "you blocked
+me" (matches ordinary social-app behavior). Likes/saves/follows use
+`upsert` against their compound unique constraints, making a repeated
+like/follow request idempotent rather than a 409.
+
+### Flutter: `community` feature
+
+`CommunityRepository` is a thin client over every endpoint above.
+`CommunityFeedController` (a `StateNotifier`, `family`-keyed by an
+optional `authorId` so the same class drives both the general feed and
+a single profile's post grid) applies likes/saves optimistically and
+rolls back on failure — tapping the heart icon updates instantly rather
+than waiting on a round trip, matching the UX bar this session has held
+since Part 2's live cardio controller. `PostDetailController` (post +
+comment thread) and `CommunityProfileController` (a profile plus
+follow/block/report actions) are separate, narrower controllers rather
+than one god-controller, following this session's established pattern
+of splitting state by what a single screen actually needs.
+
+Screens: `CommunityFeedScreen` (the Community tab's real content, at
+the pre-existing `/social` route — the path is unchanged from the old
+placeholder per Part 1's "don't remove working routes" rule, only the
+tab label and content changed), `SavedPostsScreen`, `CreatePostScreen`
+(text/photo/Reel, visibility picker, trainer-content toggle),
+`PostDetailScreen` (post + comments, add/delete comment), and
+`CommunityProfileScreen` / `EditCommunityProfileScreen` (view a
+profile's posts and follower/following counts, or edit your own).
+`CommunityPostListView` is a shared scrollable list (loading/error/
+empty states, pull-to-refresh, infinite scroll) used by both the feed
+and the Saved posts screen so they stay visually identical rather than
+duplicating that logic twice. The old `features/social/` placeholder
+directory was deleted outright — nothing else referenced it.
+
+### Integration points
+
+Reachable from the Community tab (feed) and a new "Connected Health"-
+style entry point isn't needed here since Community *is* the
+destination itself. `WearableConnectionsScreen`'s and
+`ConnectedHealthScreen`'s established "real feature reachable from an
+existing screen" pattern doesn't apply — Community already had its own
+nav destination from Part 1's six-destination rename. Post
+authorship/visibility now gives Rankings (Part 6) and Ascend Promote
+(Part 11) something concrete to build against — `isOwnPost`,
+`moderationStatus`, and `visibility` are exactly the fields a future
+"boost this post" or "this counts toward your Ranked activity" feature
+would need, built now rather than retrofitted later.
+
+### Tests
+
+Backend: `community.service.spec.ts` (15 tests — self-follow/self-block
+rejection, blocked-user follow rejection, block severing an existing
+follow via the transaction, post/comment delete ownership and
+moderation rules, report target-existence validation), `community.
+e2e-spec.ts` (16 tests over real HTTP — profile upsert/read with
+counts, a 404 for a never-created profile, a TEXT post appearing in the
+public feed, a VIDEO Reel rejected without `mediaUrl` then accepted with
+one, a FOLLOWERS-only post hidden until the viewer follows then visible
+after, a PRIVATE post visible only to its author, idempotent like/
+unlike with correct counts, save/unsave and the Saved list being
+per-viewer, comments with the post author able to moderate any comment
+on their own post, follow/unfollow and followers/following listings,
+blocking hiding both profile and posts *and* severing an existing
+follow, self-follow/self-block rejection, report filing against a real
+vs. a made-up target, and delete-post ownership).
+
+Flutter: `community_feed_controller_test.dart` (8 tests — load, empty
+state, load failure, author filtering, optimistic like round-trip,
+saved-only unsave removing the post from view, optimistic delete with
+rollback on failure), `community_profile_controller_test.dart` (5
+tests — load, missing-profile error, follow, block, report),
+`post_detail_controller_test.dart` (4 tests — load, add comment
+including a blank-body no-op, optimistic like),
+`community_feed_screen_test.dart` (3 widget tests — empty state, a
+rendered post with caption/like count/author, tapping the like icon).
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name community_profiles_posts_reels_mvp` applied against
+the same reachable local Postgres used for Part 3, `npx tsc --noEmit`
+clean, `npx eslint "{src,test}/**/*.ts" --max-warnings=0` clean, `npx
+jest --silent` → 224 tests passed (was 209), `npx jest --config
+./test/jest-e2e.json --silent` → 82 tests passed (was 66), `npx nest
+build` clean.
+
+Flutter: `dart format .` clean, `flutter analyze` → "No issues found!",
+`flutter test` → 262 tests passed (was 242).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. `docker compose
+build`/`up -d`/`ps` were not attempted — no Docker daemon is reachable
+in this environment.
+
+### Known scope decisions
+
+- **No in-app media capture or upload pipeline.** `CreatePostScreen`
+  requires an already-hosted URL for IMAGE/VIDEO posts and says so
+  explicitly in the UI — there is no camera, photo picker, or object
+  storage integration in this session. `_MediaPlaceholder` renders a
+  labeled icon, never a fake thumbnail.
+- **"Native sharing" is not implemented.** Nothing in this part posts to
+  Instagram, Facebook, or TikTok, and no such claim is made anywhere in
+  the UI or docs — Scenario 21's explicit prohibition on implying
+  automatic external-platform publishing.
+- **No moderation review queue/admin UI.** `moderationStatus` defaults
+  to APPROVED and reports land as OPEN rows with no reviewer workflow
+  yet — that's Part 10 (Support and Administration).
+- **`isTrainer` is self-declared, not verified.** The edit-profile
+  screen says this directly; there is no trainer-application or
+  verification flow.
