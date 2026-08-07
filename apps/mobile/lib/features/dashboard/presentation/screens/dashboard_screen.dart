@@ -17,6 +17,8 @@ import '../../../auth/presentation/providers/auth_identity_controller.dart';
 import '../../../cardio/presentation/providers/cardio_session_controller.dart';
 import '../../../companion/domain/companion_dialogue.dart';
 import '../../../companion/presentation/widgets/companion_quick_actions_sheet.dart';
+import '../../../friends/presentation/providers/friends_controller.dart';
+import '../../../messages/presentation/providers/conversations_controller.dart';
 import '../../../nutrition/domain/nutrition_dashboard_summary.dart';
 import '../../../nutrition/presentation/providers/nutrition_summary_controller.dart';
 import '../../../profile/domain/preferences_model.dart';
@@ -24,6 +26,8 @@ import '../../../profile/domain/profile_model.dart';
 import '../../../profile/domain/workout_schedule.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../../profile/presentation/providers/profile_controller.dart';
+import '../../../rankings/domain/ranking.dart';
+import '../../../rankings/presentation/providers/rankings_controller.dart';
 import '../../../sharing/presentation/screens/share_achievement_screen.dart';
 import '../../../wearables/presentation/screens/wearable_connections_screen.dart';
 import '../../../workout/domain/personal_record.dart';
@@ -58,6 +62,9 @@ class DashboardScreen extends ConsumerWidget {
     final identitiesAsync = ref.watch(authIdentitiesProvider);
     final achievementsAsync = ref.watch(achievementsProvider);
     final cardioSessionsAsync = ref.watch(cardioSessionsProvider);
+    final rankingsState = ref.watch(rankingsControllerProvider);
+    final friendsState = ref.watch(friendsControllerProvider);
+    final conversationsState = ref.watch(conversationsControllerProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dashboard')),
@@ -70,6 +77,9 @@ class DashboardScreen extends ConsumerWidget {
             ref.refresh(authIdentitiesProvider.future),
             ref.refresh(achievementsProvider.future),
             ref.refresh(cardioSessionsProvider.future),
+            ref.read(rankingsControllerProvider.notifier).refresh(),
+            ref.read(friendsControllerProvider.notifier).refresh(),
+            ref.read(conversationsControllerProvider.notifier).refresh(),
           ]),
           child: ListView(
             padding: const EdgeInsets.all(AscendSpacing.md),
@@ -146,27 +156,17 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const AscendSectionHeader(title: 'Community'),
               const SizedBox(height: AscendSpacing.sm),
-              const AscendCard(
-                child: _UnavailableRow(
-                  icon: Icons.leaderboard_outlined,
-                  label: 'Leaderboard rank',
-                  message: 'Coming soon with Leaderboards.',
-                ),
-              ),
+              _RankingsRow(state: rankingsState),
               const SizedBox(height: AscendSpacing.sm),
-              const AscendCard(
-                child: _UnavailableRow(
-                  icon: Icons.group_outlined,
-                  label: 'Friends',
-                  message: 'Coming soon with Social.',
-                ),
-              ),
+              _FriendsRow(state: friendsState),
+              const SizedBox(height: AscendSpacing.sm),
+              _MessagesRow(state: conversationsState),
               const SizedBox(height: AscendSpacing.sm),
               const AscendCard(
                 child: _UnavailableRow(
                   icon: Icons.photo_library_outlined,
-                  label: 'Photos & videos',
-                  message: 'Coming soon once media storage ships.',
+                  label: 'Gallery',
+                  message: 'Your private gallery is on its way.',
                 ),
               ),
               const SizedBox(height: AscendSpacing.lg),
@@ -838,6 +838,254 @@ class _NutritionSummaryCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Real Rankings status — Build Session 9 Part 1. Shows the viewer's own
+/// leaderboard position for their selected scope once opted in (found by
+/// matching [LeaderboardEntry.isViewer] in the already-loaded board,
+/// never a fabricated number), or an honest opt-in prompt otherwise. Off
+/// by default, per Scenario 16a — this row never implies participation
+/// the user hasn't chosen.
+class _RankingsRow extends ConsumerWidget {
+  const _RankingsRow({required this.state});
+
+  final RankingsState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (state.error != null) {
+      return _DashboardErrorRow(
+        icon: Icons.leaderboard_outlined,
+        label: 'Rankings',
+        onRetry: () => ref.read(rankingsControllerProvider.notifier).refresh(),
+      );
+    }
+    if (state.isLoading) {
+      return const AscendCard(
+        child: _LoadingRow(icon: Icons.leaderboard_outlined, label: 'Rankings'),
+      );
+    }
+    if (!state.status.optedIn) {
+      return AscendCard(
+        onTap: () => context.go(RoutePaths.leaderboards),
+        child: const _UnavailableRow(
+          icon: Icons.leaderboard_outlined,
+          label: 'Rankings',
+          message: 'Opt in to see where you rank against friends or globally.',
+        ),
+      );
+    }
+
+    LeaderboardEntry? mine;
+    for (final entry in state.leaderboard) {
+      if (entry.isViewer) {
+        mine = entry;
+        break;
+      }
+    }
+
+    return AscendCard(
+      onTap: () => context.go(RoutePaths.leaderboards),
+      child: Row(
+        children: [
+          Icon(
+            Icons.leaderboard_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Rankings', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  mine != null
+                      ? 'Rank #${mine.rank} · ${_scopeLabel(state.selectedScope)}'
+                      : 'Opted in — rank updates as the season scores in.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
+      ),
+    );
+  }
+
+  String _scopeLabel(RankingScope scope) => switch (scope) {
+    RankingScope.friends => 'Friends',
+    RankingScope.region => 'Region',
+    RankingScope.global => 'Global',
+  };
+}
+
+/// Real friend count and pending-request count — Build Session 9 Part 1.
+class _FriendsRow extends ConsumerWidget {
+  const _FriendsRow({required this.state});
+
+  final FriendsState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (state.error != null) {
+      return _DashboardErrorRow(
+        icon: Icons.group_outlined,
+        label: 'Friends',
+        onRetry: () => ref.read(friendsControllerProvider.notifier).refresh(),
+      );
+    }
+    if (state.isLoading) {
+      return const AscendCard(
+        child: _LoadingRow(icon: Icons.group_outlined, label: 'Friends'),
+      );
+    }
+
+    final pending = state.incoming.length;
+    return AscendCard(
+      onTap: () => context.push(RoutePaths.friends),
+      child: Row(
+        children: [
+          Icon(
+            Icons.group_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Friends', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  pending > 0
+                      ? '${state.friends.length} friends · $pending pending request${pending == 1 ? '' : 's'}'
+                      : '${state.friends.length} friends',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
+      ),
+    );
+  }
+}
+
+/// Real unread direct-message count — Build Session 9 Part 1.
+class _MessagesRow extends ConsumerWidget {
+  const _MessagesRow({required this.state});
+
+  final ConversationsState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (state.error != null) {
+      return _DashboardErrorRow(
+        icon: Icons.mail_outline,
+        label: 'Messages',
+        onRetry: () =>
+            ref.read(conversationsControllerProvider.notifier).refresh(),
+      );
+    }
+    if (state.isLoading) {
+      return const AscendCard(
+        child: _LoadingRow(icon: Icons.mail_outline, label: 'Messages'),
+      );
+    }
+
+    return AscendCard(
+      onTap: () => context.push(RoutePaths.conversations),
+      child: Row(
+        children: [
+          Icon(
+            Icons.mail_outline,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Messages', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  state.unreadCount > 0
+                      ? '${state.unreadCount} unread'
+                      : 'No unread messages',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingRow extends StatelessWidget {
+  const _LoadingRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, color: Theme.of(context).colorScheme.outline),
+        const SizedBox(width: AscendSpacing.sm),
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.titleSmall),
+        ),
+        const SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ],
+    );
+  }
+}
+
+/// A shared honest-error row for a Dashboard summary card, per this
+/// screen's "no fabricated values, always a retry action" rule.
+class _DashboardErrorRow extends StatelessWidget {
+  const _DashboardErrorRow({
+    required this.icon,
+    required this.label,
+    required this.onRetry,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AscendCard(
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.error),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  "Couldn't load — pull to refresh or retry.",
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
