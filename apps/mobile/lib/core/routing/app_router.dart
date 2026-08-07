@@ -19,6 +19,9 @@ import '../../features/community/presentation/screens/post_detail_screen.dart';
 import '../../features/community/presentation/screens/saved_posts_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
+import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
+import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
 import '../../features/leaderboards/presentation/screens/leaderboards_screen.dart';
 import '../../features/nutrition/domain/meal_type.dart';
 import '../../features/nutrition/presentation/screens/custom_food_editor_screen.dart';
@@ -189,6 +192,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.communityEditProfile,
         builder: (context, state) => const EditCommunityProfileScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroups,
+        builder: (context, state) => const TrainerGroupsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroupCreate,
+        builder: (context, state) => const CreateTrainerGroupScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroupDetail,
+        builder: (context, state) =>
+            TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

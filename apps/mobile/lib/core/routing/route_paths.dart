@@ -29,6 +29,13 @@ abstract final class RoutePaths {
   static const communityProfile = '/social/profile/:userId';
   static const communityEditProfile = '/social/profile/edit';
 
+  // Trainer Groups — Founder Scenario 24, reachable from the Community
+  // tab. Free tier only (see TRAINER_GROUP_* limits in the backend's
+  // common/policy/trainer-group-policy.ts).
+  static const trainerGroups = '/social/groups';
+  static const trainerGroupCreate = '/social/groups/new';
+  static const trainerGroupDetail = '/social/groups/:id';
+
   static const dashboard = '/dashboard';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
@@ -59,6 +66,7 @@ abstract final class RoutePaths {
   static String communityPostDetailPath(String id) => '/social/posts/$id';
   static String communityProfilePath(String userId) =>
       '/social/profile/$userId';
+  static String trainerGroupDetailPath(String id) => '/social/groups/$id';
 
   static String exerciseDetailPath(String id) => '/exercise-library/$id';
   static String workoutDetailPath(String id) => '/workout-catalog/$id';

@@ -130,9 +130,12 @@ architecture-only below).
   and a moderation review queue (Part 10).
 - **Ascend Promote (23)** — transparent paid distribution architecture;
   no live billing.
-- **Trainer groups (24)** — free basic tier (one group, small configurable
-  limit, chat, safe images, shared plans, invitations); Premium expanded
-  tier is architecture-only until Premium billing exists.
+- **Trainer groups (24)** — **free basic tier implemented in Part 5**
+  (one owned group per user, a centrally-configured member limit, text/
+  image chat, shared workout plans, invitations). Premium expanded tier
+  (more/larger groups, announcements, scheduled sessions, assignments,
+  distinct roles) is architecture-only until Premium billing exists —
+  `TrainerGroupMemberRole` only has OWNER/MEMBER so far.
 - **Sports scoring (25)** — manual match creation/confirmation/dispute
   flow; camera-assisted suggestion depends on the Premium Vision Shell.
 - **Expanded cardio and Nutrition Library (26)** — new free activity

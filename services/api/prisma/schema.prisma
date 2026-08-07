@@ -86,39 +86,45 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  refreshTokens          RefreshToken[]
-  profile                Profile?
-  preference             Preference?
-  equipment              Equipment[]
-  workoutSchedule        WorkoutSchedule?
-  devices                DeviceConnection[]
-  auditEvents            AuditEvent[]
-  workoutPlans           WorkoutPlan[]
-  workoutSessions        WorkoutSession[]
-  personalRecords        PersonalRecord[]
-  syncOperations         SyncOperation[]
-  ownedFoods             Food[]
-  mealEntries            MealEntry[]
-  macroTarget            MacroTarget?
-  waterEntries           WaterEntry[]
-  authIdentities         AuthIdentity[]
-  legalAcceptances       LegalAcceptance[]
-  deloadRecommendations  DeloadRecommendation[]
-  savedMeals             SavedMeal[]
-  achievementAwards      AchievementAward[]
-  cardioSessions         CardioSession[]
-  healthMetricSamples    HealthMetricSample[]
-  healthSyncCursors      HealthSyncCursor[]
-  communityProfile       CommunityProfile?
-  communityPosts         CommunityPost[]
-  communityLikes         CommunityLike[]
-  communityComments      CommunityComment[]
-  communitySaves         CommunitySave[]
-  communityReports       CommunityReport[]
-  communityFollowing     CommunityFollow[]      @relation("CommunityFollower")
-  communityFollowers     CommunityFollow[]      @relation("CommunityFollowing")
-  communityBlocksMade    CommunityBlock[]       @relation("CommunityBlocker")
-  communityBlocksAgainst CommunityBlock[]       @relation("CommunityBlocked")
+  refreshTokens               RefreshToken[]
+  profile                     Profile?
+  preference                  Preference?
+  equipment                   Equipment[]
+  workoutSchedule             WorkoutSchedule?
+  devices                     DeviceConnection[]
+  auditEvents                 AuditEvent[]
+  workoutPlans                WorkoutPlan[]
+  workoutSessions             WorkoutSession[]
+  personalRecords             PersonalRecord[]
+  syncOperations              SyncOperation[]
+  ownedFoods                  Food[]
+  mealEntries                 MealEntry[]
+  macroTarget                 MacroTarget?
+  waterEntries                WaterEntry[]
+  authIdentities              AuthIdentity[]
+  legalAcceptances            LegalAcceptance[]
+  deloadRecommendations       DeloadRecommendation[]
+  savedMeals                  SavedMeal[]
+  achievementAwards           AchievementAward[]
+  cardioSessions              CardioSession[]
+  healthMetricSamples         HealthMetricSample[]
+  healthSyncCursors           HealthSyncCursor[]
+  communityProfile            CommunityProfile?
+  communityPosts              CommunityPost[]
+  communityLikes              CommunityLike[]
+  communityComments           CommunityComment[]
+  communitySaves              CommunitySave[]
+  communityReports            CommunityReport[]
+  communityFollowing          CommunityFollow[]        @relation("CommunityFollower")
+  communityFollowers          CommunityFollow[]        @relation("CommunityFollowing")
+  communityBlocksMade         CommunityBlock[]         @relation("CommunityBlocker")
+  communityBlocksAgainst      CommunityBlock[]         @relation("CommunityBlocked")
+  ownedTrainerGroups          TrainerGroup[]
+  trainerGroupMembers         TrainerGroupMember[]
+  trainerGroupMessages        TrainerGroupMessage[]
+  trainerGroupInvitesSent     TrainerGroupInvitation[] @relation("TrainerGroupInviter")
+  trainerGroupInvitesReceived TrainerGroupInvitation[] @relation("TrainerGroupInvitee")
+  trainerGroupSharedPlans     TrainerGroupSharedPlan[]
 
   @@index([status])
   @@map("users")
@@ -574,10 +580,11 @@ model WorkoutPlan {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workout   Workout?              @relation(fields: [workoutId], references: [id], onDelete: SetNull)
-  exercises WorkoutPlanExercise[]
-  sessions  WorkoutSession[]
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout        Workout?                 @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercises      WorkoutPlanExercise[]
+  sessions       WorkoutSession[]
+  sharedInGroups TrainerGroupSharedPlan[]
 
   @@index([userId])
   @@map("workout_plans")
@@ -1334,4 +1341,119 @@ model CommunityReport {
   @@index([targetType, targetId])
   @@index([status])
   @@map("community_reports")
+}
+
+// --- Trainer groups — Founder Scenario 24. Free tier: one group owned
+// per user (see common/policy/trainer-group-policy.ts for the single
+// source of the owned-group and member-count limits — "not hard-coded
+// per-widget" per the scenario), text chat, safe image sharing (same
+// media policy as Community — see wellness-ethics-bible.md; no upload
+// pipeline or content scanning exists yet, matching Community's Reels),
+// shared workout plans, and invitations. Premium-future (more groups,
+// larger groups, announcements, scheduled sessions, assignments,
+// distinct roles) is not implemented — TrainerGroupMemberRole only has
+// OWNER/MEMBER for now, deliberately leaving room to add
+// MODERATOR/TRAINER later without a breaking migration.
+
+enum TrainerGroupMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum TrainerGroupInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+}
+
+model TrainerGroup {
+  id          String   @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TrainerGroupMember[]
+  messages    TrainerGroupMessage[]
+  invitations TrainerGroupInvitation[]
+  sharedPlans TrainerGroupSharedPlan[]
+
+  @@index([ownerId])
+  @@map("trainer_groups")
+}
+
+model TrainerGroupMember {
+  id       String                 @id @default(uuid())
+  groupId  String
+  userId   String
+  role     TrainerGroupMemberRole @default(MEMBER)
+  joinedAt DateTime               @default(now())
+
+  group TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("trainer_group_members")
+}
+
+// One row per group+invitee for all time — a re-invite after a decline/
+// cancel updates the existing row back to PENDING rather than creating a
+// second row, which keeps "has this person ever been invited" a simple
+// unique lookup.
+model TrainerGroupInvitation {
+  id        String                       @id @default(uuid())
+  groupId   String
+  inviterId String
+  inviteeId String
+  status    TrainerGroupInvitationStatus @default(PENDING)
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  group   TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  inviter User         @relation("TrainerGroupInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User         @relation("TrainerGroupInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, inviteeId])
+  @@index([inviteeId, status])
+  @@map("trainer_group_invitations")
+}
+
+// A text message, an image message, or both — never neither (enforced
+// in the DTO/service). imageUrl is an externally-hosted URL for the
+// same reason CommunityPost.mediaUrl is: no upload pipeline this session.
+model TrainerGroupMessage {
+  id        String   @id @default(uuid())
+  groupId   String
+  authorId  String
+  body      String?  @db.Text
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  group  TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
+  @@map("trainer_group_messages")
+}
+
+// A read-only reference to a member's own WorkoutPlan, shared into the
+// group — not a copy. If the sharer edits their plan, the group sees the
+// update; if they delete it, the share cascades away too.
+model TrainerGroupSharedPlan {
+  id            String   @id @default(uuid())
+  groupId       String
+  workoutPlanId String
+  sharedById    String
+  createdAt     DateTime @default(now())
+
+  group       TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  workoutPlan WorkoutPlan  @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  sharedBy    User         @relation(fields: [sharedById], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, workoutPlanId])
+  @@map("trainer_group_shared_plans")
 }

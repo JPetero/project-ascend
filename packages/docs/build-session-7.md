@@ -667,3 +667,143 @@ in this environment.
 - **`isTrainer` is self-declared, not verified.** The edit-profile
   screen says this directly; there is no trainer-application or
   verification flow.
+
+---
+
+## Part 5 — Trainer Groups messaging MVP
+
+Commit: `Implement messaging and trainer groups MVP`
+
+### What this part is
+
+Free-tier Trainer Groups: one owned group per user, a small centrally-
+configured member limit, text/image group chat, shared workout plans,
+and invitations — Founder Scenario 24. There is no general 1:1/friends
+messaging system in this part (that's Scenario 15, still parked) —
+"messaging" here specifically means a group's own chat thread, per the
+scenario's own scope.
+
+### Backend: `trainer-groups` module
+
+Five new Prisma models: `TrainerGroup`, `TrainerGroupMember` (unique on
+`groupId + userId`, `role` currently OWNER/MEMBER only — the enum is
+deliberately left room to add MODERATOR/TRAINER for the Premium-future
+tier without a breaking migration), `TrainerGroupInvitation` (unique on
+`groupId + inviteeId` — a single row per group+invitee for all time; a
+re-invite after a decline/cancel flips the same row back to PENDING via
+`upsert` rather than erroring on the unique constraint or creating a
+duplicate), `TrainerGroupMessage` (`body`/`imageUrl`, at least one
+required — enforced in the service since it's a cross-field rule),
+and `TrainerGroupSharedPlan` (a read-only reference to a member's own
+`WorkoutPlan`, unique on `groupId + workoutPlanId` — not a copy, so
+edits to the sharer's plan are visible to the group and a delete
+cascades the share away too).
+
+The free-tier limits (one owned group, five members) live in a single
+new file, `common/policy/trainer-group-policy.ts`, per Scenario 24's
+explicit "centrally configurable... not hard-coded per-widget"
+requirement — both the owned-group check and the member-limit check
+(enforced at both invite-creation time and again at accept time, since
+the group could fill up in between) read from the same two constants.
+
+Ownership and membership rules mirror the caution already established
+in Community: only the group owner may invite or delete the group; the
+owner can never be removed (must delete the group instead); only the
+owner may remove a *different* member, but any member may remove
+*themselves* (leave); only the sharer or the group owner may unshare a
+plan. There is no delete-message endpoint in this MVP at all — chat
+moderation is deferred alongside Part 10's Community moderation queue.
+Route ordering in
+`TrainerGroupsController` required care: `GET /trainer-groups/invitations`
+and the `/trainer-groups/invitations/:invitationId/...` routes are
+registered *before* `GET /trainer-groups/:id`, otherwise Nest would
+match a request for the invitations list as `:id = "invitations"`.
+
+### Flutter: `trainer_groups` feature
+
+`TrainerGroupsScreen` (the caller's groups plus pending invitations,
+with a "New group" FAB that only appears once the owned-group slot is
+free) and `TrainerGroupDetailScreen` (a three-tab Chat/Members/Shared
+plans view) are reachable from a new "Trainer Groups" icon in the
+Community tab's app bar — Community and Trainer Groups are both under
+Founder Scenario 21's single "Community" nav destination, so this
+doesn't add a seventh nav item. `TrainerGroupsController` (list +
+invitations) and `TrainerGroupDetailController` (one group's members,
+chat, shared plans) follow this session's established split-by-screen-
+need controller pattern rather than one shared god-controller. Sharing a
+plan reuses the existing `workoutPlanRepositoryProvider.list()` (Sprint
+2) to let the user pick from their own plans — no new workout-plan code
+was needed.
+
+### Integration points
+
+Reachable from Community (the new AppBar icon). Shared workout plans
+reuse the existing `WorkoutPlan` model and its ownership rule (only the
+plan's own owner may share it) rather than inventing a parallel
+plan-sharing model. The same `common/policy/` directory pattern
+(centralized, non-hard-coded limits) is now available for any future
+part that needs a similar free-tier numeric cap.
+
+### Tests
+
+Backend: `trainer-groups.service.spec.ts` (19 tests — owned-group limit,
+member-limit enforcement on invite and on accept, self-invite/self-block-
+style rejections, decline vs. accept branching, the accept transaction,
+cancel-invitation permission, owner-cannot-be-removed, leave-vs-remove
+permission split, empty-message rejection, plan-ownership check on
+share, unshare permission), `trainer-groups.e2e-spec.ts` (11 tests over
+real HTTP — group creation with owner auto-membership, the owned-group
+limit, the full invite → list → accept flow reflected in membership, a
+non-owner blocked from inviting, decline leaving no membership *and* the
+same invitation reusable afterward, filling a group to its 5-member
+limit and then rejecting a 6th invite, sending/listing text and image
+messages with an empty one rejected, a non-member blocked from sending
+or reading messages, sharing a workout plan with an ownership check and
+listing/unsharing it, the owner-can't-be-removed plus leave-yourself
+rules, and delete-group ownership).
+
+Flutter: `trainer_groups_controller_test.dart` (3 tests — initial load,
+accept, decline), `trainer_group_detail_controller_test.dart` (4 tests
+— load, empty-message rejection, send, share/unshare round-trip),
+`trainer_groups_screen_test.dart` (3 widget tests — empty state, a
+listed group's member count, a pending invitation's accept/decline
+actions).
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name trainer_groups_messaging_mvp` applied against the
+same local Postgres used for Parts 3–4 (the daemon had stopped between
+parts in this environment and was restarted with `sudo service
+postgresql start` before this migration), `npx tsc --noEmit` clean,
+`npx eslint "{src,test}/**/*.ts" --max-warnings=0` clean, `npx jest
+--silent` → 243 tests passed (was 224), `npx jest --config
+./test/jest-e2e.json --silent` → 93 tests passed (was 82), `npx nest
+build` clean.
+
+Flutter: `dart format .` clean, `flutter analyze` → "No issues found!",
+`flutter test` → 272 tests passed (was 262).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. No Docker daemon
+reachable, so `docker compose build`/`up -d`/`ps` were not attempted.
+
+### Known scope decisions
+
+- **No message deletion or moderation.** Chat messages can be sent and
+  listed but not removed by anyone, including the group owner — a
+  moderation affordance for group chat is deferred to Part 10 alongside
+  Community's moderation queue.
+- **No in-app image capture for chat.** `imageUrl` requires an
+  already-hosted URL, the same limitation as Community's Reels — no
+  upload pipeline exists this session.
+- **Invite by user ID only, no search.** `TrainerGroupDetailScreen`'s
+  invite dialog asks for a raw user ID (sourced from the invitee's
+  Community profile in the meantime) — there is no member-search/
+  autocomplete UI yet.
+- **Premium-future roles/scale are not implemented.** `TrainerGroupMemberRole`
+  has only OWNER/MEMBER; announcements, scheduled sessions, assignments,
+  and a MODERATOR/TRAINER role are Scenario 24's explicitly-deferred
+  Premium-future list.

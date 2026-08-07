@@ -27,6 +27,11 @@ class CommunityFeedScreen extends ConsumerWidget {
         title: const Text('Community'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.groups_2_outlined),
+            tooltip: 'Trainer Groups',
+            onPressed: () => context.push(RoutePaths.trainerGroups),
+          ),
+          IconButton(
             icon: const Icon(Icons.bookmark_border),
             tooltip: 'Saved posts',
             onPressed: () => context.push(RoutePaths.communitySaved),

@@ -20,6 +20,7 @@ import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
+import 'package:mobile/features/trainer_groups/presentation/providers/trainer_groups_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/exercise_controller.dart';
@@ -38,6 +39,7 @@ import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_repositories.dart';
+import 'fake_trainer_groups_repository.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
 
@@ -67,6 +69,7 @@ Future<ProviderContainer> createTestContainer({
   FakeHealthAdapter? healthAdapter,
   FakeHealthMetricsRepository? healthMetricsRepository,
   FakeCommunityRepository? communityRepository,
+  FakeTrainerGroupsRepository? trainerGroupsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -160,6 +163,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       communityRepositoryProvider.overrideWithValue(
         communityRepository ?? FakeCommunityRepository(),
+      ),
+      trainerGroupsRepositoryProvider.overrideWithValue(
+        trainerGroupsRepository ?? FakeTrainerGroupsRepository(),
       ),
     ],
   );

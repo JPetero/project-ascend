@@ -29,6 +29,7 @@ import { PersonalRecordsModule } from './modules/personal-records/personal-recor
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
+import { TrainerGroupsModule } from './modules/trainer-groups/trainer-groups.module';
 import { UsersModule } from './modules/users/users.module';
 import { WaterModule } from './modules/water/water.module';
 import { WorkoutHistoryModule } from './modules/workout-history/workout-history.module';
@@ -81,6 +82,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AchievementsModule,
     CardioModule,
     CommunityModule,
+    TrainerGroupsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
