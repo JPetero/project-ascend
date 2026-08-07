@@ -119,8 +119,18 @@ class ApiClient {
     String path,
     T Function(dynamic) fromData, {
     Object? data,
+    void Function(int sent, int total)? onSendProgress,
+    CancelToken? cancelToken,
   }) {
-    return _request(() => _dio.post(path, data: data), fromData);
+    return _request(
+      () => _dio.post(
+        path,
+        data: data,
+        onSendProgress: onSendProgress,
+        cancelToken: cancelToken,
+      ),
+      fromData,
+    );
   }
 
   Future<ResponseEnvelope<T>> patch<T>(
@@ -172,6 +182,10 @@ class ApiClient {
   }
 
   AppException _mapError(DioException error) {
+    if (error.type == DioExceptionType.cancel) {
+      return AppException.cancelled();
+    }
+
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||

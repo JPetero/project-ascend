@@ -21,6 +21,9 @@ class AppException implements Exception {
     code: 'UNKNOWN',
   );
 
+  factory AppException.cancelled() =>
+      const AppException(message: 'Cancelled.', code: 'CANCELLED');
+
   @override
   String toString() => message;
 }
