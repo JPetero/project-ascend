@@ -115,19 +115,21 @@ model User {
   communityComments           CommunityComment[]
   communitySaves              CommunitySave[]
   communityReports            CommunityReport[]
-  communityFollowing          CommunityFollow[]        @relation("CommunityFollower")
-  communityFollowers          CommunityFollow[]        @relation("CommunityFollowing")
-  communityBlocksMade         CommunityBlock[]         @relation("CommunityBlocker")
-  communityBlocksAgainst      CommunityBlock[]         @relation("CommunityBlocked")
+  communityFollowing          CommunityFollow[]         @relation("CommunityFollower")
+  communityFollowers          CommunityFollow[]         @relation("CommunityFollowing")
+  communityBlocksMade         CommunityBlock[]          @relation("CommunityBlocker")
+  communityBlocksAgainst      CommunityBlock[]          @relation("CommunityBlocked")
   ownedTrainerGroups          TrainerGroup[]
   trainerGroupMembers         TrainerGroupMember[]
   trainerGroupMessages        TrainerGroupMessage[]
-  trainerGroupInvitesSent     TrainerGroupInvitation[] @relation("TrainerGroupInviter")
-  trainerGroupInvitesReceived TrainerGroupInvitation[] @relation("TrainerGroupInvitee")
+  trainerGroupInvitesSent     TrainerGroupInvitation[]  @relation("TrainerGroupInviter")
+  trainerGroupInvitesReceived TrainerGroupInvitation[]  @relation("TrainerGroupInvitee")
   trainerGroupSharedPlans     TrainerGroupSharedPlan[]
   rankingOptIn                RankingOptIn?
   createdChallenges           Challenge[]
   challengeParticipations     ChallengeParticipant[]
+  subscription                UserSubscription?
+  affordabilityEligibility    AffordabilityEligibility?
 
   @@index([status])
   @@map("users")
@@ -1541,4 +1543,61 @@ model ChallengeParticipant {
   @@unique([challengeId, userId])
   @@index([userId])
   @@map("challenge_participants")
+}
+
+// Subscription/entitlement foundation — Founder Scenario 27. No billing
+// integration exists this session (see packages/docs/product/
+// parking-lot.md); this model exists so CapabilityService.getPlanTier
+// reads a real per-user row instead of a hardcoded literal, and so a
+// future payment-provider webhook has a single place to write to. No
+// row at all means FREE (CapabilityService's default), matching every
+// other "absence of a row = the private/free default" pattern already
+// established in this schema (RankingOptIn, etc).
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+}
+
+model UserSubscription {
+  id        String           @id @default(uuid())
+  userId    String           @unique
+  tier      SubscriptionTier @default(FREE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_subscriptions")
+}
+
+// Affordability programs — Founder Scenario 27's Student/Accessibility/
+// Senior/Regional Affordability eligibility model, extending the
+// student/disability-access pattern from Scenario 13. Eligibility
+// status is deliberately never joined into any public-profile query —
+// see CommunityProfile, which has no relation to this model at all.
+enum AffordabilityProgram {
+  STUDENT
+  ACCESSIBILITY
+  SENIOR
+  REGIONAL
+}
+
+enum AffordabilityStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AffordabilityEligibility {
+  id          String               @id @default(uuid())
+  userId      String               @unique
+  program     AffordabilityProgram
+  status      AffordabilityStatus  @default(PENDING)
+  notes       String?
+  submittedAt DateTime             @default(now())
+  reviewedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("affordability_eligibilities")
 }

@@ -958,3 +958,128 @@ attempted.
   "invite a friend to this challenge" affordance yet.
 - **No push notifications for challenge milestones or leaderboard rank
   changes.** Both screens are pull/refresh-based only in this MVP.
+
+## Part 7 — Subscription entitlement and affordability foundation
+
+Commit: `Add subscription entitlement and affordability foundation`
+
+### What this part is
+
+Founder Scenario 27's subscription/pricing/support requirements, split
+into what's honestly buildable without a payment provider: a real
+per-user tier read (replacing `CapabilityService.getPlanTier`'s
+hardcoded `PlanTier.FREE` literal), centralized non-final pricing, and
+a working Student/Accessibility/Senior/Regional Affordability
+application pipeline. Deliberately **not** built: any self-service
+"upgrade to Premium" endpoint or button. No billing/payment integration
+exists this session (see `parking-lot.md`), so a working upgrade flow
+would require either faking a payment success or faking a real payment
+integration — both dishonest. What exists now is the seam a future
+payment-provider webhook writes into.
+
+### Backend: `common/entitlements` and `subscriptions` module
+
+New Prisma models: `UserSubscription` (unique `userId`, `tier`
+FREE/PREMIUM, defaults FREE) and `AffordabilityEligibility` (unique
+`userId`, `program` STUDENT/ACCESSIBILITY/SENIOR/REGIONAL, `status`
+PENDING/APPROVED/REJECTED, defaults PENDING). Eligibility status is
+never joined into any public-profile query — same "private unless
+explicitly surfaced" discipline as `RankingOptIn` and Community's block
+model. `CapabilityService.getPlanTier` is now `async` and queries
+`UserSubscription`, defaulting to `PlanTier.FREE` when no row exists —
+the same "absence of a row = the default" pattern used everywhere else
+in this schema. It had zero other call sites in the codebase, so the
+signature change (sync → async) was a safe, contained edit.
+`common/config/pricing.config.ts` centralizes Scenario 27's pricing
+hypotheses (≈USD 12.99 standard / ≈USD 7.99 eligible, ≈PHP 599 standard
+/ ≈PHP 299 eligible) — the single place any future UI or endpoint reads
+from, never a duplicated literal. `SubscriptionsService.applyForEligibility`
+upserts on `userId`, so re-applying (after a REJECTED outcome, or to
+switch programs) resets the same row back to PENDING rather than
+erroring on the unique constraint — one live application per user.
+
+### Flutter: real tier resolution plus a Membership screen
+
+`core/entitlements/capability_provider.dart`'s `planTierProvider` used
+to be `Provider<PlanTier>((ref) => PlanTier.free)` — a hardcoded
+literal every screen read. It's now backed by a `FutureProvider` that
+calls the new `SubscriptionStatusRepository.getMyTier()` (a genuine
+`/subscriptions/me` round trip), unwrapped with `.valueOrNull ??
+PlanTier.free` so it stays synchronously readable and never throws —
+loading and error states both resolve to FREE, matching the "must never
+fail open into Premium" rule. Because `planTierProvider` kept its exact
+`Provider<PlanTier>` type, no existing call site (`dashboard_screen.dart`'s
+subscription card, `VisionScreen`'s capability gate) or test
+(`vision_screen_test.dart`'s `planTierProvider.overrideWithValue(...)`)
+needed to change — a genuinely real wiring change with zero call-site
+churn. The minimal fetch lives in `core/entitlements/` on purpose (not
+in a `features/subscriptions` repository) so this core layer never has
+to import a feature, matching the layering discipline the rest of
+`core/` already follows. A new `features/subscriptions` feature holds
+the richer `SubscriptionScreen` (current tier, the pricing table, and
+the affordability-program application form), reachable by tapping the
+dashboard's existing subscription status card (now genuinely tappable
+instead of inert).
+
+### Integration points
+
+`dashboard_screen.dart`'s pre-existing `_SubscriptionStatusCard` — which
+already watched `planTierProvider` — now both reflects the real fetch
+and pushes to the new Membership screen on tap; no new nav destination
+was needed. Every other `AppCapability` check in the app (Vision's gate,
+any future premium check) automatically inherits real tier resolution
+through the same `planTierProvider`/`capabilityProvider` seam, without
+each call site needing to know a network call is now involved.
+
+### Tests
+
+Backend: `capability.service.spec.ts` (6 tests — FREE default with no
+row, PREMIUM/FREE from an explicit row, a free capability available
+with no row, a premium capability unavailable with no row and available
+once PREMIUM), `subscriptions.service.spec.ts` (4 tests — pricing shape,
+no-eligibility status, eligibility included once applied, upsert
+keyed on userId), `subscriptions.e2e-spec.ts` (5 tests over real HTTP —
+centralized USD/PHP pricing with a lower eligible amount than standard,
+FREE-with-no-eligibility default, an application reflected on both
+`/me` and `/eligibility`, re-applying with a different program replacing
+the pending one, and 401 for an unauthenticated request).
+
+Flutter: `subscription_controller_test.dart` (2 tests — initial
+status/pricing load, an eligibility application recorded as PENDING),
+`subscription_screen_test.dart` (2 widget tests — Free plan plus both
+pricing currencies rendered, a pending application shown instead of the
+application form).
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name subscriptions_affordability_foundation` applied
+against the same local Postgres used for Parts 3–6, `npx tsc --noEmit`
+clean, `npx eslint "{src,test}/**/*.ts" --max-warnings=0` clean, `npx
+jest --silent` → 279 tests passed (was 269), `npx jest --config
+./test/jest-e2e.json --silent` → 115 tests passed (was 110), `npx nest
+build` clean.
+
+Flutter: `dart format --set-exit-if-changed .` clean, `flutter analyze`
+→ "No issues found!", `flutter test` → 288 tests passed (was 284).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. No Docker
+daemon reachable, so `docker compose build`/`up -d`/`ps` were not
+attempted.
+
+### Known scope decisions
+
+- **No billing/payment integration.** Nothing in this app can write a
+  PREMIUM `UserSubscription` row yet — that's the explicit boundary of
+  "foundation," not full Scenario 27. A future payment-provider webhook
+  is the intended writer.
+- **No self-service upgrade endpoint.** Deliberately omitted rather
+  than faked — see "What this part is" above.
+- **No eligibility review/approval tooling.** Applications land in
+  PENDING and stay there; an admin review queue is Part 10's territory.
+- **Pricing is read-only display, not a checkout flow.** The Membership
+  screen shows the centralized non-final numbers; it does not attempt
+  any store integration.

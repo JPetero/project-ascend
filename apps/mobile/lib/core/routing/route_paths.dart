@@ -44,6 +44,7 @@ abstract final class RoutePaths {
   static const challengeDetail = '/leaderboards/challenges/:id';
 
   static const dashboard = '/dashboard';
+  static const subscription = '/subscription';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

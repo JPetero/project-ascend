@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/core/entitlements/capability_provider.dart';
 import 'package:mobile/core/providers/core_providers.dart';
 import 'package:mobile/core/storage/app_database.dart';
 import 'package:mobile/core/storage/secure_token_storage.dart';
@@ -11,6 +12,7 @@ import 'package:mobile/features/cardio/presentation/providers/live_cardio_sessio
 import 'package:mobile/features/challenges/presentation/providers/challenges_controller.dart';
 import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
+import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
@@ -43,6 +45,8 @@ import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
+import 'fake_subscription_status_repository.dart';
+import 'fake_subscriptions_repository.dart';
 import 'fake_trainer_groups_repository.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
@@ -76,6 +80,8 @@ Future<ProviderContainer> createTestContainer({
   FakeTrainerGroupsRepository? trainerGroupsRepository,
   FakeRankingsRepository? rankingsRepository,
   FakeChallengesRepository? challengesRepository,
+  FakeSubscriptionStatusRepository? subscriptionStatusRepository,
+  FakeSubscriptionsRepository? subscriptionsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -178,6 +184,12 @@ Future<ProviderContainer> createTestContainer({
       ),
       challengesRepositoryProvider.overrideWithValue(
         challengesRepository ?? FakeChallengesRepository(),
+      ),
+      subscriptionStatusRepositoryProvider.overrideWithValue(
+        subscriptionStatusRepository ?? FakeSubscriptionStatusRepository(),
+      ),
+      subscriptionsRepositoryProvider.overrideWithValue(
+        subscriptionsRepository ?? FakeSubscriptionsRepository(),
       ),
     ],
   );

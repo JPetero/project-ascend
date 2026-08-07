@@ -27,9 +27,17 @@ actually in scope for the current session.
   deliberate simplification: 3 scopes instead of Scenario 16a's full
   local/city/region/state/national/global granularity, and no seasonal
   rewards/badges beyond the season's point total.
-- **Subscriptions/payment processing** — the capability model
-  (`free-premium-policy.md`) is ready to receive a `PlanTier`, but no
-  billing integration, receipt validation, or store integration exists.
+- **Subscriptions/payment processing** — superseded in part by Build
+  Session 7 Part 7: `CapabilityService.getPlanTier` now reads a real
+  per-user `UserSubscription` row (defaulting FREE) instead of a
+  hardcoded literal, centralized pricing exists
+  (`common/config/pricing.config.ts`), and the Student/Accessibility/
+  Senior/Regional Affordability application pipeline is live — see
+  `build-session-7.md` Part 7. Still deferred: no billing integration,
+  receipt validation, or store integration exists, so nothing can
+  actually write a PREMIUM row yet, and there is deliberately no
+  self-service "upgrade" endpoint (faking one would mean a fabricated
+  payment flow).
 - **Scanners** (food/body) — premium capability placeholder only.
 - **Live AI provider integration** — Atlas/Nova use deterministic local
   dialogue. See `atlas-nova-bible.md` for the intended architecture when

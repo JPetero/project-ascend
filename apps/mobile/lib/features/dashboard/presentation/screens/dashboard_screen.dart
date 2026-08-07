@@ -277,6 +277,7 @@ class _SubscriptionStatusCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tier = ref.watch(planTierProvider);
     return AscendCard(
+      onTap: () => context.push(RoutePaths.subscription),
       child: Row(
         children: [
           Icon(
@@ -296,6 +297,7 @@ class _SubscriptionStatusCard extends ConsumerWidget {
               ],
             ),
           ),
+          const Icon(Icons.chevron_right),
         ],
       ),
     );

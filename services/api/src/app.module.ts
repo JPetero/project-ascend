@@ -31,6 +31,7 @@ import { PersonalRecordsModule } from './modules/personal-records/personal-recor
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { TrainerGroupsModule } from './modules/trainer-groups/trainer-groups.module';
 import { UsersModule } from './modules/users/users.module';
 import { WaterModule } from './modules/water/water.module';
@@ -87,6 +88,7 @@ import { PrismaModule } from './prisma/prisma.module';
     TrainerGroupsModule,
     RankingsModule,
     ChallengesModule,
+    SubscriptionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

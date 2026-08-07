@@ -33,6 +33,7 @@ import '../../features/nutrition/presentation/screens/macro_target_editor_screen
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
+import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
 import '../../features/wearables/presentation/screens/connected_health_screen.dart';
 import '../../features/workout/presentation/providers/workout_session_controller.dart';
@@ -140,6 +141,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.dashboard,
         builder: (context, state) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.subscription,
+        builder: (context, state) => const SubscriptionScreen(),
       ),
       GoRoute(
         path: RoutePaths.connectedHealth,
