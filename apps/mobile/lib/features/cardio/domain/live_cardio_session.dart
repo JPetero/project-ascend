@@ -20,6 +20,7 @@ class LiveCardioSessionState {
     required this.distanceMeters,
     required this.routePoints,
     this.lastFixAt,
+    this.pausedForBackground = false,
   });
 
   final String localId;
@@ -41,6 +42,15 @@ class LiveCardioSessionState {
   // simple current-pace estimate from the last two points, separately
   // from resumedAt (which tracks pause/resume, not GPS fix cadence).
   final DateTime? lastFixAt;
+  // True when this session is paused because Ascend stopped tracking on
+  // its own — the app was backgrounded (see LiveCardioScreen's
+  // WidgetsBindingObserver) or the process was killed and this session
+  // was recovered from cache on relaunch — rather than the user tapping
+  // Pause themselves. Location is never tracked in the background (see
+  // GeolocatorLiveLocationService's doc comment); this flag exists so
+  // the UI can say so honestly instead of leaving the user to wonder why
+  // their run stopped recording.
+  final bool pausedForBackground;
 
   bool get isTracking => status == LiveCardioStatus.tracking;
 
@@ -68,6 +78,7 @@ class LiveCardioSessionState {
     double? distanceMeters,
     List<RoutePoint>? routePoints,
     DateTime? lastFixAt,
+    bool? pausedForBackground,
   }) {
     return LiveCardioSessionState(
       localId: localId,
@@ -82,6 +93,7 @@ class LiveCardioSessionState {
       distanceMeters: distanceMeters ?? this.distanceMeters,
       routePoints: routePoints ?? this.routePoints,
       lastFixAt: lastFixAt ?? this.lastFixAt,
+      pausedForBackground: pausedForBackground ?? this.pausedForBackground,
     );
   }
 
@@ -97,6 +109,7 @@ class LiveCardioSessionState {
     'distanceMeters': distanceMeters,
     'routePoints': routePoints.map((p) => p.toJson()).toList(),
     'lastFixAt': lastFixAt?.toIso8601String(),
+    'pausedForBackground': pausedForBackground,
   };
 
   factory LiveCardioSessionState.fromCacheJson(Map<String, dynamic> json) {
@@ -121,6 +134,7 @@ class LiveCardioSessionState {
       lastFixAt: json['lastFixAt'] != null
           ? DateTime.parse(json['lastFixAt'] as String)
           : null,
+      pausedForBackground: json['pausedForBackground'] as bool? ?? false,
     );
   }
 }

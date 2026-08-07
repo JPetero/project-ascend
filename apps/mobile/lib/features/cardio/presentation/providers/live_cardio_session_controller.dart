@@ -80,6 +80,10 @@ class LiveCardioSessionController
             activeDurationSeconds: session.liveActiveDurationSeconds(),
             clearPausedAt: false,
             pausedAt: DateTime.now(),
+            // The process was killed mid-run — Ascend didn't stop this on
+            // purpose any more than backgrounding does, so it gets the
+            // same honest "we stopped, you resume" messaging.
+            pausedForBackground: true,
           )
         : session;
     await _persist(state!);
@@ -164,7 +168,18 @@ class LiveCardioSessionController
     );
   }
 
-  Future<void> pause() async {
+  Future<void> pause() => _pause(pausedForBackground: false);
+
+  /// Called by `LiveCardioScreen`'s `WidgetsBindingObserver` when the app
+  /// is backgrounded mid-session — never by anything running off-screen.
+  /// Location is never tracked in the background (see
+  /// `GeolocatorLiveLocationService`'s doc comment), so leaving means the
+  /// GPS stream would silently stop producing fixes anyway; this makes
+  /// that honest in the session's own state instead of letting the UI
+  /// keep implying tracking is still live.
+  Future<void> pauseForBackground() => _pause(pausedForBackground: true);
+
+  Future<void> _pause({required bool pausedForBackground}) async {
     final current = state;
     if (current == null || current.status != LiveCardioStatus.tracking) return;
 
@@ -179,6 +194,7 @@ class LiveCardioSessionController
         pausedAt: now,
         activeDurationSeconds:
             current.activeDurationSeconds + (elapsed < 0 ? 0 : elapsed),
+        pausedForBackground: pausedForBackground,
       ),
     );
   }
@@ -200,6 +216,7 @@ class LiveCardioSessionController
         status: LiveCardioStatus.tracking,
         resumedAt: DateTime.now(),
         clearPausedAt: true,
+        pausedForBackground: false,
       ),
     );
     _subscribe();
