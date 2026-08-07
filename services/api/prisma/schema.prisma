@@ -142,6 +142,7 @@ model User {
   affordabilityEligibility    AffordabilityEligibility?
   supportTickets              SupportTicket[]
   supportTicketReplies        SupportTicketReply[]
+  promotedCampaigns           PromotedCampaign[]
 
   @@index([status])
   @@map("users")
@@ -1260,10 +1261,11 @@ model CommunityPost {
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
-  author   User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  likes    CommunityLike[]
-  comments CommunityComment[]
-  saves    CommunitySave[]
+  author            User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes             CommunityLike[]
+  comments          CommunityComment[]
+  saves             CommunitySave[]
+  promotedCampaigns PromotedCampaign[]
 
   @@index([authorId, createdAt])
   @@index([visibility, moderationStatus, createdAt])
@@ -1672,4 +1674,78 @@ model SupportTicketReply {
 
   @@index([ticketId, createdAt])
   @@map("support_ticket_replies")
+}
+
+// Ascend Promote — Founder Scenario 23's transparent-promotion
+// architecture. Actual billing is future, store-compliant work (no
+// live payments this session — see build-session-7.md Part 11); this
+// is the architecture a payment integration plugs into. Every
+// non-negotiable rule from the scenario is enforced structurally, not
+// by convention: a campaign can never serve an impression before an
+// admin moves it out of PENDING_REVIEW (PromoteService.recordImpression
+// checks status === ACTIVE), paid metrics live in their own tables
+// entirely separate from CommunityLike/CommunityComment (so organic and
+// paid engagement can never be summed into one blended number by
+// accident), and nothing in RankingsService or
+// common/scoring/activity-scoring.util.ts ever reads from these tables
+// — a paid boost has zero code path into Ranking scoring.
+enum PromotedCampaignStatus {
+  PENDING_REVIEW
+  ACTIVE
+  REJECTED
+  ENDED
+}
+
+model PromotedCampaign {
+  id             String                 @id @default(uuid())
+  creatorId      String
+  postId         String
+  status         PromotedCampaignStatus @default(PENDING_REVIEW)
+  // Non-final business hypothesis — a spend budget, not a live charge.
+  // Same "no live billing" pattern as Scenario 27's pricing config.
+  budgetAmount   Float
+  budgetCurrency String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  endedAt        DateTime?
+
+  creator     User                 @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  post        CommunityPost        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  impressions PromotedImpression[]
+  clicks      PromotedClick[]
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([postId])
+  @@map("promoted_campaigns")
+}
+
+// Deliberately its own table, never a column on CommunityPost or a
+// shared row with organic likes/views — see this section's header
+// comment on why paid and organic metrics must never be able to blend.
+model PromotedImpression {
+  id         String   @id @default(uuid())
+  campaignId String
+  viewerId   String
+  createdAt  DateTime @default(now())
+
+  campaign PromotedCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([viewerId, createdAt])
+  @@map("promoted_impressions")
+}
+
+model PromotedClick {
+  id         String   @id @default(uuid())
+  campaignId String
+  viewerId   String
+  createdAt  DateTime @default(now())
+
+  campaign PromotedCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("promoted_clicks")
 }

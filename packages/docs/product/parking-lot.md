@@ -155,8 +155,17 @@ architecture-only below).
   OPEN reports and can mark a reported post REMOVED — see
   `build-session-7.md` Part 10). Still pending: in-app capture/upload
   for IMAGE/VIDEO posts and native external sharing.
-- **Ascend Promote (23)** — transparent paid distribution architecture;
-  no live billing.
+- **Ascend Promote (23)** — **MVP implemented in Part 11** (Premium
+  creators submit a campaign promoting one of their own Community
+  posts; every campaign starts PENDING_REVIEW and only an admin can
+  activate it; impressions/clicks are recorded into their own tables,
+  frequency-capped per viewer per day, and reported back to the
+  creator as a metrics view that is structurally separated from
+  organic likes/comments — never blended into one number, and proven
+  by both a unit test and an e2e test to have zero influence on
+  Rankings — see `build-session-7.md` Part 11). Still architecture-only:
+  no live billing, so `budgetAmount` is a non-final spend hypothesis,
+  never a real charge.
 - **Trainer groups (24)** — **free basic tier implemented in Part 5**
   (one owned group per user, a centrally-configured member limit, text/
   image chat, shared workout plans, invitations). Premium expanded tier

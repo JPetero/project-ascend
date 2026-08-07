@@ -31,6 +31,7 @@ import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module
 import { PersonalRecordsModule } from './modules/personal-records/personal-records.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
+import { PromoteModule } from './modules/promote/promote.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SupportModule } from './modules/support/support.module';
@@ -93,6 +94,7 @@ import { PrismaModule } from './prisma/prisma.module';
     SubscriptionsModule,
     SupportModule,
     AdminModule,
+    PromoteModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

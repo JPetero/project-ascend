@@ -105,4 +105,24 @@ describe('computeActivitySummary', () => {
       select: { completedAt: true },
     });
   });
+
+  it(
+    'never touches Ascend Promote data — a paid impression/click has zero code ' +
+      'path into Ranking scoring (Founder Scenario 23)',
+    async () => {
+      // No `promotedImpression`/`promotedClick`/`promotedCampaign` key
+      // exists on this mock at all. If computeActivitySummary ever
+      // queried one, this test would fail with a "not a function"
+      // TypeError rather than silently passing — the same pattern that
+      // caught a genuinely missing mock earlier this session.
+      prisma.workoutSession.findMany.mockResolvedValue([
+        { completedAt: new Date('2026-08-05T08:00:00Z') },
+      ]);
+      const { from, to } = range();
+
+      const summary = await computeActivitySummary(prisma as never, 'user-1', from, to);
+
+      expect(summary).toEqual({ activeDays: 1, points: 1 });
+    },
+  );
 });

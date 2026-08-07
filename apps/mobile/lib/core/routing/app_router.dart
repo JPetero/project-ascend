@@ -33,6 +33,9 @@ import '../../features/nutrition/presentation/screens/macro_target_editor_screen
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
+import '../../features/promote/presentation/screens/campaign_detail_screen.dart';
+import '../../features/promote/presentation/screens/create_campaign_screen.dart';
+import '../../features/promote/presentation/screens/promote_screen.dart';
 import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
 import '../../features/support/presentation/screens/create_ticket_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
@@ -239,6 +242,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.trainerGroupDetail,
         builder: (context, state) =>
             TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaigns,
+        builder: (context, state) => const PromoteScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaignCreate,
+        builder: (context, state) => const CreateCampaignScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.promoteCampaignDetail,
+        builder: (context, state) =>
+            CampaignDetailScreen(campaignId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.challenges,

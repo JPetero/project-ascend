@@ -2,12 +2,15 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import {
   CommunityReportStatus,
   CommunityReportTargetType,
+  PromotedCampaignStatus,
   SupportTicketStatus,
 } from '@prisma/client';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionReportDto } from './dto/action-report.dto';
+import { DecideCampaignDto } from './dto/decide-campaign.dto';
 import { DecideEligibilityDto } from './dto/decide-eligibility.dto';
+import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { ListTicketsDto } from './dto/list-tickets.dto';
@@ -136,5 +139,39 @@ export class AdminService {
       }),
     ]);
     return reply;
+  }
+
+  // --- Ascend Promote review ----------------------------------------
+
+  async listCampaigns(query: ListCampaignsDto) {
+    const where = { status: query.status };
+    const [campaigns, total] = await Promise.all([
+      this.prisma.promotedCampaign.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        ...paginationArgs(query),
+      }),
+      this.prisma.promotedCampaign.count({ where }),
+    ]);
+    return { data: campaigns, meta: paginationMeta(query, total) };
+  }
+
+  async decideCampaign(adminUserId: string, id: string, dto: DecideCampaignDto) {
+    if (
+      dto.status !== PromotedCampaignStatus.ACTIVE &&
+      dto.status !== PromotedCampaignStatus.REJECTED
+    ) {
+      throw new BadRequestException('A decision must be ACTIVE or REJECTED.');
+    }
+    const campaign = await this.prisma.promotedCampaign.findUnique({ where: { id } });
+    if (!campaign) throw new NotFoundException('Campaign not found.');
+    if (campaign.status !== PromotedCampaignStatus.PENDING_REVIEW) {
+      throw new BadRequestException('Only a PENDING_REVIEW campaign can be reviewed.');
+    }
+
+    return this.prisma.promotedCampaign.update({
+      where: { id },
+      data: { status: dto.status, reviewedAt: new Date(), reviewedBy: adminUserId },
+    });
   }
 }

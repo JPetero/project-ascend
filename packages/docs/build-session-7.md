@@ -1425,3 +1425,171 @@ attempted.
   REVIEWED/ACTIONED) but `removeContent` only removes a post's
   visibility today; comment/profile moderation actions are future
   work.
+
+---
+
+## Part 11 — Ascend Promote architecture
+
+Commit: `Add transparent Ascend Promote architecture`
+
+### What this part is
+
+Founder Scenario 23's transparent paid-distribution feature: a
+Premium creator can submit one of their own Community posts as a paid
+campaign, every campaign starts under moderation review, and paid
+reach is reported back to the creator in a way that is structurally
+incapable of being confused with organic engagement or of leaking
+into Rankings. This is also the first endpoint in this entire session
+to enforce a capability check server-side rather than only in the
+Flutter UI — `PromoteService.createCampaign` calls the
+`CapabilityService.hasCapabilityForUser` built in Part 7 and rejects
+with 403 before ever touching the database.
+
+### Backend
+
+New Prisma models: `PromotedCampaign` (creatorId, postId, `status`
+defaulting to `PENDING_REVIEW`, `budgetAmount`/`budgetCurrency` — a
+non-final spend hypothesis, never a live charge — `reviewedAt`/
+`reviewedBy`/`endedAt`), `PromotedImpression`, and `PromotedClick`
+(each just `campaignId`/`viewerId`/`createdAt`). These are
+deliberately separate tables from `CommunityLike`/`CommunityComment`
+— there is no shared row, join, or column that paid and organic
+engagement both write to.
+
+`PromoteModule` (`services/api/src/modules/promote/`):
+`POST /promote/campaigns` (entitlement-gated, ownership-checked —
+only the post's author can promote it), `GET /promote/campaigns`
+(caller's own), `DELETE /promote/campaigns/:id` (creator-only, sets
+`ENDED`), `POST /promote/campaigns/:id/impression` and `.../click`
+(open to any authenticated viewer; both silently return
+`{recorded:false}` — not an error — for a non-`ACTIVE` campaign, and
+impressions are frequency-capped at
+`PROMOTE_MAX_IMPRESSIONS_PER_VIEWER_PER_DAY = 3` per viewer per UTC
+day via `common/policy/promote-policy.ts`), and
+`GET /promote/campaigns/:id/metrics`, which returns two entirely
+separate objects — `organic: {likes, comments}` and
+`promoted: {impressions, clicks}` — from two separate `count()`
+queries, never summed into one number.
+
+`AdminModule` gained a campaign review queue:
+`GET /admin/promoted-campaigns` and
+`PATCH /admin/promoted-campaigns/:id` (moves `PENDING_REVIEW` to
+`ACTIVE` or `REJECTED`; rejects re-reviewing a campaign that already
+has a decision; 404s a made-up campaign id).
+
+**Rankings-integrity guarantee, enforced two ways.** A unit test in
+`activity-scoring.util.spec.ts` calls `computeActivitySummary` against
+a mock Prisma object that has no `promotedImpression`,
+`promotedClick`, or `promotedCampaign` key defined at all — if that
+function ever grew a code path into Promote's tables, the test would
+fail immediately with a "not a function" `TypeError` rather than
+passing silently. `promote.e2e-spec.ts` backs this with a real
+end-to-end check: it generates 3 real impressions and 1 real click
+against an `ACTIVE` campaign, then calls `PUT /rankings/opt-in` and
+`GET /rankings/me` for the viewer who generated them, and asserts
+`points: 0, activeDays: 0`.
+
+### Flutter
+
+`features/promote/`: `domain/campaign.dart` (`CampaignStatus` enum,
+`Campaign`, and `CampaignMetrics` — the latter keeping
+`organicLikes`/`organicComments`/`promotedImpressions`/`promotedClicks`
+as four separate `int` fields, never a combined total),
+`data/promote_repository.dart`, `presentation/providers/promote_controller.dart`
+(caller's own campaign list) and `campaign_detail_controller.dart`
+(single campaign's metrics + end-campaign action),
+`presentation/screens/promote_screen.dart` (capability-gated on
+`AppCapability.ascendPromote` — Free users see an honest locked
+`AscendEmptyState`, same pattern as Vision in Part 8; Premium users
+see their campaign list plus a FAB to create one),
+`create_campaign_screen.dart` (reuses `CommunityRepository.listFeed(authorId:)`
+from Part 4 to let the creator pick one of their own posts, a budget
+field, a USD/PHP currency picker, and the same "non-final hypothesis
+— no billing is charged this build" disclaimer used in Part 7's
+pricing screen), and `campaign_detail_screen.dart` (two visually
+separated `AscendCard` sections — "Organic" and "Promoted (paid)" —
+each with its own explanatory caption, plus an "End campaign" action).
+
+Reachable from the Community feed's app bar via a new campaign-icon
+button, next to the existing Trainer Groups icon.
+
+### Integration points
+
+- `CapabilityService.hasCapabilityForUser` (Part 7) gates campaign
+  creation — the first server-side enforcement of a capability check
+  this session.
+- `CommunityRepository.listFeed` (Part 4) is reused rather than
+  building a new "list my posts" endpoint.
+- `CommunityPost`/`CommunityLike`/`CommunityComment` (Part 4) supply
+  the "organic" half of a campaign's metrics.
+- `AdminGuard` (Part 10) protects the new campaign review queue the
+  same way it protects the report/eligibility/support queues.
+- `computeActivitySummary` (Part 6) is proven, at both the unit and
+  e2e level, to never read Promote's tables.
+
+### Tests
+
+Backend: `promote.service.spec.ts` (10 tests — entitlement rejection,
+ownership rejection, 404s, PENDING_REVIEW never serving an impression,
+the frequency cap, click rejection for a non-ACTIVE campaign, metrics
+separation, 404 on someone else's campaign), `admin.service.spec.ts`
+gained a `decideCampaign` block (4 new tests), `activity-scoring.util.spec.ts`
+gained the mock-omission Rankings-integrity test, `promote.e2e-spec.ts`
+(16 tests, over real HTTP — the full creator flow from entitlement
+rejection through creation, ownership rejection, PENDING_REVIEW never
+serving impressions, the admin queue and its invalid-decision/
+re-review rejection, activation, the frequency cap allowing 3 and
+suppressing a 4th, click recording, metrics separation checked
+against a real like, the cross-module Rankings-integrity check
+described above, 404s for someone else's campaign and for reviewing a
+made-up one, ending a campaign, and 403 for a non-admin on the review
+queue).
+
+Flutter: `promote_controller_test.dart` (3 tests), `campaign_detail_controller_test.dart`
+(4 tests — including one asserting organic and promoted metrics stay
+on separate fields), `promote_screen_test.dart` (3 widget tests —
+Free-tier locked state, Premium empty state, a listed campaign).
+
+**A real regression caught and fixed during this part**: the initial
+post-picker used `RadioListTile`, whose `groupValue`/`onChanged`
+constructor parameters `flutter analyze` flagged as
+`deprecated_member_use` (deprecated after Flutter v3.32.0 in favor of
+a `RadioGroup` ancestor). Fixed by replacing it with a plain
+`ListTile` driving its own selection state via `onTap` and a
+`radio_button_checked`/`radio_button_unchecked` leading icon, avoiding
+the deprecated API entirely rather than adopting `RadioGroup`.
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name ascend_promote_architecture` applied against the
+same local Postgres used for Parts 3–10, `npx tsc --noEmit` clean,
+`npx eslint "{src,test}/**/*.ts" --max-warnings=0` clean (one `--fix`
+pass for formatting in `promote.service.spec.ts`), `npx jest --silent`
+→ 306 tests passed (was 291), `npx jest --config ./test/jest-e2e.json
+--silent` → 146 tests passed (was 130), `npx nest build` clean.
+
+Flutter: `dart format lib test` clean, `flutter analyze` → "No issues
+found!", `flutter test` → 313 tests passed (was 303).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. No Docker
+daemon reachable, so `docker compose build`/`up -d`/`ps` were not
+attempted.
+
+### Known scope decisions
+
+- **No live billing.** `PromotedCampaign.budgetAmount` is a non-final
+  spend hypothesis this session, exactly like `pricing.config.ts` in
+  Part 7 — nothing here ever charges a real amount.
+- **No self-service moderation escalation.** Activating or rejecting a
+  campaign requires `UserRole.ADMIN`, and (per Part 10) there is still
+  no in-app way to become an admin — the same out-of-band
+  `prisma.user.update(...)` pattern applies.
+- **Frequency cap is a fixed constant, not per-user configurable.**
+  `PROMOTE_MAX_IMPRESSIONS_PER_VIEWER_PER_DAY = 3` is centralized in
+  `common/policy/promote-policy.ts` so it is at least a single,
+  intentional decision rather than a scattered magic number, matching
+  the `trainer-group-policy.ts` pattern from Part 5.

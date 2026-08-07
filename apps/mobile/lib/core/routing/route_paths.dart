@@ -59,6 +59,15 @@ abstract final class RoutePaths {
   static const supportTicketCreate = '/support/new';
   static const supportTicketDetail = '/support/:id';
   static String supportTicketDetailPath(String id) => '/support/$id';
+
+  // Ascend Promote — Founder Scenario 23, reachable from the Community
+  // tab. Creating a campaign requires Premium
+  // (AppCapability.ascendPromote); viewing this shell's own honest
+  // locked state does not.
+  static const promoteCampaigns = '/social/promote';
+  static const promoteCampaignCreate = '/social/promote/new';
+  static const promoteCampaignDetail = '/social/promote/:id';
+  static String promoteCampaignDetailPath(String id) => '/social/promote/$id';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

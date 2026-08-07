@@ -16,6 +16,12 @@ describe('AdminService', () => {
     affordabilityEligibility: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
     supportTicket: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
     supportTicketReply: { findMany: jest.Mock };
+    promotedCampaign: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -31,6 +37,12 @@ describe('AdminService', () => {
       affordabilityEligibility: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
       supportTicket: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
       supportTicketReply: { findMany: jest.fn().mockResolvedValue([]) },
+      promotedCampaign: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
 
@@ -109,6 +121,47 @@ describe('AdminService', () => {
       await expect(
         service.replyToTicket('admin-1', 'ticket-1', { body: 'reply' }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('decideCampaign', () => {
+    it('rejects a decision that is not ACTIVE or REJECTED', async () => {
+      await expect(
+        service.decideCampaign('admin-1', 'campaign-1', { status: 'PENDING_REVIEW' as never }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('404s a campaign that does not exist', async () => {
+      prisma.promotedCampaign.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.decideCampaign('admin-1', 'campaign-1', { status: 'ACTIVE' as never }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects reviewing a campaign that already left PENDING_REVIEW', async () => {
+      prisma.promotedCampaign.findUnique.mockResolvedValue({
+        id: 'campaign-1',
+        status: 'ACTIVE',
+      });
+
+      await expect(
+        service.decideCampaign('admin-1', 'campaign-1', { status: 'REJECTED' as never }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('activates a PENDING_REVIEW campaign and records the reviewer', async () => {
+      prisma.promotedCampaign.findUnique.mockResolvedValue({
+        id: 'campaign-1',
+        status: 'PENDING_REVIEW',
+      });
+
+      await service.decideCampaign('admin-1', 'campaign-1', { status: 'ACTIVE' as never });
+
+      expect(prisma.promotedCampaign.update).toHaveBeenCalledWith({
+        where: { id: 'campaign-1' },
+        data: expect.objectContaining({ status: 'ACTIVE', reviewedBy: 'admin-1' }),
+      });
     });
   });
 });

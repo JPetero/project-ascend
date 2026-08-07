@@ -5,7 +5,9 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { AdminService } from './admin.service';
 import { ActionReportDto } from './dto/action-report.dto';
+import { DecideCampaignDto } from './dto/decide-campaign.dto';
 import { DecideEligibilityDto } from './dto/decide-eligibility.dto';
+import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { ListTicketsDto } from './dto/list-tickets.dto';
@@ -55,5 +57,19 @@ export class AdminController {
     @Body() dto: AdminReplyTicketDto,
   ) {
     return this.adminService.replyToTicket(user.id, id, dto);
+  }
+
+  @Get('promoted-campaigns')
+  listCampaigns(@Query() query: ListCampaignsDto) {
+    return this.adminService.listCampaigns(query);
+  }
+
+  @Patch('promoted-campaigns/:id')
+  decideCampaign(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: DecideCampaignDto,
+  ) {
+    return this.adminService.decideCampaign(user.id, id, dto);
   }
 }

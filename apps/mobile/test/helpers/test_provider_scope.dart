@@ -28,6 +28,7 @@ import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
+import 'package:mobile/features/promote/presentation/providers/promote_controller.dart';
 import 'package:mobile/features/trainer_groups/presentation/providers/trainer_groups_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
@@ -47,6 +48,7 @@ import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
 import 'fake_live_location_service.dart';
 import 'fake_nutrition_repositories.dart';
+import 'fake_promote_repository.dart';
 import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
 import 'fake_subscription_status_repository.dart';
@@ -89,6 +91,7 @@ Future<ProviderContainer> createTestContainer({
   FakeSubscriptionsRepository? subscriptionsRepository,
   AiProvider? aiProvider,
   FakeSupportRepository? supportRepository,
+  FakePromoteRepository? promoteRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -203,6 +206,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       supportRepositoryProvider.overrideWithValue(
         supportRepository ?? FakeSupportRepository(),
+      ),
+      promoteRepositoryProvider.overrideWithValue(
+        promoteRepository ?? FakePromoteRepository(),
       ),
     ],
   );
