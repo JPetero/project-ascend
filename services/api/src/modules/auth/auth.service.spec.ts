@@ -5,6 +5,9 @@ import { Test } from '@nestjs/testing';
 import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthIdentitiesService } from '../auth-identities/auth-identities.service';
+import { AppleTokenVerifier } from '../auth-identities/providers/apple-token-verifier';
+import { GoogleTokenVerifier } from '../auth-identities/providers/google-token-verifier';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
@@ -14,6 +17,9 @@ describe('AuthService', () => {
   let auditService: { record: jest.Mock };
   let usersService: { findByEmail: jest.Mock; findById: jest.Mock; isActive: jest.Mock };
   let emailService: { sendPasswordResetEmail: jest.Mock; sendVerificationEmail: jest.Mock };
+  let authIdentitiesService: { findByProviderSubject: jest.Mock; linkIdentity: jest.Mock };
+  let googleTokenVerifier: { verify: jest.Mock };
+  let appleTokenVerifier: { verify: jest.Mock };
   let tx: { refreshToken: { updateMany: jest.Mock; create: jest.Mock } };
   let prisma: {
     user: { create: jest.Mock; update: jest.Mock };
@@ -66,6 +72,13 @@ describe('AuthService', () => {
       sendPasswordResetEmail: jest.fn().mockResolvedValue({ delivered: false }),
       sendVerificationEmail: jest.fn().mockResolvedValue({ delivered: false }),
     };
+    authIdentitiesService = {
+      findByProviderSubject: jest.fn().mockResolvedValue(null),
+      linkIdentity: jest.fn().mockResolvedValue({ id: 'identity-1' }),
+    };
+    googleTokenVerifier = { verify: jest.fn() };
+    appleTokenVerifier = { verify: jest.fn() };
+    prisma.refreshToken.create.mockResolvedValue({ id: 'refresh-id' });
     prisma.passwordResetToken.create.mockResolvedValue({ id: 'reset-token-id' });
     prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
     prisma.emailVerificationToken.create.mockResolvedValue({ id: 'verify-token-id' });
@@ -92,6 +105,9 @@ describe('AuthService', () => {
         { provide: AuditService, useValue: auditService },
         { provide: UsersService, useValue: usersService },
         { provide: EmailService, useValue: emailService },
+        { provide: AuthIdentitiesService, useValue: authIdentitiesService },
+        { provide: GoogleTokenVerifier, useValue: googleTokenVerifier },
+        { provide: AppleTokenVerifier, useValue: appleTokenVerifier },
       ],
     }).compile();
 
@@ -523,6 +539,152 @@ describe('AuthService', () => {
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'auth.account_deleted' }),
       );
+    });
+  });
+
+  describe('signInWithGoogle', () => {
+    it('signs in the existing user when the identity is already linked', async () => {
+      googleTokenVerifier.verify.mockResolvedValue({
+        subject: 'google-sub-1',
+        email: 'ada@example.com',
+        emailVerified: true,
+      });
+      authIdentitiesService.findByProviderSubject.mockResolvedValue({
+        id: 'identity-1',
+        userId: 'user-1',
+      });
+      usersService.findById.mockResolvedValue({
+        id: 'user-1',
+        email: 'ada@example.com',
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        emailVerifiedAt: new Date(),
+      });
+
+      const result = await authService.signInWithGoogle({ idToken: 'raw-token' });
+
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(authIdentitiesService.linkIdentity).toHaveBeenCalledWith(
+        'user-1',
+        'GOOGLE',
+        'google-sub-1',
+        'ada@example.com',
+      );
+      expect(result.user.id).toBe('user-1');
+      expect(result.tokens.accessToken).toBe('signed.jwt');
+    });
+
+    it('rejects when the linked identity belongs to a no-longer-active user', async () => {
+      googleTokenVerifier.verify.mockResolvedValue({
+        subject: 'google-sub-1',
+        email: 'ada@example.com',
+        emailVerified: true,
+      });
+      authIdentitiesService.findByProviderSubject.mockResolvedValue({
+        id: 'identity-1',
+        userId: 'user-1',
+      });
+      usersService.findById.mockResolvedValue({ id: 'user-1', status: 'SUSPENDED' });
+
+      await expect(authService.signInWithGoogle({ idToken: 'raw-token' })).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('creates a brand-new account when no identity or email match exists', async () => {
+      googleTokenVerifier.verify.mockResolvedValue({
+        subject: 'google-sub-2',
+        email: 'new-google-user@example.com',
+        emailVerified: true,
+        firstName: 'Nova',
+      });
+      usersService.findByEmail.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'new-user',
+        email: 'new-google-user@example.com',
+        role: 'MEMBER',
+        emailVerifiedAt: new Date(),
+      });
+
+      const result = await authService.signInWithGoogle({ idToken: 'raw-token' });
+
+      const createArgs = prisma.user.create.mock.calls[0][0];
+      expect(createArgs.data.email).toBe('new-google-user@example.com');
+      expect(createArgs.data.profile.create.firstName).toBe('Nova');
+      expect(authIdentitiesService.linkIdentity).toHaveBeenCalledWith(
+        'new-user',
+        'GOOGLE',
+        'google-sub-2',
+        'new-google-user@example.com',
+      );
+      expect(result.user.id).toBe('new-user');
+    });
+
+    it('auto-links to an existing account when the provider vouches the email is verified', async () => {
+      googleTokenVerifier.verify.mockResolvedValue({
+        subject: 'google-sub-3',
+        email: 'existing@example.com',
+        emailVerified: true,
+      });
+      usersService.findByEmail.mockResolvedValue({
+        id: 'existing-user',
+        email: 'existing@example.com',
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        emailVerifiedAt: null,
+      });
+
+      const result = await authService.signInWithGoogle({ idToken: 'raw-token' });
+
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(authIdentitiesService.linkIdentity).toHaveBeenCalledWith(
+        'existing-user',
+        'GOOGLE',
+        'google-sub-3',
+        'existing@example.com',
+      );
+      expect(result.user.id).toBe('existing-user');
+    });
+
+    it('refuses to auto-link when the provider does not vouch the email is verified', async () => {
+      googleTokenVerifier.verify.mockResolvedValue({
+        subject: 'google-sub-4',
+        email: 'existing@example.com',
+        emailVerified: false,
+      });
+      usersService.findByEmail.mockResolvedValue({
+        id: 'existing-user',
+        email: 'existing@example.com',
+        role: 'MEMBER',
+        status: 'ACTIVE',
+      });
+
+      await expect(authService.signInWithGoogle({ idToken: 'raw-token' })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(authIdentitiesService.linkIdentity).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signInWithApple', () => {
+    it('forwards the client-supplied firstName since Apple never puts it in the ID token', async () => {
+      appleTokenVerifier.verify.mockResolvedValue({
+        subject: 'apple-sub-1',
+        email: 'new-apple-user@example.com',
+        emailVerified: true,
+      });
+      usersService.findByEmail.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({
+        id: 'new-apple-account',
+        email: 'new-apple-user@example.com',
+        role: 'MEMBER',
+        emailVerifiedAt: new Date(),
+      });
+
+      await authService.signInWithApple({ idToken: 'raw-token', firstName: 'Atlas' });
+
+      const createArgs = prisma.user.create.mock.calls[0][0];
+      expect(createArgs.data.profile.create.firstName).toBe('Atlas');
     });
   });
 

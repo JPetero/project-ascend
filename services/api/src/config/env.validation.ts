@@ -105,6 +105,18 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   APP_PUBLIC_URL?: string;
+
+  // Google/Apple sign-in (Build Session 9 Part 8) — both optional.
+  // Undefined means that provider is not configured, and its endpoint
+  // honestly rejects with a "not configured" error rather than pretending
+  // to work. See GoogleTokenVerifier / AppleTokenVerifier.
+  @IsString()
+  @IsOptional()
+  GOOGLE_OAUTH_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  APPLE_CLIENT_ID?: string;
 }
 
 /**

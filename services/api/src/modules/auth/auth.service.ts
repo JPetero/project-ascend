@@ -2,15 +2,21 @@ import * as crypto from 'crypto';
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { RefreshToken } from '@prisma/client';
+import { AuthProvider, RefreshToken, User } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { AuditService } from '../../common/audit/audit.service';
 import { AppConfig } from '../../config/configuration';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthIdentitiesService } from '../auth-identities/auth-identities.service';
+import { AppleTokenVerifier } from '../auth-identities/providers/apple-token-verifier';
+import { GoogleTokenVerifier } from '../auth-identities/providers/google-token-verifier';
+import { VerifiedSocialIdentity } from '../auth-identities/providers/social-identity.interface';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
+import { AppleSignInDto } from './dto/apple-sign-in.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { GoogleSignInDto } from './dto/google-sign-in.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -47,6 +53,9 @@ export class AuthService {
     private readonly auditService: AuditService,
     private readonly usersService: UsersService,
     private readonly emailService: EmailService,
+    private readonly authIdentitiesService: AuthIdentitiesService,
+    private readonly googleTokenVerifier: GoogleTokenVerifier,
+    private readonly appleTokenVerifier: AppleTokenVerifier,
   ) {
     this.jwtConfig = this.configService.get<AppConfig>('app')!.jwt;
   }
@@ -470,6 +479,119 @@ export class AuthService {
       entityType: 'User',
       entityId: userId,
     });
+  }
+
+  /**
+   * Build Session 9 Part 8. Verifies the raw Google-issued ID token
+   * server-side (never trusts a client-supplied subject/email), then
+   * resolves it to an Ascend account exactly like [signInWithApple].
+   */
+  async signInWithGoogle(
+    dto: GoogleSignInDto,
+  ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
+    const identity = await this.googleTokenVerifier.verify(dto.idToken);
+    return this.resolveSocialSignIn('GOOGLE', identity);
+  }
+
+  /**
+   * Apple never includes the user's name in the ID token itself — only
+   * in the client's very first authorization response — so [dto.firstName]
+   * fills the gap [identity.firstName] leaves on first sign-in.
+   */
+  async signInWithApple(
+    dto: AppleSignInDto,
+  ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
+    const identity = await this.appleTokenVerifier.verify(dto.idToken);
+    return this.resolveSocialSignIn('APPLE', { ...identity, firstName: dto.firstName });
+  }
+
+  /**
+   * Shared resolution for any verified provider identity:
+   *  1. An identity already linked to an Ascend user signs that user in.
+   *  2. Otherwise, a matching-email account is auto-linked — but only
+   *     when the provider itself vouches the email is verified, since
+   *     that's an independent proof of ownership Ascend can trust.
+   *  3. Otherwise, a brand-new account is created (with an unguessable
+   *     random password the user never sees — see changePassword/
+   *     forgotPassword for how they'd set a real one later).
+   * Every branch ends by linking the identity and issuing tokens.
+   */
+  private async resolveSocialSignIn(
+    provider: Extract<AuthProvider, 'GOOGLE' | 'APPLE'>,
+    identity: VerifiedSocialIdentity,
+  ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
+    const existingIdentity = await this.authIdentitiesService.findByProviderSubject(
+      provider,
+      identity.subject,
+    );
+
+    let user: User;
+    if (existingIdentity) {
+      const found = await this.usersService.findById(existingIdentity.userId);
+      if (!this.usersService.isActive(found)) {
+        throw new UnauthorizedException('This account is no longer active.');
+      }
+      user = found;
+    } else {
+      if (!identity.email) {
+        throw new UnauthorizedException('This sign-in method did not provide an email address.');
+      }
+      const normalizedEmail = identity.email.trim().toLowerCase();
+      const existingByEmail = await this.usersService.findByEmail(normalizedEmail);
+
+      if (existingByEmail) {
+        if (!identity.emailVerified) {
+          throw new ConflictException(
+            'An account with this email already exists. Sign in with your password instead.',
+          );
+        }
+        user = existingByEmail;
+      } else {
+        const randomPassword = crypto.randomBytes(REFRESH_SECRET_BYTES).toString('hex');
+        const passwordHash = await argon2.hash(randomPassword);
+        user = await this.prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash,
+            emailVerifiedAt: identity.emailVerified ? new Date() : null,
+            profile: { create: { firstName: identity.firstName?.trim() || 'there' } },
+            preference: { create: {} },
+          },
+        });
+        await this.auditService.record({
+          userId: user.id,
+          action: 'auth.register',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { provider },
+        });
+      }
+    }
+
+    await this.authIdentitiesService.linkIdentity(
+      user.id,
+      provider,
+      identity.subject,
+      identity.email ?? undefined,
+    );
+    await this.auditService.record({
+      userId: user.id,
+      action: 'auth.social_sign_in',
+      entityType: 'User',
+      entityId: user.id,
+      metadata: { provider },
+    });
+
+    const tokens = await this.issueTokenPair(user.id, user.email);
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
+      tokens,
+    };
   }
 
   private async issueAndSendVerificationEmail(userId: string, email: string): Promise<void> {
