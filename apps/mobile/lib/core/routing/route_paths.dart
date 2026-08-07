@@ -90,6 +90,11 @@ abstract final class RoutePaths {
   static const notificationPreferences = '/notifications/preferences';
   // Data export — Build Session 8 Part 14.
   static const dataExport = '/account/data-export';
+  // Private gallery — Build Session 9 Part 2. Album detail is reached by
+  // a plain pushed route (like WearableConnectionsScreen), not a
+  // separate go_router path, since it always comes from tapping an
+  // already-loaded GalleryAlbum in the list above it.
+  static const gallery = '/account/gallery';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

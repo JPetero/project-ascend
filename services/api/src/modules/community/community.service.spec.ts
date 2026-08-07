@@ -27,9 +27,19 @@ describe('CommunityService', () => {
   let service: CommunityService;
   let prisma: {
     communityProfile: { upsert: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock };
-    communityPost: { findUnique: jest.Mock; delete: jest.Mock; create: jest.Mock };
+    communityPost: {
+      findUnique: jest.Mock;
+      delete: jest.Mock;
+      create: jest.Mock;
+      count: jest.Mock;
+    };
     communityComment: { findUnique: jest.Mock; delete: jest.Mock };
-    communityFollow: { upsert: jest.Mock; deleteMany: jest.Mock; findUnique: jest.Mock };
+    communityFollow: {
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+      findUnique: jest.Mock;
+      count: jest.Mock;
+    };
     communityBlock: { upsert: jest.Mock; findFirst: jest.Mock };
     communityReport: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -40,25 +50,39 @@ describe('CommunityService', () => {
     getObjectUrl: jest.Mock;
     attachUsage: jest.Mock;
   };
-  let friendsService: { severTies: jest.Mock };
+  let friendsService: { severTies: jest.Mock; areFriends: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       communityProfile: { upsert: jest.fn(), findUnique: jest.fn(), findMany: jest.fn() },
-      communityPost: { findUnique: jest.fn(), delete: jest.fn(), create: jest.fn() },
+      communityPost: {
+        findUnique: jest.fn(),
+        delete: jest.fn(),
+        create: jest.fn(),
+        count: jest.fn(),
+      },
       communityComment: { findUnique: jest.fn(), delete: jest.fn() },
-      communityFollow: { upsert: jest.fn(), deleteMany: jest.fn(), findUnique: jest.fn() },
+      communityFollow: {
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+      },
       communityBlock: { upsert: jest.fn(), findFirst: jest.fn() },
       communityReport: { create: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
+    prisma.communityPost.count.mockResolvedValue(0);
+    prisma.communityFollow.count.mockResolvedValue(0);
+    prisma.communityFollow.findUnique.mockResolvedValue(null);
+    prisma.communityBlock.findFirst.mockResolvedValue(null);
     mediaService = {
       getById: jest.fn(),
       setVisibility: jest.fn(),
       getObjectUrl: jest.fn().mockReturnValue('/media/objects/key.jpg'),
       attachUsage: jest.fn(),
     };
-    friendsService = { severTies: jest.fn() };
+    friendsService = { severTies: jest.fn(), areFriends: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -300,6 +324,84 @@ describe('CommunityService', () => {
       expect(prisma.communityProfile.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: 'user-1' } }),
       );
+    });
+  });
+
+  describe('getProfile visibility — Build Session 9 Part 2', () => {
+    function profileWith(visibility: string) {
+      return {
+        userId: 'target-1',
+        displayName: 'Target',
+        bio: null,
+        avatarUrl: null,
+        isTrainer: false,
+        visibility,
+        avatarMediaAsset: null,
+        coverMediaAsset: null,
+      };
+    }
+
+    it('always lets the owner see their own profile regardless of visibility', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('PRIVATE'));
+
+      const result = await service.getProfile('target-1', 'target-1');
+
+      expect(result.userId).toBe('target-1');
+    });
+
+    it('lets anyone see a PUBLIC profile', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('PUBLIC'));
+
+      const result = await service.getProfile('viewer-1', 'target-1');
+
+      expect(result.userId).toBe('target-1');
+    });
+
+    it('404s a PRIVATE profile for anyone other than its owner', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('PRIVATE'));
+
+      await expect(service.getProfile('viewer-1', 'target-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('404s a FOLLOWERS profile for a non-follower', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('FOLLOWERS'));
+      prisma.communityFollow.findUnique.mockResolvedValue(null);
+
+      await expect(service.getProfile('viewer-1', 'target-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('shows a FOLLOWERS profile to someone who follows the target', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('FOLLOWERS'));
+      prisma.communityFollow.findUnique.mockResolvedValue({
+        followerId: 'viewer-1',
+        followingId: 'target-1',
+      });
+
+      const result = await service.getProfile('viewer-1', 'target-1');
+
+      expect(result.userId).toBe('target-1');
+    });
+
+    it('404s a FRIENDS profile for a non-friend even if they follow', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('FRIENDS'));
+      prisma.communityFollow.findUnique.mockResolvedValue({
+        followerId: 'viewer-1',
+        followingId: 'target-1',
+      });
+      friendsService.areFriends.mockResolvedValue(false);
+
+      await expect(service.getProfile('viewer-1', 'target-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('shows a FRIENDS profile to an actual mutual friend', async () => {
+      prisma.communityProfile.findUnique.mockResolvedValue(profileWith('FRIENDS'));
+      prisma.communityFollow.findUnique.mockResolvedValue(null);
+      friendsService.areFriends.mockResolvedValue(true);
+
+      const result = await service.getProfile('viewer-1', 'target-1');
+
+      expect(result.userId).toBe('target-1');
+      expect(friendsService.areFriends).toHaveBeenCalledWith('viewer-1', 'target-1');
     });
   });
 });

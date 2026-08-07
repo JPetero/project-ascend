@@ -162,11 +162,15 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: AscendSpacing.sm),
               _MessagesRow(state: conversationsState),
               const SizedBox(height: AscendSpacing.sm),
-              const AscendCard(
-                child: _UnavailableRow(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Gallery',
-                  message: 'Your private gallery is on its way.',
+              AscendCard(
+                onTap: () => context.push(RoutePaths.gallery),
+                child: const Row(
+                  children: [
+                    Icon(Icons.photo_library_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Gallery')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
                 ),
               ),
               const SizedBox(height: AscendSpacing.lg),

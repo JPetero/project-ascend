@@ -24,6 +24,7 @@ import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise
 import { ExercisesModule } from './modules/exercises/exercises.module';
 import { FoodsModule } from './modules/foods/foods.module';
 import { FriendsModule } from './modules/friends/friends.module';
+import { GalleryModule } from './modules/gallery/gallery.module';
 import { HealthModule } from './modules/health/health.module';
 import { HealthMetricsModule } from './modules/health-metrics/health-metrics.module';
 import { JointWorkoutSessionsModule } from './modules/joint-workouts/joint-workout-sessions.module';
@@ -96,6 +97,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AchievementsModule,
     CardioModule,
     CommunityModule,
+    GalleryModule,
     FriendsModule,
     TrainerGroupsModule,
     RankingsModule,
