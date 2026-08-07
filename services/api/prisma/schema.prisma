@@ -162,6 +162,7 @@ model User {
   sportScoreConfirmations          SportScoreConfirmation[]
   sportMatchDisputes               SportMatchDispute[]
   sportRatings                     SportRating[]
+  savedNutrientArticles            SavedNutrientArticle[]
 
   @@index([status])
   @@map("users")
@@ -2425,4 +2426,93 @@ model SportRating {
   @@unique([userId, sportId])
   @@index([sportId, rating])
   @@map("sport_ratings")
+}
+
+// --- Ascend Nutrition Library — Build Session 8 Part 11. Free on every
+// tier (see AppCapability.nutritionLibrary). General nutrition
+// education only — every NutrientArticle carries a safetyNote and
+// NutritionLibraryService's seed content never diagnoses a condition or
+// prescribes a specific supplement dose. References cite an
+// organization/publication by name only (no generated URLs).
+
+enum NutrientCategoryCode {
+  MACRONUTRIENT
+  MINERAL
+  VITAMIN
+}
+
+model NutrientCategory {
+  id          String               @id @default(uuid())
+  code        NutrientCategoryCode @unique
+  name        String
+  description String
+
+  articles NutrientArticle[]
+
+  @@map("nutrient_categories")
+}
+
+model NutrientArticle {
+  id         String   @id @default(uuid())
+  categoryId String
+  slug       String   @unique
+  title      String
+  summary    String
+  body       String   @db.Text
+  // Always present — see this section's doc comment.
+  safetyNote String   @db.Text
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category    NutrientCategory       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  foodSources NutrientFoodSource[]
+  references  NutrientReference[]
+  savedBy     SavedNutrientArticle[]
+
+  @@index([categoryId])
+  @@map("nutrient_articles")
+}
+
+// A display-ready amount string (e.g. "26g protein per 100g") rather
+// than a raw number + unit pair — this library is educational content,
+// not a food-logging data source (see the Meal Prep / Food models for
+// that), so it never needs unit conversion.
+model NutrientFoodSource {
+  id        String @id @default(uuid())
+  articleId String
+  foodName  String
+  amount    String
+  sortOrder Int    @default(0)
+
+  article NutrientArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("nutrient_food_sources")
+}
+
+model NutrientReference {
+  id        String @id @default(uuid())
+  articleId String
+  label     String
+  sortOrder Int    @default(0)
+
+  article NutrientArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("nutrient_references")
+}
+
+model SavedNutrientArticle {
+  id        String   @id @default(uuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article NutrientArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId])
+  @@map("saved_nutrient_articles")
 }

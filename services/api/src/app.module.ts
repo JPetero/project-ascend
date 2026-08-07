@@ -31,6 +31,7 @@ import { MacroTargetsModule } from './modules/macro-targets/macro-targets.module
 import { MediaModule } from './modules/media/media.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { MuscleGroupsModule } from './modules/muscle-groups/muscle-groups.module';
+import { NutritionLibraryModule } from './modules/nutrition-library/nutrition-library.module';
 import { NutritionLogModule } from './modules/nutrition-log/nutrition-log.module';
 import { PersonalRecordsModule } from './modules/personal-records/personal-records.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
@@ -105,6 +106,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MessagesModule,
     JointWorkoutSessionsModule,
     SportsModule,
+    NutritionLibraryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

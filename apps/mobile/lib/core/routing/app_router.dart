@@ -38,6 +38,9 @@ import '../../features/nutrition/presentation/screens/custom_food_editor_screen.
 import '../../features/nutrition/presentation/screens/food_search_screen.dart';
 import '../../features/nutrition/presentation/screens/macro_target_editor_screen.dart';
 import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
+import '../../features/nutrition_library/presentation/screens/nutrient_article_screen.dart';
+import '../../features/nutrition_library/presentation/screens/nutrition_library_screen.dart';
+import '../../features/nutrition_library/presentation/screens/saved_nutrient_articles_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/promote/presentation/screens/campaign_detail_screen.dart';
@@ -214,6 +217,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.macroTargetEditor,
         builder: (context, state) => const MacroTargetEditorScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.nutritionLibrary,
+        builder: (context, state) => const NutritionLibraryScreen(),
+      ),
+      // Registered before the :slug route below — a literal path segment
+      // must win over the dynamic one, and GoRouter matches in list order.
+      GoRoute(
+        path: RoutePaths.savedNutrientArticles,
+        builder: (context, state) => const SavedNutrientArticlesScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.nutrientArticleDetail,
+        builder: (context, state) =>
+            NutrientArticleScreen(slug: state.pathParameters['slug']!),
       ),
       GoRoute(
         path: RoutePaths.communityPostDetail,
