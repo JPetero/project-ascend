@@ -25,6 +25,7 @@ import { FoodsModule } from './modules/foods/foods.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { HealthModule } from './modules/health/health.module';
 import { HealthMetricsModule } from './modules/health-metrics/health-metrics.module';
+import { JointWorkoutSessionsModule } from './modules/joint-workouts/joint-workout-sessions.module';
 import { LegalModule } from './modules/legal/legal.module';
 import { MacroTargetsModule } from './modules/macro-targets/macro-targets.module';
 import { MediaModule } from './modules/media/media.module';
@@ -101,6 +102,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PromoteModule,
     MediaModule,
     MessagesModule,
+    JointWorkoutSessionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

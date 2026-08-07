@@ -76,6 +76,11 @@ abstract final class RoutePaths {
   static const conversations = '/messages';
   static const conversationDetail = '/messages/:id';
   static String conversationDetailPath(String id) => '/messages/$id';
+  // Joint Workout Sessions — Build Session 8 Part 9. Friend-only.
+  static const jointWorkouts = '/social/joint-workouts';
+  static const jointWorkoutDetail = '/social/joint-workouts/:id';
+  static String jointWorkoutDetailPath(String id) =>
+      '/social/joint-workouts/$id';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
