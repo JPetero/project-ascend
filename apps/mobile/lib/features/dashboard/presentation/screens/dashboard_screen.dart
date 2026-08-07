@@ -199,6 +199,18 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AscendSpacing.sm),
               AscendCard(
+                onTap: () => context.push(RoutePaths.notificationPreferences),
+                child: const Row(
+                  children: [
+                    Icon(Icons.notifications_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Notification preferences')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
                 onTap: () => context.push(RoutePaths.support),
                 child: const Row(
                   children: [

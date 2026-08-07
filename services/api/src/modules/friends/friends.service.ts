@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { FriendRequestStatus } from '@prisma/client';
+import { FriendRequestStatus, NotificationType } from '@prisma/client';
 import { canonicalFriendPair } from '../../common/friendship/friendship-pair.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const PROFILE_SELECT = {
   userId: true,
@@ -20,7 +21,10 @@ const PROFILE_SELECT = {
  */
 @Injectable()
 export class FriendsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async searchUsers(viewerId: string, query: string) {
     const [blockedByViewer, blockingViewer] = await Promise.all([
@@ -96,7 +100,15 @@ export class FriendsService {
       throw new BadRequestException('A friend request to this person is already pending.');
     }
 
-    return this.prisma.friendRequest.create({ data: { senderId, recipientId } });
+    const request = await this.prisma.friendRequest.create({ data: { senderId, recipientId } });
+    await this.notifications.notify(
+      recipientId,
+      NotificationType.FRIEND_REQUEST,
+      'New friend request',
+      'Someone sent you a friend request.',
+      request.id,
+    );
+    return request;
   }
 
   async acceptRequest(userId: string, requestId: string) {

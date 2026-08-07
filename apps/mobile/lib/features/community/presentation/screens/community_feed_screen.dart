@@ -77,6 +77,7 @@ class CommunityFeedScreen extends ConsumerWidget {
               onPressed: () =>
                   context.push(RoutePaths.communityProfilePath(userId)),
             ),
+          const NotificationBellAction(),
           const ProfileIconAction(),
         ],
       ),

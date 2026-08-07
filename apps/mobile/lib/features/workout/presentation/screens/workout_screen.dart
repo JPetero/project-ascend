@@ -49,6 +49,7 @@ class WorkoutScreen extends ConsumerWidget {
             tooltip: 'History',
             onPressed: () => context.push(RoutePaths.workoutHistory),
           ),
+          const NotificationBellAction(),
           const ProfileIconAction(),
         ],
       ),

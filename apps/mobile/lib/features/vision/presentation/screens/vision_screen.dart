@@ -28,7 +28,7 @@ class VisionScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vision'),
-        actions: const [ProfileIconAction()],
+        actions: const [NotificationBellAction(), ProfileIconAction()],
       ),
       body: SafeArea(
         child: hasAccess

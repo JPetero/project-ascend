@@ -4,10 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DirectConversationStatus, DirectMessageType } from '@prisma/client';
+import { DirectConversationStatus, DirectMessageType, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FriendsService } from '../friends/friends.service';
 import { MediaService } from '../media/media.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SendMessageDto } from './dto/send-message.dto';
 
 /**
@@ -25,6 +26,7 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly mediaService: MediaService,
     private readonly friendsService: FriendsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getOrCreateConversation(userId: string, recipientId: string) {
@@ -210,6 +212,17 @@ export class MessagesService {
         this.mediaService.attachUsage(mediaAssetId, 'CHAT_MESSAGE', message.id),
       ),
     ]);
+
+    const recipient = conversation.participants.find((p) => p.userId !== userId);
+    if (recipient) {
+      await this.notifications.notify(
+        recipient.userId,
+        NotificationType.DIRECT_MESSAGE,
+        'New message',
+        message.body ?? 'Sent you a message.',
+        conversationId,
+      );
+    }
 
     return message;
   }

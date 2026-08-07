@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AppConfig } from '../../config/configuration';
 import { FriendsModule } from '../friends/friends.module';
 import { MediaModule } from '../media/media.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { MessagesController } from './messages.controller';
 import { MessagesGateway } from './messages.gateway';
 import { MessagesService } from './messages.service';
@@ -12,6 +13,7 @@ import { MessagesService } from './messages.service';
   imports: [
     MediaModule,
     FriendsModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

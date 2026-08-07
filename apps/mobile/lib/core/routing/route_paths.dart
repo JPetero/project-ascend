@@ -85,6 +85,9 @@ abstract final class RoutePaths {
   static const sportsMatches = '/social/sports';
   static const sportMatchDetail = '/social/sports/:id';
   static String sportMatchDetailPath(String id) => '/social/sports/$id';
+  // Notifications and reminders — Build Session 8 Part 12.
+  static const notificationsInbox = '/notifications';
+  static const notificationPreferences = '/notifications/preferences';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';

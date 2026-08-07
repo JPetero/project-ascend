@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FriendsService } from '../friends/friends.service';
 import { MediaService } from '../media/media.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { MessagesService } from './messages.service';
 
 function conversation(overrides: Partial<Record<string, unknown>> = {}) {
@@ -63,6 +64,7 @@ describe('MessagesService', () => {
     };
     mediaService = { getById: jest.fn(), attachUsage: jest.fn() };
     friendsService = { areFriends: jest.fn().mockResolvedValue(false) };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -70,6 +72,7 @@ describe('MessagesService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: MediaService, useValue: mediaService },
         { provide: FriendsService, useValue: friendsService },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
