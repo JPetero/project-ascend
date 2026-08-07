@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FriendsService } from '../friends/friends.service';
 import { MediaService } from '../media/media.service';
 import { CreateCommunityCommentDto } from './dto/create-community-comment.dto';
 import { CreateCommunityPostDto } from './dto/create-community-post.dto';
@@ -46,6 +47,7 @@ export class CommunityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mediaService: MediaService,
+    private readonly friendsService: FriendsService,
   ) {}
 
   // --- Profiles ---------------------------------------------------------
@@ -352,6 +354,10 @@ export class CommunityService {
         },
       }),
     ]);
+    // Blocking also severs any friendship/pending friend request — a
+    // block is a stronger signal than "not friends", it should never
+    // leave a friendship record standing (Build Session 8 Part 7).
+    await this.friendsService.severTies(blockerId, blockedId);
   }
 
   async unblock(blockerId: string, blockedId: string): Promise<void> {

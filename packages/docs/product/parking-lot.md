@@ -107,9 +107,13 @@ extension points exist.
   pipeline before any user media upload ships; premium cosmetics are a
   separate, later layer. Privacy controls ship free from day one of this
   feature, not added later.
-- **Friends, messaging, and joint workouts (15)** — full social graph,
-  chat, and moderation system; friend-only joint workouts as the initial
-  scope, not stranger-based.
+- **Friends, messaging, and joint workouts (15)** — **the friend graph
+  implemented in Build Session 8 Part 7**: real mutual `Friendship`
+  (search, send/accept/decline/cancel a `FriendRequest`, remove a
+  friend, a real friend count) deliberately separate from Community's
+  one-directional Follow; blocking someone severs any friendship or
+  pending request. Still open: direct messaging (chat) and friend-only
+  joint workouts — both build on this same friend graph.
 - **Location-based leaderboards (16a)** — ships as an honest coming-soon
   state; real ranking needs the achievement/activity model above plus the
   coarse-region privacy model.

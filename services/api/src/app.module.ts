@@ -22,6 +22,7 @@ import { EquipmentTypesModule } from './modules/equipment-types/equipment-types.
 import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise-categories.module';
 import { ExercisesModule } from './modules/exercises/exercises.module';
 import { FoodsModule } from './modules/foods/foods.module';
+import { FriendsModule } from './modules/friends/friends.module';
 import { HealthModule } from './modules/health/health.module';
 import { HealthMetricsModule } from './modules/health-metrics/health-metrics.module';
 import { LegalModule } from './modules/legal/legal.module';
@@ -89,6 +90,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AchievementsModule,
     CardioModule,
     CommunityModule,
+    FriendsModule,
     TrainerGroupsModule,
     RankingsModule,
     ChallengesModule,

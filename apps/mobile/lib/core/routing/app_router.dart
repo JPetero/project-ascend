@@ -22,6 +22,7 @@ import '../../features/challenges/presentation/screens/challenges_screen.dart';
 import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
@@ -229,6 +230,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.communityEditProfile,
         builder: (context, state) => const EditCommunityProfileScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.friends,
+        builder: (context, state) => const FriendsScreen(),
       ),
       GoRoute(
         path: RoutePaths.trainerGroups,
