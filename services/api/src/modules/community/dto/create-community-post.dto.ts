@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
@@ -19,14 +20,21 @@ export class CreateCommunityPostDto {
   @IsEnum(CommunityPostMediaType)
   mediaType?: CommunityPostMediaType;
 
-  // Required whenever mediaType isn't TEXT — this session has no media
-  // upload/transcoding pipeline, so the client is responsible for
-  // producing a URL (e.g. from its own object storage) before creating
-  // the post. See packages/docs/build-session-7.md Part 4.
+  // The id of a MediaAsset already uploaded through the Media Platform
+  // (Build Session 8 Part 2) — the preferred path. Required whenever
+  // mediaType isn't TEXT and mediaUrl isn't supplied instead.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  mediaAssetId?: string;
+
+  // Legacy/external path — an already-hosted URL, kept for content
+  // hosted outside Ascend's own storage. Required whenever mediaType
+  // isn't TEXT and mediaAssetId isn't supplied instead.
   @ApiPropertyOptional()
   @ValidateIf(
     (o: CreateCommunityPostDto) =>
-      o.mediaType != null && o.mediaType !== CommunityPostMediaType.TEXT,
+      o.mediaType != null && o.mediaType !== CommunityPostMediaType.TEXT && !o.mediaAssetId,
   )
   @IsUrl()
   mediaUrl?: string;

@@ -90,6 +90,7 @@ class FakeCommunityRepository implements CommunityRepository {
   Future<CommunityPost> createPost({
     CommunityPostMediaType mediaType = CommunityPostMediaType.text,
     String? mediaUrl,
+    String? mediaAssetId,
     String? caption,
     CommunityVisibility visibility = CommunityVisibility.public,
     bool isTrainerContent = false,
@@ -105,16 +106,25 @@ class FakeCommunityRepository implements CommunityRepository {
     return post;
   }
 
+  bool? lastFollowingOnly;
+
   @override
   Future<List<CommunityPost>> listFeed({
     int page = 1,
     int limit = 20,
     String? authorId,
+    bool followingOnly = false,
   }) async {
     _maybeThrow();
-    final filtered = authorId == null
+    lastFollowingOnly = followingOnly;
+    var filtered = authorId == null
         ? posts
         : posts.where((p) => p.authorId == authorId).toList();
+    if (followingOnly) {
+      filtered = filtered
+          .where((p) => p.isOwnPost || followedUserIds.contains(p.authorId))
+          .toList();
+    }
     final start = (page - 1) * limit;
     if (start >= filtered.length) return [];
     return filtered.skip(start).take(limit).toList();

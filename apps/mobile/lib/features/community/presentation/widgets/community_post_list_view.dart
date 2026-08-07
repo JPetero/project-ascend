@@ -19,6 +19,7 @@ class CommunityPostListView extends StatefulWidget {
     required this.onTapPost,
     required this.onTapAuthor,
     this.onDelete,
+    this.onReport,
     this.emptyTitle = 'No posts yet',
     this.emptyMessage =
         'Follow other members or share your own workout, progress, or a quick Reel to get started.',
@@ -32,6 +33,7 @@ class CommunityPostListView extends StatefulWidget {
   final void Function(CommunityPost post) onTapPost;
   final void Function(CommunityPost post) onTapAuthor;
   final void Function(CommunityPost post)? onDelete;
+  final Future<void> Function(CommunityPost post, String reason)? onReport;
   final String emptyTitle;
   final String emptyMessage;
 
@@ -109,6 +111,9 @@ class _CommunityPostListViewState extends State<CommunityPostListView> {
             onSave: () => widget.onSave(post),
             onDelete: widget.onDelete != null && post.isOwnPost
                 ? () => widget.onDelete!(post)
+                : null,
+            onReport: widget.onReport != null && !post.isOwnPost
+                ? (reason) => widget.onReport!(post, reason)
                 : null,
           );
         },

@@ -142,6 +142,80 @@ describe('Community profiles/posts/Reels (e2e)', () => {
     expect(created.body.data.isTrainerContent).toBe(true);
   });
 
+  const VALID_JPEG_BASE64 = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+  ]).toString('base64');
+
+  async function uploadReadyImage(auth: () => Record<string, string>) {
+    const initiated = await request(app.getHttpServer())
+      .post('/media/uploads')
+      .set(auth())
+      .send({
+        mediaType: 'COMMUNITY_IMAGE',
+        originalFilename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1000,
+      })
+      .expect(201);
+    const mediaAssetId = initiated.body.data.mediaAsset.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/media/uploads/${mediaAssetId}/local-bytes`)
+      .set(auth())
+      .send({ base64: VALID_JPEG_BASE64 })
+      .expect(201);
+
+    return mediaAssetId;
+  }
+
+  it('creates a post from an uploaded Media Platform asset and resolves a real object URL', async () => {
+    const mediaAssetId = await uploadReadyImage(authA);
+
+    const created = await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authA())
+      .send({ mediaType: 'IMAGE', mediaAssetId, caption: 'Uploaded through the Media Platform' })
+      .expect(201);
+
+    expect(created.body.data.mediaUrl).toContain('/media/objects/');
+
+    const asset = await request(app.getHttpServer())
+      .get(`/media/${mediaAssetId}`)
+      .set(authA())
+      .expect(200);
+    expect(asset.body.data.visibility).toBe('PUBLIC');
+  });
+
+  it("404s creating a post from someone else's media asset", async () => {
+    const mediaAssetId = await uploadReadyImage(authB);
+
+    await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authA())
+      .send({ mediaType: 'IMAGE', mediaAssetId, caption: 'Not mine' })
+      .expect(404);
+  });
+
+  it('rejects creating a post from a media asset that has not finished uploading', async () => {
+    const initiated = await request(app.getHttpServer())
+      .post('/media/uploads')
+      .set(authA())
+      .send({
+        mediaType: 'COMMUNITY_IMAGE',
+        originalFilename: 'photo.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1000,
+      })
+      .expect(201);
+    const mediaAssetId = initiated.body.data.mediaAsset.id as string;
+
+    await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authA())
+      .send({ mediaType: 'IMAGE', mediaAssetId, caption: 'Never finished uploading' })
+      .expect(400);
+  });
+
   it('keeps a FOLLOWERS-only post hidden until the viewer follows the author, then visible', async () => {
     const created = await request(app.getHttpServer())
       .post('/community/posts')
@@ -166,6 +240,52 @@ describe('Community profiles/posts/Reels (e2e)', () => {
       .set(authB())
       .expect(200);
     expect(afterFollow.body.data.caption).toBe('Followers-only update');
+
+    await request(app.getHttpServer())
+      .delete(`/community/follow/${userIdC}`)
+      .set(authB())
+      .expect(204);
+  });
+
+  it('the "Following" feed mode shows only own + followed-author posts, excluding a stranger\'s PUBLIC post', async () => {
+    const stranger = await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authC())
+      .send({ caption: 'A public post from a stranger to the viewer' })
+      .expect(201);
+
+    const discover = await request(app.getHttpServer())
+      .get('/community/posts')
+      .set(authB())
+      .expect(200);
+    expect(
+      discover.body.data.data.some((p: { id: string }) => p.id === stranger.body.data.id),
+    ).toBe(true);
+
+    const followingOnly = await request(app.getHttpServer())
+      .get('/community/posts')
+      .query({ followingOnly: 'true' })
+      .set(authB())
+      .expect(200);
+    expect(
+      followingOnly.body.data.data.some((p: { id: string }) => p.id === stranger.body.data.id),
+    ).toBe(false);
+
+    await request(app.getHttpServer())
+      .post(`/community/follow/${userIdC}`)
+      .set(authB())
+      .expect(204);
+
+    const followingAfterFollow = await request(app.getHttpServer())
+      .get('/community/posts')
+      .query({ followingOnly: 'true' })
+      .set(authB())
+      .expect(200);
+    expect(
+      followingAfterFollow.body.data.data.some(
+        (p: { id: string }) => p.id === stranger.body.data.id,
+      ),
+    ).toBe(true);
 
     await request(app.getHttpServer())
       .delete(`/community/follow/${userIdC}`)

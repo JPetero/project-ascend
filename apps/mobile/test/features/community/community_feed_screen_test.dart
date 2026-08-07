@@ -82,4 +82,65 @@ void main() {
     expect(find.byIcon(Icons.favorite), findsOneWidget);
     expect(find.text('1'), findsOneWidget);
   });
+
+  testWidgets(
+    "switching to Following hides a stranger's post and shows an honest empty state",
+    (tester) async {
+      final repository = FakeCommunityRepository(
+        posts: [samplePost(id: 'post-1', caption: 'From a stranger')],
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        communityRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: CommunityFeedScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+      expect(find.text('From a stranger'), findsOneWidget);
+
+      await tester.tap(find.text('Following'));
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('From a stranger'), findsNothing);
+      expect(find.text('Nobody you follow has posted yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets('reporting a post from the menu submits the reason', (
+    tester,
+  ) async {
+    final repository = FakeCommunityRepository(
+      posts: [samplePost(id: 'post-1', caption: 'Someone else\'s post')],
+    );
+    final container = await createTestContainer(
+      signedIn: true,
+      communityRepository: repository,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: CommunityFeedScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Report'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Inappropriate content');
+    await tester.tap(find.text('Submit'));
+    await pumpForAsyncSettle(tester);
+
+    expect(find.text('Report submitted.'), findsOneWidget);
+  });
 }

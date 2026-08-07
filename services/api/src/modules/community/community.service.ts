@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MediaService } from '../media/media.service';
 import { CreateCommunityCommentDto } from './dto/create-community-comment.dto';
 import { CreateCommunityPostDto } from './dto/create-community-post.dto';
 import { CreateCommunityReportDto } from './dto/create-community-report.dto';
@@ -42,7 +43,10 @@ type ProfileSummary = Prisma.CommunityProfileGetPayload<{ select: typeof PROFILE
  */
 @Injectable()
 export class CommunityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mediaService: MediaService,
+  ) {}
 
   // --- Profiles ---------------------------------------------------------
 
@@ -101,21 +105,50 @@ export class CommunityService {
   // --- Posts --------------------------------------------------------------
 
   async createPost(userId: string, dto: CreateCommunityPostDto) {
+    let mediaUrl = dto.mediaUrl;
+
+    if (dto.mediaAssetId) {
+      const asset = await this.mediaService.getById(userId, dto.mediaAssetId);
+      if (asset.ownerId !== userId) {
+        throw new NotFoundException('Media asset not found.');
+      }
+      if (asset.processingState !== 'READY') {
+        throw new BadRequestException('This upload has not finished processing yet.');
+      }
+      if (asset.moderationState === 'REJECTED' || asset.moderationState === 'REMOVED') {
+        throw new ForbiddenException('This media cannot be posted.');
+      }
+      // Post visibility is the real access gate at the API layer; the
+      // underlying object just needs to be fetchable once the post is
+      // anything other than fully private.
+      await this.mediaService.setVisibility(
+        userId,
+        dto.mediaAssetId,
+        dto.visibility === CommunityVisibility.PRIVATE ? 'PRIVATE' : 'PUBLIC',
+      );
+      mediaUrl = this.mediaService.getObjectUrl(asset.storageKey);
+    }
+
     const post = await this.prisma.communityPost.create({
       data: {
         authorId: userId,
         mediaType: dto.mediaType ?? undefined,
-        mediaUrl: dto.mediaUrl,
+        mediaUrl,
         caption: dto.caption,
         visibility: dto.visibility ?? undefined,
         isTrainerContent: dto.isTrainerContent ?? false,
       },
     });
+
+    if (dto.mediaAssetId) {
+      await this.mediaService.attachUsage(dto.mediaAssetId, 'COMMUNITY_POST', post.id);
+    }
+
     return this.hydratePost(post, userId);
   }
 
   async listFeed(viewerId: string, query: QueryCommunityPostsDto) {
-    const where = await this.buildVisibleWhere(viewerId, query.authorId);
+    const where = await this.buildVisibleWhere(viewerId, query.authorId, query.followingOnly);
 
     const [posts, total] = await Promise.all([
       this.prisma.communityPost.findMany({
@@ -377,6 +410,7 @@ export class CommunityService {
   private async buildVisibleWhere(
     viewerId: string,
     authorIdFilter?: string,
+    followingOnly?: boolean,
   ): Promise<Prisma.CommunityPostWhereInput> {
     const [blockedByViewer, blockingViewer, following] = await Promise.all([
       this.prisma.communityBlock.findMany({
@@ -398,19 +432,32 @@ export class CommunityService {
     ];
     const followingIds = following.map((f) => f.followingId);
 
-    const visibilityOr: Prisma.CommunityPostWhereInput[] = [
-      { authorId: viewerId },
-      {
+    const visibilityOr: Prisma.CommunityPostWhereInput[] = [{ authorId: viewerId }];
+    if (followingOnly) {
+      // "Following" mode — only the caller's own posts plus anything by
+      // someone they follow, regardless of that post's own PUBLIC/
+      // FOLLOWERS visibility (both are fine to show a follower).
+      if (followingIds.length > 0) {
+        visibilityOr.push({
+          visibility: { in: [CommunityVisibility.PUBLIC, CommunityVisibility.FOLLOWERS] },
+          moderationStatus: CommunityModerationStatus.APPROVED,
+          authorId: { in: followingIds },
+        });
+      }
+    } else {
+      // "Discover" mode (default) — own posts, any PUBLIC post, and
+      // FOLLOWERS-only posts from people the caller follows.
+      visibilityOr.push({
         visibility: CommunityVisibility.PUBLIC,
         moderationStatus: CommunityModerationStatus.APPROVED,
-      },
-    ];
-    if (followingIds.length > 0) {
-      visibilityOr.push({
-        visibility: CommunityVisibility.FOLLOWERS,
-        moderationStatus: CommunityModerationStatus.APPROVED,
-        authorId: { in: followingIds },
       });
+      if (followingIds.length > 0) {
+        visibilityOr.push({
+          visibility: CommunityVisibility.FOLLOWERS,
+          moderationStatus: CommunityModerationStatus.APPROVED,
+          authorId: { in: followingIds },
+        });
+      }
     }
 
     return {

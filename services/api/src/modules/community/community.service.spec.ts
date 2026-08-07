@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { Test } from '@nestjs/testing';
 import { CommunityReportTargetType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MediaService } from '../media/media.service';
 import { CommunityService } from './community.service';
 
 function post(overrides: Partial<Record<string, unknown>> = {}) {
@@ -25,30 +26,97 @@ describe('CommunityService', () => {
   let service: CommunityService;
   let prisma: {
     communityProfile: { upsert: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock };
-    communityPost: { findUnique: jest.Mock; delete: jest.Mock };
+    communityPost: { findUnique: jest.Mock; delete: jest.Mock; create: jest.Mock };
     communityComment: { findUnique: jest.Mock; delete: jest.Mock };
     communityFollow: { upsert: jest.Mock; deleteMany: jest.Mock; findUnique: jest.Mock };
     communityBlock: { upsert: jest.Mock; findFirst: jest.Mock };
     communityReport: { create: jest.Mock };
     $transaction: jest.Mock;
   };
+  let mediaService: {
+    getById: jest.Mock;
+    setVisibility: jest.Mock;
+    getObjectUrl: jest.Mock;
+    attachUsage: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
       communityProfile: { upsert: jest.fn(), findUnique: jest.fn(), findMany: jest.fn() },
-      communityPost: { findUnique: jest.fn(), delete: jest.fn() },
+      communityPost: { findUnique: jest.fn(), delete: jest.fn(), create: jest.fn() },
       communityComment: { findUnique: jest.fn(), delete: jest.fn() },
       communityFollow: { upsert: jest.fn(), deleteMany: jest.fn(), findUnique: jest.fn() },
       communityBlock: { upsert: jest.fn(), findFirst: jest.fn() },
       communityReport: { create: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
+    mediaService = {
+      getById: jest.fn(),
+      setVisibility: jest.fn(),
+      getObjectUrl: jest.fn().mockReturnValue('/media/objects/key.jpg'),
+      attachUsage: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [CommunityService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        CommunityService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: MediaService, useValue: mediaService },
+      ],
     }).compile();
 
     service = moduleRef.get(CommunityService);
+  });
+
+  describe('createPost with a Media Platform asset', () => {
+    it("404s a media asset the caller doesn't own", async () => {
+      mediaService.getById.mockResolvedValue({
+        ownerId: 'someone-else',
+        storageKey: 'key.jpg',
+        processingState: 'READY',
+        moderationState: 'APPROVED',
+      });
+
+      await expect(
+        service.createPost('author-1', {
+          mediaType: 'IMAGE',
+          mediaAssetId: 'asset-1',
+        } as never),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.communityPost.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a media asset that has not finished processing', async () => {
+      mediaService.getById.mockResolvedValue({
+        ownerId: 'author-1',
+        storageKey: 'key.jpg',
+        processingState: 'PENDING',
+        moderationState: 'PENDING',
+      });
+
+      await expect(
+        service.createPost('author-1', {
+          mediaType: 'IMAGE',
+          mediaAssetId: 'asset-1',
+        } as never),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a removed media asset', async () => {
+      mediaService.getById.mockResolvedValue({
+        ownerId: 'author-1',
+        storageKey: 'key.jpg',
+        processingState: 'READY',
+        moderationState: 'REMOVED',
+      });
+
+      await expect(
+        service.createPost('author-1', {
+          mediaType: 'IMAGE',
+          mediaAssetId: 'asset-1',
+        } as never),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('follow', () => {
