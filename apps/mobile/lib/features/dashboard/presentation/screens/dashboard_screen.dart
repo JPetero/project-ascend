@@ -198,6 +198,18 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
+                onTap: () => context.push(RoutePaths.support),
+                child: const Row(
+                  children: [
+                    Icon(Icons.support_agent_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Help & support')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
               _ShareAchievementLink(
                 streakDays: computeWorkoutStreak(
                   (historyAsync.value ?? const <WorkoutHistoryEntry>[])

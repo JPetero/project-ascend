@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './common/audit/audit.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthIdentitiesModule } from './modules/auth-identities/auth-identities.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -32,6 +33,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { SupportModule } from './modules/support/support.module';
 import { TrainerGroupsModule } from './modules/trainer-groups/trainer-groups.module';
 import { UsersModule } from './modules/users/users.module';
 import { WaterModule } from './modules/water/water.module';
@@ -89,6 +91,8 @@ import { PrismaModule } from './prisma/prisma.module';
     RankingsModule,
     ChallengesModule,
     SubscriptionsModule,
+    SupportModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

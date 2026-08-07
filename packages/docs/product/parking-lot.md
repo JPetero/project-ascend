@@ -148,11 +148,13 @@ architecture-only below).
 - **Six-destination navigation and Vision (21)** — label/route rename
   (Train/Fuel/Community/Ascend AI/Rankings) plus a sixth, Premium-gated
   Vision destination.
-- **Community Reels (22)** — **MVP implemented in Part 4** (posts
-  including Reels, captions, likes, comments, saves, follows, reports,
-  blocks, per-post visibility, creator/trainer profiles). Still pending:
-  in-app capture/upload for IMAGE/VIDEO posts, native external sharing,
-  and a moderation review queue (Part 10).
+- **Community Reels (22)** — **MVP implemented in Part 4**, moderation
+  queue **implemented in Part 10** (posts including Reels, captions,
+  likes, comments, saves, follows, reports, blocks, per-post
+  visibility, creator/trainer profiles, plus an admin queue that lists
+  OPEN reports and can mark a reported post REMOVED — see
+  `build-session-7.md` Part 10). Still pending: in-app capture/upload
+  for IMAGE/VIDEO posts and native external sharing.
 - **Ascend Promote (23)** — transparent paid distribution architecture;
   no live billing.
 - **Trainer groups (24)** — **free basic tier implemented in Part 5**
@@ -166,11 +168,17 @@ architecture-only below).
 - **Expanded cardio and Nutrition Library (26)** — new free activity
   types on top of existing GPS cardio; a free educational nutrient
   encyclopedia.
-- **Support, companion tone, and pricing (27)** — help center/ticket/
-  bug-report/safety-report/accessibility/billing-help/appeal surfaces;
-  Atlas/Nova tone-and-boundary rules (no consciousness claims, no NSFW,
-  no therapy replacement); centralized, configurable pricing model with
-  Student/Accessibility/Senior/Regional Affordability programs — no live
+- **Support, companion tone, and pricing (27)** — **Support implemented
+  in Part 10**: every user, on every tier, can create a help/bug-
+  report/safety-report/accessibility/account-recovery/billing-help/
+  moderation-appeal ticket and reply on the thread; an admin queue
+  lists and replies to tickets, gated by a new minimal `UserRole`
+  (MEMBER/ADMIN) foundation with no self-service promotion endpoint —
+  see `build-session-7.md` Part 10. Atlas/Nova tone-and-boundary rules
+  (no consciousness claims, no NSFW, no therapy replacement) were
+  already true of the existing deterministic dialogue and remain so.
+  Centralized, configurable pricing with Student/Accessibility/Senior/
+  Regional Affordability programs shipped in Part 7 — still no live
   store billing.
 
 ## Ideas not yet scheduled

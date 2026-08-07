@@ -1279,3 +1279,149 @@ libs, so `flutter build apk --debug` was not attempted.
   `hurt`/`pain`/`injury`/`injured` list the local service already used
   moved to the shared gate; broadening it (e.g. to more injury-adjacent
   phrasing) was out of scope for this part.
+
+## Part 10 — Support and administration foundation
+
+Commit: `Implement support and administration foundation`
+
+### What this part is
+
+Founder Scenario 27's Support requirements — a help center, ticket
+creation, bug reporting, a safety report path, an accessibility
+feedback channel, account recovery, billing help, and a moderation-
+appeal path, free on every tier — plus the minimal administration
+foundation the app already had two forward references waiting on:
+`CommunityReport`'s own doc comment ("only an admin workflow (Part 10)
+moves it to REVIEWED/ACTIONED") and Part 7's `AffordabilityEligibility`
+("an admin review queue is Part 10's territory").
+
+### Backend: minimal admin-role foundation
+
+A `UserRole` enum (MEMBER/ADMIN) was added to `User`, defaulting to
+MEMBER. Deliberately no self-service promotion endpoint exists —
+granting ADMIN is an out-of-band database operation this session (see
+Known scope decisions). Role is read fresh from the DB on every
+request: `JwtStrategy.validate()` already re-fetches the full user row
+per request (for the active-status check), so returning `role` there
+was free — no JWT payload change, no new query, and a role change (or
+account suspension) takes effect on the very next request rather than
+waiting for a token to expire. `AdminGuard` (`common/guards/`) checks
+`request.user.role === ADMIN` and throws `ForbiddenException`
+otherwise; it runs after the global `JwtAuthGuard`, which always
+populates `request.user` first.
+
+### Backend: `support` module (free, every tier)
+
+`SupportTicket` (category, subject, message, status) and
+`SupportTicketReply` (`isStaff` distinguishes an admin reply from the
+ticket owner's own follow-up) — one table per concept rather than one
+model per Scenario 27 category, since every category only differs by
+`category` and downstream handling, not by shape. Every endpoint sits
+behind the ordinary `JwtAuthGuard` only — no capability check, because
+support is never gated in the first place (same as `AppCapability
+.SUPPORT_ACCESS` already being unconditionally free). Viewing or
+replying to a ticket owned by someone else 404s rather than 403s, the
+same "not found over forbidden" privacy pattern used throughout this
+app.
+
+### Backend: `admin` module
+
+Three queues, all behind `AdminGuard`: **Community moderation**
+(`GET /admin/community-reports`, `PATCH /admin/community-reports/:id`
+— rejects transitioning back to OPEN; ACTIONED with `removeContent:
+true` on a POST-type report atomically sets `CommunityPost
+.moderationStatus` to REMOVED in the same `$transaction` as the status
+update), **affordability eligibility review**
+(`GET/PATCH /admin/eligibility-applications`) — a decision is
+APPROVED or REJECTED only; approving an application does **not** grant
+PREMIUM, since no billing exists to actually charge the discounted
+price — it only records that the user qualifies for it once billing
+does), and the **support-ticket staff queue**
+(`GET /admin/support-tickets`, `GET /admin/support-tickets/:id`,
+`PATCH /admin/support-tickets/:id/reply` — creates an `isStaff: true`
+reply and optionally updates the ticket's status in the same
+transaction, setting `resolvedAt` when the new status is RESOLVED).
+
+### Flutter: `support` feature (user-facing)
+
+`SupportScreen` (ticket list, honest empty state), `CreateTicketScreen`
+(category dropdown covering all seven Scenario 27 categories, subject/
+message form), `SupportTicketDetailScreen` (thread view distinguishing
+staff replies from the caller's own, reply box). Reachable from the
+dashboard's existing settings area via a new "Help & support"
+`AscendCard`, next to the pre-existing "Wearables & devices" entry —
+no new nav destination needed, matching the pattern the Subscription
+screen already established in Part 7.
+
+### Tests
+
+Backend: `admin.service.spec.ts` (6 tests), `support.service.spec.ts`
+(6 tests), `admin.e2e-spec.ts` (10 tests over real HTTP — non-admin
+403s from every admin route; the report queue and action flow
+including the OPEN-rejection and 404 cases and the atomic post-removal
+check; the eligibility queue, approval, and its PENDING-rejection/404
+cases, including a cross-part integration check that the approval is
+reflected on `/subscriptions/me`; the support-ticket queue, staff
+reply, and resulting RESOLVED status visible back through the owner's
+own `/support/tickets/:id`), `support.e2e-spec.ts` (5 tests — ticket
+creation and listing, every one of the seven categories accepted with
+no capability check ever blocking creation, reply creation, and the
+404-not-403 privacy check for both viewing and replying to someone
+else's ticket).
+
+Flutter: `support_controller_test.dart` (2 tests), `support_ticket_detail_controller_test.dart`
+(2 tests), `support_screen_test.dart` (2 widget tests — empty state,
+a listed ticket's category/status).
+
+**A real regression caught and fixed during this part**: adding the
+new "Help & support" dashboard card pushed the pre-existing Sign Out
+button further down the scrollable settings list, and `sign_out_test.dart`'s
+`scrollUntilVisible` call — which only guarantees a single pixel of a
+widget is on-screen — left the button's computed tap-center just
+outside the fixed test viewport (off by about 20 logical pixels).
+Fixed by adding `tester.ensureVisible()` after the scroll, which
+brings the widget fully into view rather than just barely onto the
+edge of the screen.
+
+### Commands run and results
+
+Backend: `npx prisma format`/`npx prisma validate` clean, `npx prisma
+migrate dev --name support_admin_foundation` applied against the same
+local Postgres used for Parts 3–9, `npx tsc --noEmit` clean, `npx
+eslint "{src,test}/**/*.ts" --max-warnings=0` clean, `npx jest --silent`
+→ 291 tests passed (was 279), `npx jest --config ./test/jest-e2e.json
+--silent` → 130 tests passed (was 115), `npx nest build` clean.
+
+Flutter: `dart format --set-exit-if-changed .` clean, `flutter analyze`
+→ "No issues found!", `flutter test` → 303 tests passed (was 297).
+
+### Platform limitations (honest, not fabricated)
+
+Same as every other part this session: no Android SDK/Chrome/Linux GTK
+libs, so `flutter build apk --debug` was not attempted. No Docker
+daemon reachable, so `docker compose build`/`up -d`/`ps` were not
+attempted.
+
+### Known scope decisions
+
+- **No self-service admin promotion.** There is no endpoint anywhere
+  that grants `UserRole.ADMIN` — doing so safely needs its own
+  authorization model (who can grant admin, audited how) that is out
+  of scope for a foundation part. Promoting a user to ADMIN this
+  session is an out-of-band database write; `admin.e2e-spec.ts` does
+  exactly that (`prisma.user.update(...)`) to set up its test fixture,
+  documented inline as the only way to do it.
+- **No Flutter admin UI.** The three admin queues are fully built and
+  tested on the backend, but this session ships no consumer-app screen
+  for them — there is no way to reach ADMIN from the app itself, so an
+  admin-only UI inside the same consumer app would be unreachable
+  dead code. Staff would call the API directly (or a future dedicated
+  admin panel) until that changes.
+- **Approving an eligibility application does not grant PREMIUM.** No
+  billing exists to actually collect the discounted price, so
+  "APPROVED" only records eligibility for when it does.
+- **Content removal covers POST-type reports only.** `CommunityComment`
+  and `CommunityProfile` reports can be actioned (status moves to
+  REVIEWED/ACTIONED) but `removeContent` only removes a post's
+  visibility today; comment/profile moderation actions are future
+  work.

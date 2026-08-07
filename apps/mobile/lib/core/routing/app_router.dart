@@ -34,6 +34,9 @@ import '../../features/nutrition/presentation/screens/meal_prep_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/presentation/providers/profile_controller.dart';
 import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
+import '../../features/support/presentation/screens/create_ticket_screen.dart';
+import '../../features/support/presentation/screens/support_screen.dart';
+import '../../features/support/presentation/screens/support_ticket_detail_screen.dart';
 import '../../features/vision/domain/vision_module.dart';
 import '../../features/vision/presentation/screens/vision_module_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
@@ -147,6 +150,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.subscription,
         builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.support,
+        builder: (context, state) => const SupportScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.supportTicketCreate,
+        builder: (context, state) => const CreateTicketScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.supportTicketDetail,
+        builder: (context, state) =>
+            SupportTicketDetailScreen(ticketId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: RoutePaths.visionModuleDetail,

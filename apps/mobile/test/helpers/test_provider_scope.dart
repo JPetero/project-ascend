@@ -16,6 +16,7 @@ import 'package:mobile/features/companion/data/local_deterministic_ai_provider.d
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
 import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
+import 'package:mobile/features/support/presentation/providers/support_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/wearable_sync_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/food_controller.dart';
 import 'package:mobile/features/nutrition/presentation/providers/macro_target_controller.dart';
@@ -50,6 +51,7 @@ import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
 import 'fake_subscription_status_repository.dart';
 import 'fake_subscriptions_repository.dart';
+import 'fake_support_repository.dart';
 import 'fake_trainer_groups_repository.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
@@ -86,6 +88,7 @@ Future<ProviderContainer> createTestContainer({
   FakeSubscriptionStatusRepository? subscriptionStatusRepository,
   FakeSubscriptionsRepository? subscriptionsRepository,
   AiProvider? aiProvider,
+  FakeSupportRepository? supportRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -197,6 +200,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       aiProviderProvider.overrideWithValue(
         aiProvider ?? const LocalDeterministicAiProvider(),
+      ),
+      supportRepositoryProvider.overrideWithValue(
+        supportRepository ?? FakeSupportRepository(),
       ),
     ],
   );

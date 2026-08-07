@@ -21,6 +21,15 @@ enum UserStatus {
   DELETED
 }
 
+// Minimal admin foundation — Founder Scenario 27's support/moderation
+// requirements (Build Session 7 Part 10). No self-service promotion
+// endpoint exists; granting ADMIN is an out-of-band operation this
+// session (see build-session-7.md Part 10's known scope decisions).
+enum UserRole {
+  MEMBER
+  ADMIN
+}
+
 enum SexForCalculations {
   MALE
   FEMALE
@@ -83,6 +92,7 @@ model User {
   email        String     @unique
   passwordHash String
   status       UserStatus @default(ACTIVE)
+  role         UserRole   @default(MEMBER)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -130,6 +140,8 @@ model User {
   challengeParticipations     ChallengeParticipant[]
   subscription                UserSubscription?
   affordabilityEligibility    AffordabilityEligibility?
+  supportTickets              SupportTicket[]
+  supportTicketReplies        SupportTicketReply[]
 
   @@index([status])
   @@map("users")
@@ -1600,4 +1612,64 @@ model AffordabilityEligibility {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("affordability_eligibilities")
+}
+
+// Support — Founder Scenario 27. Every category here is free on every
+// tier (AppCapability.SUPPORT_ACCESS); none of this is ever
+// Premium-gated. One table covers every category the scenario lists
+// (help center follow-up, bug reports, safety reports, accessibility
+// feedback, account recovery, billing help, moderation appeals) rather
+// than one model per category, since they only differ by `category`
+// and downstream handling, not by shape.
+enum SupportTicketCategory {
+  GENERAL
+  BUG_REPORT
+  SAFETY_REPORT
+  ACCESSIBILITY_FEEDBACK
+  ACCOUNT_RECOVERY
+  BILLING_HELP
+  MODERATION_APPEAL
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id         String                @id @default(uuid())
+  userId     String
+  category   SupportTicketCategory
+  subject    String
+  message    String                @db.Text
+  status     SupportTicketStatus   @default(OPEN)
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  resolvedAt DateTime?
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies SupportTicketReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportTicketReply {
+  id        String   @id @default(uuid())
+  ticketId  String
+  authorId  String
+  // Distinguishes an admin/staff reply from the ticket owner's own
+  // follow-up message on the same thread.
+  isStaff   Boolean  @default(false)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_replies")
 }

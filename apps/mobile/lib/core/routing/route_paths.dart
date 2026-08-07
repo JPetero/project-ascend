@@ -52,6 +52,13 @@ abstract final class RoutePaths {
   static const visionModuleDetail = '/vision/modules/:moduleId';
   static String visionModuleDetailPath(String moduleId) =>
       '/vision/modules/$moduleId';
+
+  // Support — Founder Scenario 27, free on every tier, reachable from
+  // the profile/dashboard screen.
+  static const support = '/support';
+  static const supportTicketCreate = '/support/new';
+  static const supportTicketDetail = '/support/:id';
+  static String supportTicketDetailPath(String id) => '/support/$id';
   static const connectedHealth = '/wearables/connected-health';
   static const achievements = '/achievements';
   static const cardioHistory = '/cardio';
