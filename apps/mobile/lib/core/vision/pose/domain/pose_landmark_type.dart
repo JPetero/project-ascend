@@ -1,0 +1,41 @@
+/// The BlazePose 33-point landmark set used by Google ML Kit's on-device
+/// Pose Detection API (Build Session 10 Part 2) — the current maintained,
+/// Flutter-compatible on-device pose solution. Every landmark ML Kit can
+/// report has an entry here so [PoseDetectorAdapter] implementations have
+/// nowhere to silently drop data; exercise analyzers only read the small
+/// subset relevant to a given movement.
+enum PoseLandmarkType {
+  nose,
+  leftEyeInner,
+  leftEye,
+  leftEyeOuter,
+  rightEyeInner,
+  rightEye,
+  rightEyeOuter,
+  leftEar,
+  rightEar,
+  leftMouth,
+  rightMouth,
+  leftShoulder,
+  rightShoulder,
+  leftElbow,
+  rightElbow,
+  leftWrist,
+  rightWrist,
+  leftPinky,
+  rightPinky,
+  leftIndex,
+  rightIndex,
+  leftThumb,
+  rightThumb,
+  leftHip,
+  rightHip,
+  leftKnee,
+  rightKnee,
+  leftAnkle,
+  rightAnkle,
+  leftHeel,
+  rightHeel,
+  leftFootIndex,
+  rightFootIndex,
+}
