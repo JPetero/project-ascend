@@ -31,6 +31,7 @@ import 'package:mobile/features/joint_workouts/presentation/providers/joint_work
 import 'package:mobile/features/messages/presentation/providers/conversations_controller.dart';
 import 'package:mobile/features/nutrition_library/presentation/providers/nutrition_library_controller.dart';
 import 'package:mobile/features/notifications/presentation/providers/notifications_controller.dart';
+import 'package:mobile/features/notifications/presentation/providers/workout_reminder_controller.dart';
 import 'package:mobile/features/data_export/presentation/providers/data_export_controller.dart';
 import 'package:mobile/features/sports/presentation/providers/sports_matches_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
@@ -64,6 +65,7 @@ import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
 import 'fake_messages_repository.dart';
 import 'fake_data_export_repository.dart';
+import 'fake_local_notification_scheduling_service.dart';
 import 'fake_notifications_repository.dart';
 import 'fake_nutrition_library_repository.dart';
 import 'fake_nutrition_repositories.dart';
@@ -122,6 +124,7 @@ Future<ProviderContainer> createTestContainer({
   FakeDataExportRepository? dataExportRepository,
   FakeDataExportShareService? dataExportShareService,
   FakeGalleryRepository? galleryRepository,
+  FakeLocalNotificationSchedulingService? localNotificationSchedulingService,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -273,6 +276,10 @@ Future<ProviderContainer> createTestContainer({
       ),
       galleryRepositoryProvider.overrideWithValue(
         galleryRepository ?? FakeGalleryRepository(),
+      ),
+      localNotificationSchedulingServiceProvider.overrideWithValue(
+        localNotificationSchedulingService ??
+            FakeLocalNotificationSchedulingService(),
       ),
     ],
   );
