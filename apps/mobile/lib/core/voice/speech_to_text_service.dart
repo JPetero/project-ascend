@@ -40,7 +40,9 @@ class PluginSpeechToTextService implements SpeechToTextService {
   @override
   Future<SpeechAvailability> initialize() async {
     final available = await _speech.initialize();
-    return available ? SpeechAvailability.available : SpeechAvailability.unavailable;
+    return available
+        ? SpeechAvailability.available
+        : SpeechAvailability.unavailable;
   }
 
   @override

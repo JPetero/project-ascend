@@ -125,27 +125,28 @@ class CompanionVoiceController extends StateNotifier<CompanionVoiceState> {
   }
 }
 
-final companionVoiceControllerProvider = StateNotifierProvider.autoDispose<
-  CompanionVoiceController,
-  CompanionVoiceState
->((ref) {
-  final controller = CompanionVoiceController(
-    speechToText: ref.watch(speechToTextServiceProvider),
-    textToSpeech: ref.watch(textToSpeechServiceProvider),
-    onFinalTranscript: (text) {
-      ref.read(companionChatControllerProvider.notifier).sendMessage(text);
-    },
-  );
+final companionVoiceControllerProvider =
+    StateNotifierProvider.autoDispose<
+      CompanionVoiceController,
+      CompanionVoiceState
+    >((ref) {
+      final controller = CompanionVoiceController(
+        speechToText: ref.watch(speechToTextServiceProvider),
+        textToSpeech: ref.watch(textToSpeechServiceProvider),
+        onFinalTranscript: (text) {
+          ref.read(companionChatControllerProvider.notifier).sendMessage(text);
+        },
+      );
 
-  ref.listen<CompanionChatState>(companionChatControllerProvider, (
-    previous,
-    next,
-  ) {
-    final previousCount = previous?.messages.length ?? 0;
-    if (next.messages.length <= previousCount) return;
-    final latest = next.messages.last;
-    if (!latest.isFromUser) controller.speak(latest.text);
-  });
+      ref.listen<CompanionChatState>(companionChatControllerProvider, (
+        previous,
+        next,
+      ) {
+        final previousCount = previous?.messages.length ?? 0;
+        if (next.messages.length <= previousCount) return;
+        final latest = next.messages.last;
+        if (!latest.isFromUser) controller.speak(latest.text);
+      });
 
-  return controller;
-});
+      return controller;
+    });

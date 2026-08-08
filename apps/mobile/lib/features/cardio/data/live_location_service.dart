@@ -161,7 +161,10 @@ class GeolocatorLiveLocationService implements LiveLocationService {
     double distanceFilterMeters = 5,
     bool keepAliveInBackground = false,
   }) {
-    final settings = _buildSettings(distanceFilterMeters, keepAliveInBackground);
+    final settings = _buildSettings(
+      distanceFilterMeters,
+      keepAliveInBackground,
+    );
     return geo.Geolocator.getPositionStream(locationSettings: settings)
         .where(
           (position) => isAcceptableAccuracy(
@@ -189,8 +192,7 @@ class GeolocatorLiveLocationService implements LiveLocationService {
         distanceFilter: distanceFilterMeters.round(),
         foregroundNotificationConfig: const geo.ForegroundNotificationConfig(
           notificationTitle: 'Ascend is tracking your session',
-          notificationText:
-              'Recording your route — tap to return to Ascend.',
+          notificationText: 'Recording your route — tap to return to Ascend.',
           enableWakeLock: true,
         ),
       );

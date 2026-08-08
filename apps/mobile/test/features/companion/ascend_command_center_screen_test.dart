@@ -124,49 +124,47 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a reply is spoken aloud when speak-replies is enabled',
-    (tester) async {
-      final textToSpeech = FakeTextToSpeechService();
-      final container = await createTestContainer(
-        signedIn: true,
-        textToSpeechService: textToSpeech,
-        subscriptionStatusRepository: FakeSubscriptionStatusRepository(
-          tier: PlanTier.premium,
-        ),
-      );
-      addTearDown(container.dispose);
-      container.listen(companionChatControllerProvider, (_, _) {});
-      container.listen(companionVoiceControllerProvider, (_, _) {});
+  testWidgets('a reply is spoken aloud when speak-replies is enabled', (
+    tester,
+  ) async {
+    final textToSpeech = FakeTextToSpeechService();
+    final container = await createTestContainer(
+      signedIn: true,
+      textToSpeechService: textToSpeech,
+      subscriptionStatusRepository: FakeSubscriptionStatusRepository(
+        tier: PlanTier.premium,
+      ),
+    );
+    addTearDown(container.dispose);
+    container.listen(companionChatControllerProvider, (_, _) {});
+    container.listen(companionVoiceControllerProvider, (_, _) {});
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(home: AscendCommandCenterScreen()),
-        ),
-      );
-      await pumpForAsyncSettle(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AscendCommandCenterScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
 
-      await tester.tap(find.byTooltip('Speak replies aloud (Premium)'));
-      await pumpForAsyncSettle(tester);
+    await tester.tap(find.byTooltip('Speak replies aloud (Premium)'));
+    await pumpForAsyncSettle(tester);
 
-      final chatController = container.read(
-        companionChatControllerProvider.notifier,
-      );
-      // sendMessage uses real Future.delayed timers under the fake test
-      // clock — same reasoning as companion_chat_controller_test.dart's
-      // pumpUntil helper.
-      // ignore: unawaited_futures
-      chatController.sendMessage('hello');
-      await _pumpUntil(
-        tester,
-        () =>
-            container.read(companionChatControllerProvider).messages.length >=
-            2,
-      );
-      await tester.pump(const Duration(milliseconds: 700));
+    final chatController = container.read(
+      companionChatControllerProvider.notifier,
+    );
+    // sendMessage uses real Future.delayed timers under the fake test
+    // clock — same reasoning as companion_chat_controller_test.dart's
+    // pumpUntil helper.
+    // ignore: unawaited_futures
+    chatController.sendMessage('hello');
+    await _pumpUntil(
+      tester,
+      () =>
+          container.read(companionChatControllerProvider).messages.length >= 2,
+    );
+    await tester.pump(const Duration(milliseconds: 700));
 
-      expect(textToSpeech.spoken, hasLength(1));
-    },
-  );
+    expect(textToSpeech.spoken, hasLength(1));
+  });
 }

@@ -37,19 +37,22 @@ void main() {
     },
   );
 
-  test('startListening reports unavailable honestly when the device cannot', () async {
-    speechToText.availability = SpeechAvailability.unavailable;
-    final controller = buildController();
-    addTearDown(controller.dispose);
+  test(
+    'startListening reports unavailable honestly when the device cannot',
+    () async {
+      speechToText.availability = SpeechAvailability.unavailable;
+      final controller = buildController();
+      addTearDown(controller.dispose);
 
-    await controller.startListening();
+      await controller.startListening();
 
-    expect(
-      controller.state.listeningStatus,
-      VoiceListeningStatus.unavailable,
-    );
-    expect(speechToText.startListeningCallCount, 0);
-  });
+      expect(
+        controller.state.listeningStatus,
+        VoiceListeningStatus.unavailable,
+      );
+      expect(speechToText.startListeningCallCount, 0);
+    },
+  );
 
   test('a partial result updates the transcript without finishing', () async {
     final controller = buildController();
@@ -63,21 +66,18 @@ void main() {
     expect(finalTranscripts, isEmpty);
   });
 
-  test(
-    'a final result clears the transcript, returns to idle, and hands the '
-    'text to onFinalTranscript',
-    () async {
-      final controller = buildController();
-      addTearDown(controller.dispose);
-      await controller.startListening();
+  test('a final result clears the transcript, returns to idle, and hands the '
+      'text to onFinalTranscript', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await controller.startListening();
 
-      speechToText.emitResult('log a meal', isFinal: true);
+    speechToText.emitResult('log a meal', isFinal: true);
 
-      expect(controller.state.listeningStatus, VoiceListeningStatus.idle);
-      expect(controller.state.partialTranscript, isEmpty);
-      expect(finalTranscripts, ['log a meal']);
-    },
-  );
+    expect(controller.state.listeningStatus, VoiceListeningStatus.idle);
+    expect(controller.state.partialTranscript, isEmpty);
+    expect(finalTranscripts, ['log a meal']);
+  });
 
   test('a blank final result is not handed to onFinalTranscript', () async {
     final controller = buildController();
@@ -100,20 +100,17 @@ void main() {
     expect(speechToText.stopListeningCallCount, 1);
   });
 
-  test(
-    'setSpeakRepliesEnabled(false) stops any in-progress speech',
-    () async {
-      final controller = buildController();
-      addTearDown(controller.dispose);
-      controller.setSpeakRepliesEnabled(true);
+  test('setSpeakRepliesEnabled(false) stops any in-progress speech', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    controller.setSpeakRepliesEnabled(true);
 
-      controller.setSpeakRepliesEnabled(false);
-      await Future<void>.delayed(Duration.zero);
+    controller.setSpeakRepliesEnabled(false);
+    await Future<void>.delayed(Duration.zero);
 
-      expect(controller.state.speakRepliesEnabled, isFalse);
-      expect(textToSpeech.stopCallCount, 1);
-    },
-  );
+    expect(controller.state.speakRepliesEnabled, isFalse);
+    expect(textToSpeech.stopCallCount, 1);
+  });
 
   test('speak() is a no-op when speakRepliesEnabled is off', () async {
     final controller = buildController();

@@ -20,7 +20,10 @@ final localNotificationSchedulingServiceProvider =
     });
 
 class WorkoutReminderState {
-  const WorkoutReminderState({required this.time, this.permissionDenied = false});
+  const WorkoutReminderState({
+    required this.time,
+    this.permissionDenied = false,
+  });
 
   final TimeOfDay time;
   final bool permissionDenied;
@@ -57,7 +60,10 @@ class WorkoutReminderController extends StateNotifier<WorkoutReminderState> {
   /// Cancels the on-device schedule when reminders are off or no workout
   /// days are set; otherwise requests permission (never schedules
   /// without it) and (re)schedules for every configured day.
-  Future<void> sync({required bool enabled, required List<String> daysOfWeek}) async {
+  Future<void> sync({
+    required bool enabled,
+    required List<String> daysOfWeek,
+  }) async {
     if (!enabled || daysOfWeek.isEmpty) {
       await _schedulingService.cancel(workoutReminderNotificationBaseId);
       state = state.copyWith(permissionDenied: false);
@@ -83,9 +89,13 @@ class WorkoutReminderController extends StateNotifier<WorkoutReminderState> {
 }
 
 final workoutReminderControllerProvider =
-    StateNotifierProvider<WorkoutReminderController, WorkoutReminderState>((ref) {
+    StateNotifierProvider<WorkoutReminderController, WorkoutReminderState>((
+      ref,
+    ) {
       return WorkoutReminderController(
-        schedulingService: ref.watch(localNotificationSchedulingServiceProvider),
+        schedulingService: ref.watch(
+          localNotificationSchedulingServiceProvider,
+        ),
         localPreferences: ref.watch(localPreferencesProvider),
       );
     });

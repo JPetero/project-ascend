@@ -34,14 +34,17 @@ void main() {
       expect(point, const Offset(200, 100));
     });
 
-    test('returns zero for a degenerate zero-sized image rather than dividing by zero', () {
-      final point = scalePoint(
-        x: 10,
-        y: 10,
-        imageSize: Size.zero,
-        canvasSize: const Size(320, 240),
-      );
-      expect(point, Offset.zero);
-    });
+    test(
+      'returns zero for a degenerate zero-sized image rather than dividing by zero',
+      () {
+        final point = scalePoint(
+          x: 10,
+          y: 10,
+          imageSize: Size.zero,
+          canvasSize: const Size(320, 240),
+        );
+        expect(point, Offset.zero);
+      },
+    );
   });
 }

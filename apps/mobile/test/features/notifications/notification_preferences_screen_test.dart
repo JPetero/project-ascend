@@ -118,10 +118,7 @@ void main() {
       await pumpForAsyncSettle(tester);
 
       expect(find.text('Reminder time'), findsOneWidget);
-      expect(
-        schedulingService.scheduledBaseIds,
-        contains(1000),
-      );
+      expect(schedulingService.scheduledBaseIds, contains(1000));
     },
   );
 

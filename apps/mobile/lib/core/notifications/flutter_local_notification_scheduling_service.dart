@@ -58,7 +58,11 @@ class FlutterLocalNotificationSchedulingService
           IOSFlutterLocalNotificationsPlugin
         >();
     if (ios != null) {
-      final granted = await ios.requestPermissions(alert: true, badge: true, sound: true);
+      final granted = await ios.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       return granted ?? false;
     }
 

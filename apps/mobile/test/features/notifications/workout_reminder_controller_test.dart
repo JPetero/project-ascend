@@ -46,38 +46,54 @@ void main() {
     expect(schedulingService.scheduledBaseIds, isEmpty);
   });
 
-  test('sync requests permission and schedules for each configured day', () async {
-    final controller = buildController();
-    await controller.sync(enabled: true, daysOfWeek: ['MON', 'WED', 'FRI']);
+  test(
+    'sync requests permission and schedules for each configured day',
+    () async {
+      final controller = buildController();
+      await controller.sync(enabled: true, daysOfWeek: ['MON', 'WED', 'FRI']);
 
-    expect(schedulingService.requestPermissionCallCount, 1);
-    expect(
-      schedulingService.scheduledBaseIds,
-      contains(workoutReminderNotificationBaseId),
-    );
-    final scheduled = schedulingService.lastSchedule[workoutReminderNotificationBaseId]!;
-    expect(scheduled.weekdays, {DateTime.monday, DateTime.wednesday, DateTime.friday});
-    expect(controller.state.permissionDenied, isFalse);
-  });
+      expect(schedulingService.requestPermissionCallCount, 1);
+      expect(
+        schedulingService.scheduledBaseIds,
+        contains(workoutReminderNotificationBaseId),
+      );
+      final scheduled =
+          schedulingService.lastSchedule[workoutReminderNotificationBaseId]!;
+      expect(scheduled.weekdays, {
+        DateTime.monday,
+        DateTime.wednesday,
+        DateTime.friday,
+      });
+      expect(controller.state.permissionDenied, isFalse);
+    },
+  );
 
-  test('sync marks permissionDenied and cancels when permission is refused', () async {
-    schedulingService.permissionGranted = false;
-    final controller = buildController();
-    await controller.sync(enabled: true, daysOfWeek: ['MON']);
+  test(
+    'sync marks permissionDenied and cancels when permission is refused',
+    () async {
+      schedulingService.permissionGranted = false;
+      final controller = buildController();
+      await controller.sync(enabled: true, daysOfWeek: ['MON']);
 
-    expect(controller.state.permissionDenied, isTrue);
-    expect(schedulingService.scheduledBaseIds, isEmpty);
-  });
+      expect(controller.state.permissionDenied, isTrue);
+      expect(schedulingService.scheduledBaseIds, isEmpty);
+    },
+  );
 
   test('setReminderTime persists the new time and resyncs', () async {
     final controller = buildController();
     const newTime = TimeOfDay(hour: 7, minute: 30);
 
-    await controller.setReminderTime(newTime, enabled: true, daysOfWeek: ['TUE']);
+    await controller.setReminderTime(
+      newTime,
+      enabled: true,
+      daysOfWeek: ['TUE'],
+    );
 
     expect(controller.state.time, newTime);
     expect(localPreferences.workoutReminderTime, newTime);
-    final scheduled = schedulingService.lastSchedule[workoutReminderNotificationBaseId]!;
+    final scheduled =
+        schedulingService.lastSchedule[workoutReminderNotificationBaseId]!;
     expect(scheduled.time, newTime);
     expect(scheduled.weekdays, {DateTime.tuesday});
   });

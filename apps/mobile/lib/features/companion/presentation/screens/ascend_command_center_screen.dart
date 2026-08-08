@@ -106,7 +106,9 @@ class _AscendCommandCenterScreenState
       return;
     }
     final voiceController = ref.read(companionVoiceControllerProvider.notifier);
-    final enabled = ref.read(companionVoiceControllerProvider).speakRepliesEnabled;
+    final enabled = ref
+        .read(companionVoiceControllerProvider)
+        .speakRepliesEnabled;
     voiceController.setSpeakRepliesEnabled(!enabled);
   }
 
@@ -261,9 +263,7 @@ class _AscendCommandCenterScreenState
                         ? null
                         : () => _toggleListening(hasVoiceAccess),
                     icon: Icon(
-                      isListening
-                          ? Icons.mic_rounded
-                          : Icons.mic_none_rounded,
+                      isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
                     ),
                     tooltip: hasVoiceAccess
                         ? (isListening ? 'Stop listening' : 'Voice input')

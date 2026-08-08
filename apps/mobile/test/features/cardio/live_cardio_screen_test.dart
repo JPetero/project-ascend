@@ -146,53 +146,47 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a background-tracking-capable session keeps tracking through a '
-    'background/foreground cycle instead of pausing',
-    (tester) async {
-      final locationService = FakeLiveLocationService()
-        ..backgroundCapableResult = true;
-      final container = await createTestContainer(
-        signedIn: true,
-        liveLocationService: locationService,
-      );
-      addTearDown(container.dispose);
-      addTearDown(locationService.dispose);
+  testWidgets('a background-tracking-capable session keeps tracking through a '
+      'background/foreground cycle instead of pausing', (tester) async {
+    final locationService = FakeLiveLocationService()
+      ..backgroundCapableResult = true;
+    final container = await createTestContainer(
+      signedIn: true,
+      liveLocationService: locationService,
+    );
+    addTearDown(container.dispose);
+    addTearDown(locationService.dispose);
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(home: LiveCardioScreen()),
-        ),
-      );
-      await pumpForAsyncSettle(tester);
-      await tester.tap(find.text('Start tracking'));
-      await pumpForAsyncSettle(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: LiveCardioScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+    await tester.tap(find.text('Start tracking'));
+    await pumpForAsyncSettle(tester);
 
-      expect(
-        find.text('Keeps tracking if you lock your phone'),
-        findsOneWidget,
-      );
+    expect(find.text('Keeps tracking if you lock your phone'), findsOneWidget);
 
-      await tester.runAsync(() async {
-        WidgetsBinding.instance.handleAppLifecycleStateChanged(
-          AppLifecycleState.paused,
-        );
-        await Future<void>.delayed(Duration.zero);
-      });
-
+    await tester.runAsync(() async {
       WidgetsBinding.instance.handleAppLifecycleStateChanged(
-        AppLifecycleState.resumed,
+        AppLifecycleState.paused,
       );
-      await pumpForAsyncSettle(tester);
+      await Future<void>.delayed(Duration.zero);
+    });
 
-      final session = container.read(liveCardioSessionControllerProvider);
-      expect(session?.isTracking, isTrue);
-      expect(session?.pausedForBackground, isFalse);
-      expect(
-        find.textContaining('Paused because Ascend was in the background'),
-        findsNothing,
-      );
-    },
-  );
+    WidgetsBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+    await pumpForAsyncSettle(tester);
+
+    final session = container.read(liveCardioSessionControllerProvider);
+    expect(session?.isTracking, isTrue);
+    expect(session?.pausedForBackground, isFalse);
+    expect(
+      find.textContaining('Paused because Ascend was in the background'),
+      findsNothing,
+    );
+  });
 }

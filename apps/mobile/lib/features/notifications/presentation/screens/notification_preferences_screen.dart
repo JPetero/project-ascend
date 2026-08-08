@@ -26,7 +26,12 @@ class NotificationPreferencesScreen extends ConsumerStatefulWidget {
 class _NotificationPreferencesScreenState
     extends ConsumerState<NotificationPreferencesScreen> {
   List<String> get _daysOfWeek =>
-      ref.read(profileControllerProvider).asData?.value?.workoutSchedule?.daysOfWeek ??
+      ref
+          .read(profileControllerProvider)
+          .asData
+          ?.value
+          ?.workoutSchedule
+          ?.daysOfWeek ??
       const [];
 
   Future<void> _syncWorkoutReminders(bool enabled) async {
@@ -46,7 +51,9 @@ class _NotificationPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(notificationPreferencesControllerProvider);
-    final controller = ref.read(notificationPreferencesControllerProvider.notifier);
+    final controller = ref.read(
+      notificationPreferencesControllerProvider.notifier,
+    );
     final reminderState = ref.watch(workoutReminderControllerProvider);
 
     // Resyncing the on-device schedule depends on two independently-async
@@ -62,7 +69,10 @@ class _NotificationPreferencesScreenState
       final enabled = next.asData?.value?.workoutReminders as bool?;
       if (enabled != null) _syncWorkoutReminders(enabled);
     });
-    ref.listen<AsyncValue<dynamic>>(profileControllerProvider, (previous, next) {
+    ref.listen<AsyncValue<dynamic>>(profileControllerProvider, (
+      previous,
+      next,
+    ) {
       if (!next.hasValue) return;
       final enabled = ref
           .read(notificationPreferencesControllerProvider)
@@ -99,7 +109,8 @@ class _NotificationPreferencesScreenState
                       // ref.listen below, which fires for this change too
                       // (as well as the very first successful load) —
                       // one path, not a duplicate call here.
-                      onChanged: (value) => controller.update({'workoutReminders': value}),
+                      onChanged: (value) =>
+                          controller.update({'workoutReminders': value}),
                     ),
                     if (preferences.workoutReminders) ...[
                       ListTile(
@@ -120,7 +131,9 @@ class _NotificationPreferencesScreenState
                       ),
                       if (reminderState.permissionDenied)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+                          padding: const EdgeInsets.only(
+                            bottom: AscendSpacing.sm,
+                          ),
                           child: Text(
                             'Notifications are turned off for Ascend in your '
                             'device settings, so this reminder cannot be '
