@@ -13,6 +13,8 @@ const _publicPaths = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify-email',
+  '/auth/google',
+  '/auth/apple',
   '/health',
 ];
 

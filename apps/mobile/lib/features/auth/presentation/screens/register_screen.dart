@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../providers/auth_controller.dart';
+import '../widgets/social_sign_in_buttons.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -165,6 +166,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   label: 'Create Account',
                   isLoading: isSubmitting,
                   onPressed: _submit,
+                ),
+                const SizedBox(height: AscendSpacing.lg),
+                SocialSignInButtons(
+                  onError: (message) => setState(() => _errorMessage = message),
                 ),
               ],
             ),

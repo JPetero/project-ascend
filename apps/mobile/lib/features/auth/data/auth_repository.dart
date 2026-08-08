@@ -68,6 +68,37 @@ class AuthRepository {
     return _persistSessionAndReturnUser(envelope.data!);
   }
 
+  /// Signs in (creating an account on first use) with a Google-issued ID
+  /// token (Build Session 10 Part 9) — the backend's GoogleTokenVerifier
+  /// re-verifies it server-side before trusting anything in it.
+  Future<AuthUser> signInWithGoogle(String idToken) async {
+    final envelope = await _apiClient.post(
+      '/auth/google',
+      (data) => data as Map<String, dynamic>,
+      data: {'idToken': idToken, 'platform': _currentPlatform},
+    );
+
+    return _persistSessionAndReturnUser(envelope.data!);
+  }
+
+  /// Signs in (creating an account on first use) with an Apple-issued ID
+  /// token (Build Session 10 Part 10). [firstName] is only ever non-null
+  /// on the very first authorization between this app and the user's
+  /// Apple ID — Apple never repeats it.
+  Future<AuthUser> signInWithApple(String idToken, {String? firstName}) async {
+    final envelope = await _apiClient.post(
+      '/auth/apple',
+      (data) => data as Map<String, dynamic>,
+      data: {
+        'idToken': idToken,
+        'firstName': ?firstName,
+        'platform': _currentPlatform,
+      },
+    );
+
+    return _persistSessionAndReturnUser(envelope.data!);
+  }
+
   Future<AuthUser> me() async {
     final envelope = await _apiClient.get(
       '/auth/me',

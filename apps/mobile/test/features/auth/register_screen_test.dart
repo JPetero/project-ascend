@@ -88,4 +88,14 @@ void main() {
       );
     });
   });
+
+  testWidgets(
+    'also offers Google/Apple continue buttons (Build Session 10 Parts 9/10)',
+    (tester) async {
+      await _pumpRegisterScreen(tester);
+
+      expect(find.text('Continue with Google'), findsOneWidget);
+      expect(find.text('Continue with Apple'), findsOneWidget);
+    },
+  );
 }

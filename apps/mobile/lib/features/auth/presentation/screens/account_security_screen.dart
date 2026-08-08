@@ -125,8 +125,9 @@ class _IdentitiesCard extends StatelessWidget {
             ),
           const SizedBox(height: AscendSpacing.xs),
           Text(
-            'Connecting a Google or Apple account from the app isn\'t '
-            'available in this build yet.',
+            'Signing in with a Google or Apple account that uses the same '
+            'verified email connects it automatically — there isn\'t a '
+            'separate "connect" button for that yet.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

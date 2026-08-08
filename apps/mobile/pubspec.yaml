@@ -79,6 +79,14 @@ dependencies:
   camera: ^0.11.0+2
   google_mlkit_pose_detection: ^0.14.0
 
+  # Real Google/Apple sign-in clients (Build Session 10 Parts 9/10) — the
+  # official plugins for obtaining a provider-issued ID token, which the
+  # backend's GoogleTokenVerifier/AppleTokenVerifier then verify
+  # server-side (see auth-identities/providers/). Neither plugin talks to
+  # Ascend's own servers.
+  google_sign_in: ^7.1.0
+  sign_in_with_apple: ^7.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
