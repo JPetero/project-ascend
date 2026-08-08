@@ -147,6 +147,19 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   GOOGLE_PLAY_PACKAGE_NAME?: string;
+
+  // Remote push notifications (Build Session 10 Part 12) — optional.
+  // Undefined means NotificationsModule falls back to
+  // NoopPushNotificationProvider, which honestly records "not
+  // configured" instead of pretending to deliver a push. See
+  // FcmPushNotificationProvider.
+  @IsString()
+  @IsOptional()
+  FCM_SERVICE_ACCOUNT_JSON?: string;
+
+  @IsString()
+  @IsOptional()
+  FCM_PROJECT_ID?: string;
 }
 
 /**

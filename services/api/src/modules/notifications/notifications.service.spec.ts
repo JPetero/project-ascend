@@ -19,6 +19,7 @@ describe('NotificationsService', () => {
       updateMany: jest.Mock;
     };
     notificationDelivery: { create: jest.Mock };
+    pushDeviceToken: { upsert: jest.Mock; deleteMany: jest.Mock };
   };
   let pushProvider: { send: jest.Mock };
   let localProvider: { schedule: jest.Mock };
@@ -38,6 +39,7 @@ describe('NotificationsService', () => {
         updateMany: jest.fn(),
       },
       notificationDelivery: { create: jest.fn() },
+      pushDeviceToken: { upsert: jest.fn(), deleteMany: jest.fn() },
     };
     pushProvider = { send: jest.fn().mockResolvedValue({ delivered: false }) };
     localProvider = { schedule: jest.fn().mockResolvedValue({ delivered: false }) };
@@ -149,6 +151,26 @@ describe('NotificationsService', () => {
       const count = await service.unreadCount('user-1');
 
       expect(count).toBe(3);
+    });
+  });
+
+  describe('registerDeviceToken / unregisterDeviceToken', () => {
+    it('upserts on the token itself, moving it to the registering user', async () => {
+      await service.registerDeviceToken('user-1', { token: 'fcm-token-1', platform: 'ios' });
+
+      expect(prisma.pushDeviceToken.upsert).toHaveBeenCalledWith({
+        where: { token: 'fcm-token-1' },
+        create: { userId: 'user-1', token: 'fcm-token-1', platform: 'ios' },
+        update: { userId: 'user-1', platform: 'ios', lastSeenAt: expect.any(Date) },
+      });
+    });
+
+    it('scopes unregister to the caller so one user cannot remove another\'s token', async () => {
+      await service.unregisterDeviceToken('user-1', 'fcm-token-1');
+
+      expect(prisma.pushDeviceToken.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', token: 'fcm-token-1' },
+      });
     });
   });
 });

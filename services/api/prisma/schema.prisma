@@ -206,6 +206,7 @@ model User {
   purchases                        Purchase[]
   adminPermissionGrants            AdminPermissionGrant[]
   visionAnalysisSessions           VisionAnalysisSession[]
+  pushDeviceTokens                 PushDeviceToken[]
 
   @@index([status])
   @@map("users")
@@ -2858,6 +2859,29 @@ model NotificationDelivery {
 
   @@index([eventId])
   @@map("notification_deliveries")
+}
+
+// Build Session 10 Part 12 — one row per device the user has granted
+// push permission on. `token` is unique because a provider-issued push
+// token belongs to exactly one installation at a time; re-registering
+// the same token (e.g. after a reinstall under a different account)
+// moves it to the newly-registering user rather than creating a
+// duplicate. Consumed by FcmPushNotificationProvider — never returned
+// to any client beyond the registration call itself.
+model PushDeviceToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  // Freeform client-reported platform ("ios" | "android"), purely
+  // informational — never used for any security decision.
+  platform   String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_device_tokens")
 }
 
 // Build Session 10 Part 6 — private, user-owned results from a live

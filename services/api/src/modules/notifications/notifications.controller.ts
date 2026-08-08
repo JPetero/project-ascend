@@ -1,7 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { NotificationsService } from './notifications.service';
 
@@ -44,5 +56,25 @@ export class NotificationsController {
   async markAllRead(@CurrentUser() user: AuthenticatedUser) {
     await this.notifications.markAllRead(user.id);
     return { read: true };
+  }
+
+  @Post('device-tokens')
+  @HttpCode(HttpStatus.OK)
+  async registerDeviceToken(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: RegisterDeviceTokenDto,
+  ) {
+    await this.notifications.registerDeviceToken(user.id, dto);
+    return { registered: true };
+  }
+
+  @Delete('device-tokens/:token')
+  @HttpCode(HttpStatus.OK)
+  async unregisterDeviceToken(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('token') token: string,
+  ) {
+    await this.notifications.unregisterDeviceToken(user.id, token);
+    return { unregistered: true };
   }
 }
