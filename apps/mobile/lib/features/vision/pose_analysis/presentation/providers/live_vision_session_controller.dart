@@ -36,7 +36,9 @@ class LiveVisionSessionState {
   /// Never negative — a manual "-1" can correct the auto-detected count
   /// down, but the displayed count always floors at zero rather than
   /// going negative, which would read as nonsensical to a user mid-set.
-  int get repCount => (autoRepCount + manualAdjustment) < 0 ? 0 : autoRepCount + manualAdjustment;
+  int get repCount => (autoRepCount + manualAdjustment) < 0
+      ? 0
+      : autoRepCount + manualAdjustment;
 
   FormObservation? get latestCue => cues.isEmpty ? null : cues.last;
 
@@ -76,10 +78,13 @@ class LiveVisionSessionState {
 /// correction is tracked as a separate offset here so a user's
 /// correction never fights with or resets the analyzer's own state
 /// machine (see Part 3's "manual +1/-1 correction" requirement).
-class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> {
-  LiveVisionSessionController({required SupportedExercise exercise, ExercisePoseAnalyzer? analyzer})
-    : _analyzer = analyzer ?? createExercisePoseAnalyzer(exercise),
-      super(LiveVisionSessionState(exercise: exercise));
+class LiveVisionSessionController
+    extends StateNotifier<LiveVisionSessionState> {
+  LiveVisionSessionController({
+    required SupportedExercise exercise,
+    ExercisePoseAnalyzer? analyzer,
+  }) : _analyzer = analyzer ?? createExercisePoseAnalyzer(exercise),
+       super(LiveVisionSessionState(exercise: exercise));
 
   final ExercisePoseAnalyzer _analyzer;
   DateTime? _startedAt;
@@ -96,7 +101,10 @@ class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> 
   void pause() {
     if (state.status != LiveVisionSessionStatus.running) return;
     _pausedAt = clock.now();
-    state = state.copyWith(status: LiveVisionSessionStatus.paused, elapsed: _elapsedNow());
+    state = state.copyWith(
+      status: LiveVisionSessionStatus.paused,
+      elapsed: _elapsedNow(),
+    );
   }
 
   void resume() {
@@ -109,7 +117,10 @@ class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> 
   }
 
   void stop() {
-    state = state.copyWith(status: LiveVisionSessionStatus.completed, elapsed: _elapsedNow());
+    state = state.copyWith(
+      status: LiveVisionSessionStatus.completed,
+      elapsed: _elapsedNow(),
+    );
   }
 
   /// The only entry point that advances rep counting/cues — a no-op
@@ -124,7 +135,9 @@ class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> 
       autoRepCount: state.autoRepCount + (update.repCompleted ? 1 : 0),
       confidence: update.confidence,
       lastFrameAccepted: update.frameAccepted,
-      cues: update.observations.isEmpty ? state.cues : [...state.cues, ...update.observations],
+      cues: update.observations.isEmpty
+          ? state.cues
+          : [...state.cues, ...update.observations],
       elapsed: _elapsedNow(),
     );
   }
@@ -139,7 +152,11 @@ class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> 
 
   void resetCounts() {
     _analyzer.reset();
-    state = state.copyWith(autoRepCount: 0, manualAdjustment: 0, cues: const []);
+    state = state.copyWith(
+      autoRepCount: 0,
+      manualAdjustment: 0,
+      cues: const [],
+    );
   }
 
   Duration _elapsedNow() {
@@ -149,11 +166,11 @@ class LiveVisionSessionController extends StateNotifier<LiveVisionSessionState> 
   }
 }
 
-final liveVisionSessionControllerProvider =
-    StateNotifierProvider.autoDispose
-        .family<LiveVisionSessionController, LiveVisionSessionState, SupportedExercise>((
-          ref,
-          exercise,
-        ) {
-          return LiveVisionSessionController(exercise: exercise);
-        });
+final liveVisionSessionControllerProvider = StateNotifierProvider.autoDispose
+    .family<
+      LiveVisionSessionController,
+      LiveVisionSessionState,
+      SupportedExercise
+    >((ref, exercise) {
+      return LiveVisionSessionController(exercise: exercise);
+    });

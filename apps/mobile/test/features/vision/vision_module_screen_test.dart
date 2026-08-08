@@ -30,7 +30,11 @@ Widget _wrap(
 }
 
 Future<void> _tapEnsuringVisible(WidgetTester tester, Finder finder) async {
-  await tester.ensureVisible(finder);
+  await tester.scrollUntilVisible(
+    finder,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
   await tester.pumpAndSettle();
   await tester.tap(finder);
 }
@@ -40,11 +44,25 @@ void main() {
     'shows the original honest not-yet-built state for a mode with no V1 assist',
     (tester) async {
       await tester.pumpWidget(
+        _wrap(const VisionModuleScreen(module: VisionModule.outfitGuidance)),
+      );
+
+      expect(find.text('Outfit Guidance'), findsWidgets);
+      expect(find.textContaining('no analysis runs yet'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Rep Counter and Form Coach V1: offers a real live camera analysis entry point',
+    (tester) async {
+      await tester.pumpWidget(
         _wrap(const VisionModuleScreen(module: VisionModule.repCounter)),
       );
 
       expect(find.text('Rep Counter'), findsWidgets);
-      expect(find.textContaining('no analysis runs yet'), findsOneWidget);
+      expect(find.text('Live camera analysis'), findsOneWidget);
+      expect(find.text('Choose an exercise'), findsOneWidget);
+      expect(find.byIcon(Icons.history_outlined), findsOneWidget);
     },
   );
 
@@ -70,6 +88,11 @@ void main() {
       _wrap(const VisionModuleScreen(module: VisionModule.formCoach)),
     );
 
+    await tester.scrollUntilVisible(
+      find.text('Capture video'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Capture video'), findsOneWidget);
   });
 

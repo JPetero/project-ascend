@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 /// Scenario 21 and `free-premium-policy.md`'s Vision entry. Mapped
 /// directly from Scenario 17's "potential future scanner modes" list
 /// (explicitly deferred there — "do not implement this milestone").
-/// This shell is the honest navigation/architecture around that future
-/// work, not the camera/computer-vision processing itself: no mode
-/// here runs any camera capture, ML inference, or produces a result.
+/// [formCoach] and [repCounter] now run real on-device pose analysis for
+/// three exercises (Build Session 10 Parts 2-5 —
+/// `features/vision/pose_analysis/`); [progressScan] and [foodScan] have
+/// real, smaller V1 assists (Build Session 9 Part 11-13); [sportCapture]
+/// and [outfitGuidance] remain capture-only, with no analysis of any
+/// kind — see each module's status copy in `VisionModuleScreen`.
 enum VisionModule {
   formCoach,
   repCounter,

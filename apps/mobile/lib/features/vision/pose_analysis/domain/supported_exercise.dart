@@ -18,3 +18,29 @@ String supportedExerciseLabel(SupportedExercise exercise) {
       return 'Shoulder press';
   }
 }
+
+/// URL-safe route-parameter id — distinct from the backend's
+/// SCREAMING_SNAKE_CASE wire format (see `supportedExerciseToJson`).
+String supportedExerciseRouteId(SupportedExercise exercise) {
+  switch (exercise) {
+    case SupportedExercise.bodyweightSquat:
+      return 'bodyweight-squat';
+    case SupportedExercise.bicepsCurl:
+      return 'biceps-curl';
+    case SupportedExercise.shoulderPress:
+      return 'shoulder-press';
+  }
+}
+
+SupportedExercise? supportedExerciseFromRouteId(String id) {
+  switch (id) {
+    case 'bodyweight-squat':
+      return SupportedExercise.bodyweightSquat;
+    case 'biceps-curl':
+      return SupportedExercise.bicepsCurl;
+    case 'shoulder-press':
+      return SupportedExercise.shoulderPress;
+    default:
+      return null;
+  }
+}

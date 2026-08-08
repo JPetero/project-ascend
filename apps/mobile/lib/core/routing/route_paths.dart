@@ -65,6 +65,14 @@ abstract final class RoutePaths {
   // pushed from the Progress Scan module screen above.
   static const progressComparison = '/vision/progress-comparison';
 
+  // Live pose-analysis session (Build Session 10 Part 2-5) — a real
+  // camera + on-device pose engine for Form Coach/Rep Counter, distinct
+  // from the older capture-only VisionModuleScreen flow above.
+  static const visionLiveSession = '/vision/live/:exercise';
+  static String visionLiveSessionPath(String exercise) =>
+      '/vision/live/$exercise';
+  static const visionResultsHistory = '/vision/history';
+
   // Support — Founder Scenario 27, free on every tier, reachable from
   // the profile/dashboard screen.
   static const support = '/support';
