@@ -2,9 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/route_paths.dart';
+import '../../../nutrition/domain/meal_type.dart';
 import '../../domain/vision_module.dart';
 import '../providers/vision_capture_controller.dart';
 
@@ -34,7 +37,7 @@ class VisionModuleScreen extends ConsumerWidget {
         content: Text(
           'This will open your camera to capture a ${isVideo ? 'short video' : 'photo'} '
           'for ${visionModuleInfo(module).title}. Nothing is uploaded, stored, or '
-          'analyzed — this mode has not shipped yet.',
+          'automatically analyzed.',
         ),
         actions: [
           TextButton(
@@ -50,6 +53,53 @@ class VisionModuleScreen extends ConsumerWidget {
     );
     if (consented != true || !context.mounted) return;
     await ref.read(visionCaptureControllerProvider(module).notifier).capture();
+  }
+
+  Future<void> _logFood(BuildContext context) async {
+    final mealType = await showAscendBottomSheet<MealType>(
+      context: context,
+      title: 'Log this to',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final type in MealType.values)
+            ListTile(
+              title: Text(mealTypeLabel(type)),
+              onTap: () => Navigator.of(context).pop(type),
+            ),
+        ],
+      ),
+    );
+    if (mealType == null || !context.mounted) return;
+    context.push(RoutePaths.foodSearch, extra: mealType);
+  }
+
+  Future<void> _showFormCues(BuildContext context) {
+    return showAscendBottomSheet<void>(
+      context: context,
+      title: 'General form cues',
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Ascend doesn't automatically analyze this recording yet — "
+            'these are general checkpoints to review it against yourself, '
+            'or share it with a qualified coach. Not an assessment of '
+            'your specific rep.',
+          ),
+          SizedBox(height: AscendSpacing.md),
+          _FormCue(text: 'Neutral spine — no excessive rounding or arching'),
+          _FormCue(text: 'Controlled tempo, especially lowering the weight'),
+          _FormCue(text: 'Full, comfortable range of motion for the movement'),
+          _FormCue(text: "Joints track in line with your feet, not caving in"),
+          _FormCue(text: 'Braced core and steady breathing throughout'),
+          _FormCue(
+            text: 'Stop if you feel sharp pain — never worth pushing through',
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -68,23 +118,103 @@ class VisionModuleScreen extends ConsumerWidget {
           children: [
             AscendEmptyState(
               icon: info.icon,
-              title: '${info.title} is on its way',
-              message:
-                  '${info.summary} Nothing here is simulated — no analysis '
-                  'runs yet. When this mode ships, every result will show '
-                  'its confidence and limitations, and camera access will '
-                  'always require your explicit consent.',
+              title: info.title,
+              message: _statusMessage(module, info.summary),
             ),
             const SizedBox(height: AscendSpacing.lg),
+            if (module == VisionModule.progressScan) ...[
+              AscendCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Compare two photos',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AscendSpacing.xs),
+                    const Text(
+                      'A real, working comparison — pick two photos you '
+                      'already saved to a Progress album in your gallery '
+                      'and view them side by side. No measurement or '
+                      'analysis runs on either photo.',
+                    ),
+                    const SizedBox(height: AscendSpacing.md),
+                    AscendPrimaryButton(
+                      label: 'Compare two photos',
+                      onPressed: () =>
+                          context.push(RoutePaths.progressComparison),
+                      expand: false,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.lg),
+            ],
             _CaptureSection(
               module: module,
               state: captureState,
               onCapture: () => _startCapture(context, ref),
               onRetake: () => _startCapture(context, ref),
               onDiscard: controller.discard,
+              onLogFood: module == VisionModule.foodScan
+                  ? () => _logFood(context)
+                  : null,
+              onShowFormCues: module == VisionModule.formCoach
+                  ? () => _showFormCues(context)
+                  : null,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Honest, module-aware status copy — the generic "no analysis runs yet"
+/// framing still applies to every mode (none does real computer-vision
+/// analysis), but the three modes with a genuine V1 assist (Build
+/// Session 9 Part 11-13) get copy describing what that assist actually
+/// is, instead of implying nothing works yet.
+String _statusMessage(VisionModule module, String summary) {
+  switch (module) {
+    case VisionModule.formCoach:
+      return '$summary Automatic form analysis is not built yet. Capture a '
+          "video and review it against Ascend's general form checklist, or "
+          'share it with a coach.';
+    case VisionModule.progressScan:
+      return '$summary Automatic measurement or analysis is not built yet, '
+          'but you can already compare two of your saved gallery photos '
+          'side by side below.';
+    case VisionModule.foodScan:
+      return "$summary Ascend can't identify food from a photo yet — "
+          'capture a reference photo, then search for what you ate to log '
+          'it normally.';
+    case VisionModule.repCounter:
+    case VisionModule.sportCapture:
+    case VisionModule.outfitGuidance:
+      return '$summary Nothing here is simulated — no analysis runs yet. '
+          'When this mode ships, every result will show its confidence and '
+          'limitations, and camera access will always require your '
+          'explicit consent.';
+  }
+}
+
+class _FormCue extends StatelessWidget {
+  const _FormCue({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_outline, size: 18),
+          const SizedBox(width: AscendSpacing.sm),
+          Expanded(child: Text(text)),
+        ],
       ),
     );
   }
@@ -97,6 +227,8 @@ class _CaptureSection extends StatelessWidget {
     required this.onCapture,
     required this.onRetake,
     required this.onDiscard,
+    this.onLogFood,
+    this.onShowFormCues,
   });
 
   final VisionModule module;
@@ -104,6 +236,8 @@ class _CaptureSection extends StatelessWidget {
   final VoidCallback onCapture;
   final VoidCallback onRetake;
   final VoidCallback onDiscard;
+  final VoidCallback? onLogFood;
+  final VoidCallback? onShowFormCues;
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +340,20 @@ class _CaptureSection extends StatelessWidget {
                   ),
                 ],
               ),
+              if (onLogFood != null) ...[
+                const SizedBox(height: AscendSpacing.sm),
+                AscendPrimaryButton(
+                  label: 'Log this food',
+                  onPressed: onLogFood,
+                ),
+              ],
+              if (onShowFormCues != null) ...[
+                const SizedBox(height: AscendSpacing.sm),
+                AscendPrimaryButton(
+                  label: 'See general form cues',
+                  onPressed: onShowFormCues,
+                ),
+              ],
             ],
           ),
         );

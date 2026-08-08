@@ -60,6 +60,10 @@ abstract final class RoutePaths {
   static const visionModuleDetail = '/vision/modules/:moduleId';
   static String visionModuleDetailPath(String moduleId) =>
       '/vision/modules/$moduleId';
+  // Progress Scan V1 (Build Session 9 Part 11-13) — a real visual
+  // comparison of two already-saved gallery photos, not a fresh capture;
+  // pushed from the Progress Scan module screen above.
+  static const progressComparison = '/vision/progress-comparison';
 
   // Support — Founder Scenario 27, free on every tier, reachable from
   // the profile/dashboard screen.

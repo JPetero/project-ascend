@@ -58,6 +58,7 @@ import '../../features/support/presentation/screens/create_ticket_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/support/presentation/screens/support_ticket_detail_screen.dart';
 import '../../features/vision/domain/vision_module.dart';
+import '../../features/vision/presentation/screens/progress_comparison_screen.dart';
 import '../../features/vision/presentation/screens/vision_module_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
 import '../../features/wearables/presentation/screens/connected_health_screen.dart';
@@ -205,6 +206,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final module = visionModuleFromId(moduleId) ?? VisionModule.formCoach;
           return VisionModuleScreen(module: module);
         },
+      ),
+      GoRoute(
+        path: RoutePaths.progressComparison,
+        builder: (context, state) => const ProgressComparisonScreen(),
       ),
       GoRoute(
         path: RoutePaths.notificationsInbox,

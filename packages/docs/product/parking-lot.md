@@ -130,14 +130,24 @@ extension points exist.
   still open.
 - **Premium camera and computer vision (17)** — the camera/computer-
   vision processing itself is still explicitly deferred per Scenario
-  17's "do not implement this milestone." Build Session 7 Part 8 added
-  the honest modular shell around that future work — a real capability
-  gate plus a real, single-source-of-truth list of the six future modes
-  (Form Coach, Rep Counter, Progress Scan, Food Scan, Sport Capture,
-  Outfit Guidance), each its own honest not-yet-built placeholder — see
-  `build-session-7.md` Part 8. Full safety-rail requirements remain
-  documented in `user-scenario-bible.md` and `wellness-ethics-bible.md`
-  ahead of any real camera build.
+  17's "do not implement this milestone" (no real ML/pose/food-
+  recognition model exists anywhere in this codebase). Build Session 7
+  Part 8 added the honest modular shell (capability gate + the six-mode
+  list); Build Session 8 Part 16 added real camera capture/preview per
+  mode, still uploading and analyzing nothing. Build Session 9 Part
+  11-13 shipped genuine, non-simulated V1 assists for three of the six
+  modes, built entirely on top of existing plumbing rather than any new
+  ML work: **Progress Scan** — a real side-by-side comparison of two
+  photos the user already saved to a PROGRESS gallery album (Build
+  Session 9 Part 2's gallery), no measurement or inference; **Food
+  Scan** — capture a reference photo, then log via the existing
+  food-search/meal-entry flow (no auto-recognition, no photo attached to
+  the entry); **Form Coach** — capture a video, then review it against a
+  static, non-personalized general form-cues checklist (no per-rep
+  analysis). Rep Counter, Sport Capture, and Outfit Guidance remain
+  exactly the capture-only placeholder from Part 16. Full safety-rail
+  requirements for a real analysis build remain documented in
+  `user-scenario-bible.md` and `wellness-ethics-bible.md`.
 - **Richer companion voice (18)** — premium voice conversation; free
   deterministic dialogue is what exists today and stays free.
 - **Assistant research mode with citations (19)** — live web-backed
