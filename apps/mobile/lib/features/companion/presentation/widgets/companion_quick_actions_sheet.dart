@@ -40,7 +40,10 @@ const _quickActions = [
 ];
 
 /// Opened by tapping the floating companion bubble. Offers the four core
-/// quick actions plus a microphone placeholder for future voice input.
+/// quick actions plus a shortcut into the Assistant screen's real voice
+/// controls (mic input/TTS replies shipped in Build Session 9 Part 14) —
+/// this sheet has no voice UI of its own, so it navigates rather than
+/// duplicating `AscendCommandCenterScreen`'s `CompanionVoiceController`.
 class CompanionQuickActionsSheet extends StatelessWidget {
   const CompanionQuickActionsSheet({super.key});
 
@@ -85,12 +88,11 @@ class CompanionQuickActionsSheet extends StatelessWidget {
         const SizedBox(height: AscendSpacing.sm),
         OutlinedButton.icon(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Voice input is coming soon.')),
-            );
+            Navigator.of(context).pop();
+            context.go(RoutePaths.assistant);
           },
           icon: const Icon(Icons.mic_none_rounded),
-          label: const Text('Voice (coming soon)'),
+          label: const Text('Talk to your companion'),
         ),
       ],
     );

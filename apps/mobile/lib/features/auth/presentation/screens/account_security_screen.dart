@@ -121,7 +121,8 @@ class _IdentitiesCard extends StatelessWidget {
             ),
           const SizedBox(height: AscendSpacing.xs),
           Text(
-            'Linking Google and Apple accounts is coming soon.',
+            'Connecting a Google or Apple account from the app isn\'t '
+            'available in this build yet.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
