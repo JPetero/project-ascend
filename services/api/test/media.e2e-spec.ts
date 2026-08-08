@@ -54,9 +54,14 @@ describe('Media Platform (e2e)', () => {
     tokenA = await register('media-a@example.com', 'Ada');
     tokenB = await register('media-b@example.com', 'Bea');
     adminToken = await register('media-admin@example.com', 'Cam');
-    await prisma.user.update({
+    const admin = await prisma.user.update({
       where: { email: 'media-admin@example.com' },
       data: { role: 'ADMIN' },
+    });
+    // Build Session 9 Part 19 — MODERATE_COMMUNITY is what actually lets
+    // this account use /admin/community-reports below.
+    await prisma.adminPermissionGrant.create({
+      data: { userId: admin.id, permission: 'MODERATE_COMMUNITY' },
     });
   });
 

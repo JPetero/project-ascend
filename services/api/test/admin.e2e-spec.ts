@@ -55,8 +55,18 @@ describe('Admin foundation (e2e)', () => {
     tokenAdmin = admin.token;
     // No self-service promotion endpoint exists this session (see
     // build-session-7.md Part 10) — an out-of-band DB write is the
-    // only way to grant ADMIN, including in this test.
+    // only way to grant ADMIN, including in this test. Once ADMIN, the
+    // specific permission grants below (Build Session 9 Part 19) are
+    // what let this account actually use each admin surface exercised
+    // in this file.
     await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN' } });
+    await prisma.adminPermissionGrant.createMany({
+      data: [
+        { userId: admin.id, permission: 'MODERATE_COMMUNITY' },
+        { userId: admin.id, permission: 'REVIEW_ELIGIBILITY' },
+        { userId: admin.id, permission: 'MANAGE_SUPPORT' },
+      ],
+    });
   });
 
   afterAll(async () => {

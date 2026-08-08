@@ -1,15 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  AdminPermission,
   CommunityReportStatus,
   CommunityReportTargetType,
   PromotedCampaignStatus,
   SupportTicketStatus,
+  UserRole,
 } from '@prisma/client';
+import { AuditService } from '../../common/audit/audit.service';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionReportDto } from './dto/action-report.dto';
 import { DecideCampaignDto } from './dto/decide-campaign.dto';
 import { DecideEligibilityDto } from './dto/decide-eligibility.dto';
+import { GrantAdminPermissionDto } from './dto/grant-admin-permission.dto';
 import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
@@ -21,12 +25,19 @@ import { AdminReplyTicketDto } from './dto/reply-ticket.dto';
  * (see CommunityReport's own doc comment: "only an admin workflow
  * (Part 10) moves it to REVIEWED/ACTIONED"), the affordability-program
  * review queue (Part 7), and the support-ticket staff queue. Gated by
- * `AdminGuard`, not a capability check — being an admin isn't a
- * Premium/Free distinction.
+ * `AdminPermissionGuard`, not a capability check — being an admin isn't
+ * a Premium/Free distinction. As of Build Session 9 Part 19, each
+ * surface additionally requires its own `AdminPermission` grant (see
+ * AdminPermissionGuard's doc comment) — this service's own
+ * grant/revoke methods are what an existing MANAGE_ADMINS holder uses
+ * to manage that.
  */
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   // --- Community moderation --------------------------------------------
 
@@ -190,5 +201,84 @@ export class AdminService {
       where: { id },
       data: { status: dto.status, reviewedAt: new Date(), reviewedBy: adminUserId },
     });
+  }
+
+  // --- Admin RBAC (Build Session 9 Part 19) ------------------------------
+
+  async listAdmins() {
+    const admins = await this.prisma.user.findMany({
+      where: { role: UserRole.ADMIN },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        email: true,
+        adminPermissionGrants: { select: { permission: true } },
+      },
+    });
+    return admins.map((admin) => ({
+      id: admin.id,
+      email: admin.email,
+      permissions: admin.adminPermissionGrants.map((grant) => grant.permission),
+    }));
+  }
+
+  async grantPermission(
+    grantedByUserId: string,
+    targetUserId: string,
+    dto: GrantAdminPermissionDto,
+  ) {
+    const target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target) throw new NotFoundException('User not found.');
+    if (target.role !== UserRole.ADMIN) {
+      throw new BadRequestException('Only an ADMIN-role account can hold an admin permission.');
+    }
+
+    await this.prisma.adminPermissionGrant.upsert({
+      where: { userId_permission: { userId: targetUserId, permission: dto.permission } },
+      update: {},
+      create: { userId: targetUserId, permission: dto.permission },
+    });
+    await this.auditService.record({
+      userId: grantedByUserId,
+      action: 'admin_permission.granted',
+      entityType: 'User',
+      entityId: targetUserId,
+      metadata: { permission: dto.permission },
+    });
+
+    return this.getMyPermissions(targetUserId);
+  }
+
+  async revokePermission(
+    revokedByUserId: string,
+    targetUserId: string,
+    permission: AdminPermission,
+  ) {
+    await this.prisma.adminPermissionGrant.deleteMany({
+      where: { userId: targetUserId, permission },
+    });
+    await this.auditService.record({
+      userId: revokedByUserId,
+      action: 'admin_permission.revoked',
+      entityType: 'User',
+      entityId: targetUserId,
+      metadata: { permission },
+    });
+
+    return this.getMyPermissions(targetUserId);
+  }
+
+  /**
+   * The caller's own permission grants — used both as the grant/revoke
+   * return value and by `GET /admin/me/permissions`, which any ADMIN
+   * can call (no specific permission tag) so the admin web app can
+   * render only the nav items/actions that account actually has.
+   */
+  async getMyPermissions(userId: string) {
+    const grants = await this.prisma.adminPermissionGrant.findMany({
+      where: { userId },
+      select: { permission: true },
+    });
+    return { userId, permissions: grants.map((grant) => grant.permission) };
   }
 }

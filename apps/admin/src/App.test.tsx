@@ -55,6 +55,7 @@ describe('App', () => {
       JSON.stringify({
         user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
         accessToken: 'tok',
+        permissions: ['MODERATE_COMMUNITY', 'MANAGE_SUPPORT', 'REVIEW_ELIGIBILITY'],
       }),
     );
     vi.mocked(fetch).mockResolvedValue(
@@ -72,5 +73,32 @@ describe('App', () => {
     );
 
     await waitFor(() => expect(screen.getByText('Community reports')).toBeInTheDocument());
+  });
+
+  it('hides nav items and blocks the route for an admin lacking that specific permission', async () => {
+    sessionStorage.setItem(
+      'ascend-admin-session',
+      JSON.stringify({
+        user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
+        accessToken: 'tok',
+        permissions: ['MANAGE_SUPPORT'],
+      }),
+    );
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        data: { data: [], meta: { page: 1, limit: 20, total: 0 } },
+        meta: {},
+        error: null,
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/community-reports']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Community reports')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Not authorized')).toBeInTheDocument());
   });
 });

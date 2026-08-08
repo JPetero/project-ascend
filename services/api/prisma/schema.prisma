@@ -30,6 +30,36 @@ enum UserRole {
   ADMIN
 }
 
+// Granular admin RBAC (Build Session 9 Part 19). ADMIN alone only gates
+// "is this account staff at all" — which specific admin surfaces a
+// given staff account can use is governed by which of these an
+// AdminPermissionGrant row exists for. MANAGE_ADMINS is itself gated
+// the same way: an admin needs a MANAGE_ADMINS grant to grant or revoke
+// any permission (including MANAGE_ADMINS itself) on another admin.
+// Becoming ADMIN in the first place remains the out-of-band DB
+// operation described above; this only splits what an existing ADMIN
+// account can do once it exists.
+enum AdminPermission {
+  MODERATE_COMMUNITY
+  REVIEW_ELIGIBILITY
+  MANAGE_SUPPORT
+  REVIEW_PROMOTIONS
+  MANAGE_ADMINS
+}
+
+model AdminPermissionGrant {
+  id         String          @id @default(uuid())
+  userId     String
+  permission AdminPermission
+  createdAt  DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permission])
+  @@index([userId])
+  @@map("admin_permission_grants")
+}
+
 enum SexForCalculations {
   MALE
   FEMALE
@@ -173,6 +203,7 @@ model User {
   notificationEvents               NotificationEvent[]
   galleryAlbums                    GalleryAlbum[]
   purchases                        Purchase[]
+  adminPermissionGrants            AdminPermissionGrant[]
 
   @@index([status])
   @@map("users")

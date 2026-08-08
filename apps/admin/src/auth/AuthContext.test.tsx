@@ -11,10 +11,11 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function Probe() {
-  const { user, isAdmin, login, logout } = useAuth();
+  const { user, isAdmin, permissions, login, logout } = useAuth();
   return (
     <div>
       <p>{user ? `signed in as ${user.email} (${isAdmin ? 'admin' : 'member'})` : 'signed out'}</p>
+      <p>permissions: {permissions.join(',') || 'none'}</p>
       <button onClick={() => login('ada@example.com', 'pw')}>Login</button>
       <button onClick={logout}>Logout</button>
     </div>
@@ -31,11 +32,53 @@ describe('AuthProvider', () => {
     vi.unstubAllGlobals();
   });
 
-  it('starts signed out and persists the session on login', async () => {
+  it('starts signed out and persists the session (including its permission grants) on login', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
+            tokens: {
+              accessToken: 'tok',
+              refreshToken: 'r',
+              tokenType: 'Bearer',
+              expiresIn: '15m',
+            },
+          },
+          meta: {},
+          error: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: { userId: 'u1', permissions: ['MODERATE_COMMUNITY'] },
+          meta: {},
+          error: null,
+        }),
+      );
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    expect(screen.getByText('signed out')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Login'));
+
+    await waitFor(() =>
+      expect(screen.getByText('signed in as ada@example.com (admin)')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('permissions: MODERATE_COMMUNITY')).toBeInTheDocument();
+    expect(sessionStorage.getItem('ascend-admin-session')).toContain('ada@example.com');
+    expect(sessionStorage.getItem('ascend-admin-session')).toContain('MODERATE_COMMUNITY');
+  });
+
+  it('never fetches permissions for a MEMBER login', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       jsonResponse({
         data: {
-          user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
+          user: { id: 'u2', email: 'bea@example.com', role: 'MEMBER' },
           tokens: {
             accessToken: 'tok',
             refreshToken: 'r',
@@ -53,14 +96,13 @@ describe('AuthProvider', () => {
         <Probe />
       </AuthProvider>,
     );
-    expect(screen.getByText('signed out')).toBeInTheDocument();
-
     await userEvent.click(screen.getByText('Login'));
 
     await waitFor(() =>
-      expect(screen.getByText('signed in as ada@example.com (admin)')).toBeInTheDocument(),
+      expect(screen.getByText('signed in as bea@example.com (member)')).toBeInTheDocument(),
     );
-    expect(sessionStorage.getItem('ascend-admin-session')).toContain('ada@example.com');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('permissions: none')).toBeInTheDocument();
   });
 
   it('restores a session already in sessionStorage on mount', () => {

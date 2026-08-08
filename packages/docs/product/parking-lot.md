@@ -270,9 +270,20 @@ architecture-only below).
   in Part 10**: every user, on every tier, can create a help/bug-
   report/safety-report/accessibility/account-recovery/billing-help/
   moderation-appeal ticket and reply on the thread; an admin queue
-  lists and replies to tickets, gated by a new minimal `UserRole`
+  lists and replies to tickets, gated by a minimal `UserRole`
   (MEMBER/ADMIN) foundation with no self-service promotion endpoint —
-  see `build-session-7.md` Part 10. Atlas/Nova tone-and-boundary rules
+  see `build-session-7.md` Part 10. Becoming ADMIN in the first place
+  is still that same out-of-band DB write. As of Build Session 9 Part
+  19, being ADMIN is only the floor: each of the four admin surfaces
+  (community moderation, eligibility review, support queue, promote
+  review) additionally requires its own `AdminPermission` grant,
+  managed self-service by any admin holding `MANAGE_ADMINS`
+  (`GET/POST/DELETE /admin/admins...`, `apps/admin/src/pages/
+  AdminsPage.tsx`) — see AdminPermissionGuard's doc comment. Existing
+  ADMIN accounts were backfilled with every permission except
+  MANAGE_ADMINS at migration time so nobody already trusted lost
+  access; the first MANAGE_ADMINS grant for a new admin is, like ADMIN
+  itself, an out-of-band DB write. Atlas/Nova tone-and-boundary rules
   (no consciousness claims, no NSFW, no therapy replacement) were
   already true of the existing deterministic dialogue and remain so.
   Centralized, configurable pricing with Student/Accessibility/Senior/

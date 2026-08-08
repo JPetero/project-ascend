@@ -84,3 +84,23 @@ td {
   border: 1px solid #cccccc55;
   border-radius: 8px;
 }
+
+.permission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.15rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #eeeeee;
+  font-size: 0.75rem;
+}
+
+.permission-badge button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+}
