@@ -16,4 +16,10 @@ export class LoginDto {
   @IsString()
   @MaxLength(120)
   deviceName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  platform?: string;
 }

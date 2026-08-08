@@ -14,4 +14,16 @@ export class AppleSignInDto {
   @IsString()
   @MaxLength(80)
   firstName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  deviceName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  platform?: string;
 }

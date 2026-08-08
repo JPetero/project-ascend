@@ -229,6 +229,15 @@ model RefreshToken {
   // by reading the row, without needing the AuditEvent log.
   reusedAt   DateTime?
   deviceName String?
+  // Freeform client-reported platform label ("ios" | "android" | "web"),
+  // purely informational for the "Your devices" list — never used for any
+  // security decision.
+  platform   String?
+  // Copied forward unchanged on every rotation (Build Session 10 Part 11),
+  // unlike `createdAt` which resets to "now" on each rotated row. This is
+  // what lets the sessions list show "signed in 3 days ago" for a device
+  // that has silently refreshed many times since.
+  sessionCreatedAt DateTime @default(now())
   createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
