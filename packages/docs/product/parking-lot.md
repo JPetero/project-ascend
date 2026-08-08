@@ -46,8 +46,10 @@ actually in scope for the current session.
   `LocalDeterministicAiProvider` as the only implementation so far) —
   see `build-session-7.md` Part 9 and `atlas-nova-bible.md`'s "Future:
   live AI" section for the intended architecture this now realizes.
-- **Voice integration** — not started; existing "coming soon" UI markers
-  in the companion feature predate this session and remain accurate.
+- **Voice integration** — **on-device speech input/output shipped in
+  Build Session 9 Part 14** (see the Scenario 18 entry below); the
+  underlying conversation is still the same deterministic local dialogue
+  described above, not a live/generative voice model.
 - **Photos/videos gallery** — dashboard shows an honest unavailable state;
   real media storage is future work.
 - **Friends** — dashboard shows an honest unavailable state; depends on
@@ -148,8 +150,22 @@ extension points exist.
   exactly the capture-only placeholder from Part 16. Full safety-rail
   requirements for a real analysis build remain documented in
   `user-scenario-bible.md` and `wellness-ethics-bible.md`.
-- **Richer companion voice (18)** — premium voice conversation; free
-  deterministic dialogue is what exists today and stays free.
+- **Richer companion voice (18)** — Build Session 9 Part 14 shipped a
+  genuine, on-device voice V1, gated behind the pre-existing
+  `AppCapability.premiumCompanionVoices`: tapping the mic uses real
+  speech-to-text (`speech_to_text`) to transcribe what the user says,
+  which is then handed to the exact same text pipeline and safety gate
+  every typed message goes through (`AiProvider.reply`); an opt-in
+  "speak replies aloud" toggle uses real text-to-speech (`flutter_tts`)
+  to read the companion's reply back. Both are on-device only — no audio
+  ever leaves the phone — and both require explicit per-session
+  activation, per atlas-nova-bible.md's "no always-listening behavior by
+  default" rule. Free typed chat is unaffected and stays free. Still
+  future work: the underlying conversation itself remains
+  `LocalDeterministicAiProvider`'s deterministic dialogue, not a live/
+  generative voice model — that's Part 15/16's live-AI-provider scope,
+  separate from this voice I/O layer. Not exercised on a physical device
+  — no device available this session; see build-session-9.md.
 - **Assistant research mode with citations (19)** — live web-backed
   research with source verification; today's Assistant is deterministic
   local dialogue only.

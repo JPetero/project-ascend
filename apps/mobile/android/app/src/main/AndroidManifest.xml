@@ -20,7 +20,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Media Platform (Build Session 8 Part 3) — requested only when the
-         user chooses to take a photo/video via image_picker. -->
+         user chooses to take a photo/video via image_picker. Also covers
+         Atlas/Nova voice input (Build Session 9 Part 14): Android has no
+         separate speech-recognition permission, so speech_to_text reuses
+         this same RECORD_AUDIO grant — requested only when the user taps
+         the mic button, never automatically. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

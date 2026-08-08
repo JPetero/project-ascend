@@ -53,6 +53,15 @@ dependencies:
   timezone: ^0.9.4
   flutter_timezone: ^5.1.0
 
+  # Atlas/Nova voice V1 (Build Session 9 Part 14) — on-device speech
+  # recognition and speech synthesis only; no audio is ever sent to a
+  # server, and both packages are only touched once the user explicitly
+  # taps the mic or turns on "speak replies" — see
+  # core/voice/speech_to_text_service.dart and
+  # core/voice/text_to_speech_service.dart.
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

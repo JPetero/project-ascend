@@ -47,7 +47,14 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Ascend uses your camera only when you choose to take a photo or video — for a Community post, your profile, a meal or progress photo, or a Vision capture.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ascend uses your microphone only when you choose to record a video with sound, such as a Community Reel.</string>
+	<string>Ascend uses your microphone only when you choose to record a video with sound, or when you tap the mic to talk to your companion.</string>
+	<!-- Atlas/Nova voice V1 (Build Session 9 Part 14) — separate from
+	     NSMicrophoneUsageDescription above; iOS requires this key
+	     specifically for on-device speech recognition (speech_to_text).
+	     Requested only when the user taps the mic button in the companion
+	     chat, a Premium feature — see companion_voice_controller.dart. -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ascend uses on-device speech recognition only when you tap the mic to talk to your companion instead of typing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ascend uses your photo library only when you choose to select an existing photo or video to attach.</string>
 	<!-- Build Session 9 Part 10 — required for iOS to deliver location
