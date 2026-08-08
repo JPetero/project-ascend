@@ -9,8 +9,10 @@ const _styleDirectives: Record<CoachingStyleDto, string> = {
   [CoachingStyleDto.GENTLE]: 'Gentle: warm, patient, encouraging, never guilt-based.',
   [CoachingStyleDto.BALANCED]: 'Balanced: friendly and clear, a supportive middle ground.',
   [CoachingStyleDto.DIRECT]: 'Direct: brief and to the point, still respectful and never harsh.',
-  [CoachingStyleDto.TOUGH]: 'Tough: energetic and challenging, pushes for effort, but never insulting or shaming.',
-  [CoachingStyleDto.ATHLETE]: 'Athlete: performance-focused, technical, treats the user like a serious trainee.',
+  [CoachingStyleDto.TOUGH]:
+    'Tough: energetic and challenging, pushes for effort, but never insulting or shaming.',
+  [CoachingStyleDto.ATHLETE]:
+    'Athlete: performance-focused, technical, treats the user like a serious trainee.',
 };
 
 /**
