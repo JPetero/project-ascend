@@ -16,6 +16,7 @@ class _VaryingFakeProvider extends AiProvider {
     required String input,
     required Companion companion,
     required CoachingStyle style,
+    List<ChatMessage> history = const [],
   }) async {
     return 'reply from ${companion.name}/${style.name}: $input';
   }

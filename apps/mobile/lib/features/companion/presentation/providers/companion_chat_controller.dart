@@ -1,17 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/entitlements/capability.dart';
+import '../../../../core/entitlements/capability_provider.dart';
+import '../../../../core/providers/core_providers.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../data/ai_provider.dart';
+import '../../data/live_ai_provider.dart';
 import '../../data/local_deterministic_ai_provider.dart';
 import '../../domain/chat_message.dart';
 import '../../domain/companion_animation_state.dart';
 
-/// The single place a future live provider gets swapped in — see
-/// features/companion/data/ai_provider.dart. No call site needs to
-/// change when that happens; only this override.
+/// The single place the live provider gets swapped in — see
+/// features/companion/data/ai_provider.dart. No other call site needs to
+/// change. Gated behind `AppCapability.advancedAiConversations` (Build
+/// Session 9 Part 15/16): a Free account never even attempts the
+/// network call, matching Scenario 18's "free deterministic dialogue...
+/// stays free" — LiveAiProvider's own fallback would land on the same
+/// local provider anyway if it were reached, so this is a genuine
+/// short-circuit, not a behavior difference.
 final aiProviderProvider = Provider<AiProvider>((ref) {
-  return const LocalDeterministicAiProvider();
+  const local = LocalDeterministicAiProvider();
+  final hasLiveAccess = ref.watch(
+    capabilityProvider(AppCapability.advancedAiConversations),
+  );
+  if (!hasLiveAccess) return local;
+  return LiveAiProvider(
+    apiClient: ref.watch(apiClientProvider),
+    fallback: local,
+  );
 });
 
 class CompanionChatState {

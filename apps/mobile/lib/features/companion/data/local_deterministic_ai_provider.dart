@@ -1,4 +1,5 @@
 import '../../profile/domain/preferences_model.dart';
+import '../domain/chat_message.dart';
 import 'ai_provider.dart';
 import 'local_companion_response_service.dart';
 
@@ -21,6 +22,7 @@ class LocalDeterministicAiProvider extends AiProvider {
     required String input,
     required Companion companion,
     required CoachingStyle style,
+    List<ChatMessage> history = const [],
   }) async {
     return _responseService.respond(input, companion: companion, style: style);
   }
