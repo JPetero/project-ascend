@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../domain/notification_deep_link.dart';
 import '../../domain/notification_models.dart';
 import '../providers/notifications_controller.dart';
 
@@ -98,9 +99,11 @@ class NotificationsInboxScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final event = state.events[index];
                     return AscendCard(
-                      onTap: event.isRead
-                          ? null
-                          : () => controller.markRead(event.id),
+                      onTap: () {
+                        if (!event.isRead) controller.markRead(event.id);
+                        final path = deepLinkPathFor(event.type, event.data);
+                        if (path != null) context.push(path);
+                      },
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

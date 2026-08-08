@@ -51,6 +51,18 @@ export interface AiConfig {
   anthropicModel: string;
 }
 
+export interface PushConfig {
+  // A Firebase service-account key (the raw JSON key file content), used
+  // to obtain an OAuth access token for the FCM HTTP v1 send API.
+  // Undefined means remote push is not configured this environment —
+  // NotificationsModule falls back to NoopPushNotificationProvider. See
+  // FcmPushNotificationProvider's doc comment.
+  fcmServiceAccountJson?: string;
+  // The Firebase project id the FCM v1 send endpoint is scoped to
+  // (https://fcm.googleapis.com/v1/projects/{fcmProjectId}/messages:send).
+  fcmProjectId?: string;
+}
+
 export interface IapConfig {
   // App Store Connect shared secret, used to call Apple's verifyReceipt
   // endpoint for auto-renewable subscriptions. Undefined means Apple
@@ -74,6 +86,7 @@ export default (): {
   email: EmailConfig;
   socialAuth: SocialAuthConfig;
   ai: AiConfig;
+  push: PushConfig;
   iap: IapConfig;
 } => ({
   app: {
@@ -114,6 +127,10 @@ export default (): {
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
+  },
+  push: {
+    fcmServiceAccountJson: process.env.FCM_SERVICE_ACCOUNT_JSON,
+    fcmProjectId: process.env.FCM_PROJECT_ID,
   },
   iap: {
     appleSharedSecret: process.env.APPLE_IAP_SHARED_SECRET,

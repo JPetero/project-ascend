@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NotificationChannel, NotificationDeliveryStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import {
   LOCAL_NOTIFICATION_PROVIDER,
@@ -67,6 +68,27 @@ export class NotificationsService {
       where: { userId, readAt: null },
       data: { readAt: new Date() },
     });
+  }
+
+  /**
+   * Registers (or refreshes) the caller's remote push token (Build
+   * Session 10 Part 12). Upserts on the token itself, not
+   * userId+token, because a provider-issued token belongs to exactly
+   * one installation at a time — re-registering the same token under a
+   * different account (reinstall, account switch) moves it rather than
+   * creating a stale duplicate that FCM would still deliver to.
+   */
+  async registerDeviceToken(userId: string, dto: RegisterDeviceTokenDto): Promise<void> {
+    await this.prisma.pushDeviceToken.upsert({
+      where: { token: dto.token },
+      create: { userId, token: dto.token, platform: dto.platform },
+      update: { userId, platform: dto.platform, lastSeenAt: new Date() },
+    });
+  }
+
+  /** Scoped to the caller's own tokens — never lets one user remove another's. */
+  async unregisterDeviceToken(userId: string, token: string): Promise<void> {
+    await this.prisma.pushDeviceToken.deleteMany({ where: { userId, token } });
   }
 
   async notify(

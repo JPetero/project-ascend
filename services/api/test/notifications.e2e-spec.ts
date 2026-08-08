@@ -166,4 +166,75 @@ describe('Notifications (e2e)', () => {
       .expect(200);
     expect((after.body.data as unknown[]).length).toBe(beforeCount);
   });
+
+  it('registers a device token, then unregisters it', async () => {
+    await request(app.getHttpServer())
+      .post('/notifications/device-tokens')
+      .set(authA())
+      .send({ token: 'fcm-test-token-1', platform: 'ios' })
+      .expect(200);
+
+    const stored = await prisma.pushDeviceToken.findUnique({
+      where: { token: 'fcm-test-token-1' },
+    });
+    expect(stored).not.toBeNull();
+    expect(stored!.platform).toBe('ios');
+
+    await request(app.getHttpServer())
+      .delete('/notifications/device-tokens/fcm-test-token-1')
+      .set(authA())
+      .expect(200);
+
+    const afterDelete = await prisma.pushDeviceToken.findUnique({
+      where: { token: 'fcm-test-token-1' },
+    });
+    expect(afterDelete).toBeNull();
+  });
+
+  it('re-registering the same token moves it to the new registering user', async () => {
+    await request(app.getHttpServer())
+      .post('/notifications/device-tokens')
+      .set(authA())
+      .send({ token: 'fcm-shared-token', platform: 'android' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post('/notifications/device-tokens')
+      .set(authB())
+      .send({ token: 'fcm-shared-token', platform: 'android' })
+      .expect(200);
+
+    const stored = await prisma.pushDeviceToken.findUnique({
+      where: { token: 'fcm-shared-token' },
+    });
+    expect(stored!.userId).toBe(userIdB);
+  });
+
+  it('cannot unregister a token belonging to another user', async () => {
+    await request(app.getHttpServer())
+      .post('/notifications/device-tokens')
+      .set(authB())
+      .send({ token: 'fcm-owned-by-b' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete('/notifications/device-tokens/fcm-owned-by-b')
+      .set(authA())
+      .expect(200);
+
+    const stillThere = await prisma.pushDeviceToken.findUnique({
+      where: { token: 'fcm-owned-by-b' },
+    });
+    expect(stillThere).not.toBeNull();
+  });
+
+  it('requires authentication for device-token endpoints', async () => {
+    await request(app.getHttpServer())
+      .post('/notifications/device-tokens')
+      .send({ token: 'unauthenticated-token' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .delete('/notifications/device-tokens/unauthenticated-token')
+      .expect(401);
+  });
 });
