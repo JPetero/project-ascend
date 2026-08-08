@@ -85,14 +85,21 @@ extension points exist.
   pause/resume/finish/abandon, live distance/duration/pace, route-point
   capture with accuracy filtering and endpoint trimming, interrupted-
   session recovery, offline operation) shipped in `build-session-7.md`
-  ("Implement live private GPS cardio"). Still open: conflict-with-
-  scheduled-workout handling, wearable-sourced sessions (the `source`
-  field already distinguishes `MANUAL`/`LIVE_GPS`/`WEARABLE` for when
-  that lands — see the Health Connect/HealthKit foundation), and
-  background/killed-app continuation of an active recording (today's
-  recovery restores progress up to the last point recorded while the app
-  was running, not points that would have been recorded while it wasn't
-  — a true background location service is a larger, separate scope).
+  ("Implement live private GPS cardio"); ✅ true active-session
+  background continuation (Android foreground service via
+  `AndroidSettings.foregroundNotificationConfig`, iOS "Always"-authorized
+  background updates via `AppleSettings.allowBackgroundLocationUpdates`,
+  both requested only once a session has actually started, never at
+  launch) shipped in `build-session-9.md` Part 10 — not physically
+  device-tested this session, see that doc's disclosed limitation. Still
+  open: conflict-with-scheduled-workout handling, wearable-sourced
+  sessions (the `source` field already distinguishes
+  `MANUAL`/`LIVE_GPS`/`WEARABLE` for when that lands — see the Health
+  Connect/HealthKit foundation), and killed-process continuation — if the
+  OS kills the app process outright (not just backgrounds it), the
+  foreground service/background updates die with it and recovery still
+  only restores progress up to the last point recorded before the kill,
+  same as before Part 10.
 - **Stranger proximity matching (12)** — explicitly not to be built
   without re-reading the full restriction list in `user-scenario-bible.md`:
   coarse zones only, mutual opt-in, expiring matches, instant block/

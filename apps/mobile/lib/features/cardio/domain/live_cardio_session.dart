@@ -21,6 +21,7 @@ class LiveCardioSessionState {
     required this.routePoints,
     this.lastFixAt,
     this.pausedForBackground = false,
+    this.backgroundTrackingEnabled = false,
   });
 
   final String localId;
@@ -51,6 +52,13 @@ class LiveCardioSessionState {
   // the UI can say so honestly instead of leaving the user to wonder why
   // their run stopped recording.
   final bool pausedForBackground;
+  // True when start()'s escalation to background-capable tracking (Build
+  // Session 9 Part 10) was granted for THIS session specifically — never
+  // requested or assumed true before a session exists. When true, the
+  // GPS subscription is expected to keep delivering fixes while
+  // backgrounded (Android foreground service / iOS "Always" updates), so
+  // `pauseForBackground()` becomes a no-op instead of pausing.
+  final bool backgroundTrackingEnabled;
 
   bool get isTracking => status == LiveCardioStatus.tracking;
 
@@ -94,6 +102,7 @@ class LiveCardioSessionState {
       routePoints: routePoints ?? this.routePoints,
       lastFixAt: lastFixAt ?? this.lastFixAt,
       pausedForBackground: pausedForBackground ?? this.pausedForBackground,
+      backgroundTrackingEnabled: backgroundTrackingEnabled,
     );
   }
 
@@ -110,6 +119,7 @@ class LiveCardioSessionState {
     'routePoints': routePoints.map((p) => p.toJson()).toList(),
     'lastFixAt': lastFixAt?.toIso8601String(),
     'pausedForBackground': pausedForBackground,
+    'backgroundTrackingEnabled': backgroundTrackingEnabled,
   };
 
   factory LiveCardioSessionState.fromCacheJson(Map<String, dynamic> json) {
@@ -135,6 +145,8 @@ class LiveCardioSessionState {
           ? DateTime.parse(json['lastFixAt'] as String)
           : null,
       pausedForBackground: json['pausedForBackground'] as bool? ?? false,
+      backgroundTrackingEnabled:
+          json['backgroundTrackingEnabled'] as bool? ?? false,
     );
   }
 }

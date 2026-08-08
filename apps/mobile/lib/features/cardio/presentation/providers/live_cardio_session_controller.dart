@@ -115,6 +115,13 @@ class LiveCardioSessionController
       );
     }
 
+    // Best-effort, session-scoped escalation — never requested before a
+    // session exists, never assumed granted. If it isn't available, the
+    // session simply falls back to the original foreground-only,
+    // auto-pause-on-background behavior (see pauseForBackground).
+    final backgroundCapable = await _locationService
+        .requestBackgroundCapablePermission();
+
     final now = DateTime.now();
     final session = LiveCardioSessionState(
       localId: _generateLocalId(),
@@ -126,6 +133,7 @@ class LiveCardioSessionController
       activeDurationSeconds: 0,
       distanceMeters: 0,
       routePoints: const [],
+      backgroundTrackingEnabled: backgroundCapable,
     );
     await _persist(session);
     _subscribe();
@@ -133,7 +141,11 @@ class LiveCardioSessionController
 
   void _subscribe() {
     _positionSubscription?.cancel();
-    _positionSubscription = _locationService.watchPosition().listen(_onFix);
+    _positionSubscription = _locationService
+        .watchPosition(
+          keepAliveInBackground: state?.backgroundTrackingEnabled ?? false,
+        )
+        .listen(_onFix);
   }
 
   void _onFix(LiveLocationFix fix) {
@@ -172,12 +184,18 @@ class LiveCardioSessionController
 
   /// Called by `LiveCardioScreen`'s `WidgetsBindingObserver` when the app
   /// is backgrounded mid-session — never by anything running off-screen.
-  /// Location is never tracked in the background (see
-  /// `GeolocatorLiveLocationService`'s doc comment), so leaving means the
-  /// GPS stream would silently stop producing fixes anyway; this makes
+  /// A no-op when `backgroundTrackingEnabled` is true for this session
+  /// (Build Session 9 Part 10): the GPS subscription is expected to keep
+  /// delivering fixes via the platform's background-capable
+  /// configuration, so there is nothing honest to pause. Otherwise
+  /// unchanged from the original design — the GPS stream would silently
+  /// stop producing fixes the moment the app backgrounds, so this makes
   /// that honest in the session's own state instead of letting the UI
   /// keep implying tracking is still live.
-  Future<void> pauseForBackground() => _pause(pausedForBackground: true);
+  Future<void> pauseForBackground() async {
+    if (state?.backgroundTrackingEnabled ?? false) return;
+    await _pause(pausedForBackground: true);
+  }
 
   Future<void> _pause({required bool pausedForBackground}) async {
     final current = state;

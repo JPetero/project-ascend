@@ -48,13 +48,14 @@ class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen>
     super.dispose();
   }
 
-  // Location is never tracked in the background (see
-  // GeolocatorLiveLocationService's doc comment) — Build Session 8 Part
-  // 13 makes leaving the app honest instead of silent: a tracking
-  // session auto-pauses the moment the app is backgrounded, and
-  // LiveCardioSessionState.pausedForBackground carries that reason
-  // through to the UI so the user finds out why their run stopped
-  // recording rather than discovering a shorter route than expected.
+  // Build Session 8 Part 13 made leaving the app honest instead of
+  // silent: a tracking session used to always auto-pause the moment the
+  // app backgrounded. Build Session 9 Part 10 widens that — if the user
+  // granted background-capable tracking when this session started
+  // (LiveCardioSessionState.backgroundTrackingEnabled), the controller's
+  // pauseForBackground() is a no-op and tracking genuinely continues.
+  // Otherwise this still pauses exactly as before, and
+  // pausedForBackground carries that reason through to the UI.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.paused) return;
@@ -220,10 +221,14 @@ class _SetupView extends StatelessWidget {
               const SizedBox(height: AscendSpacing.sm),
               const Text(
                 "We'll ask for location access to track your route, "
-                'distance, and pace live. Location is only used while a '
-                "session is active — never in the background, and your "
-                'route stays private by default. You can turn this down '
-                'and log a session manually instead.',
+                'distance, and pace live. Location is only ever used '
+                "while a session is active — never outside one. We'll "
+                'also ask whether tracking can keep going if you lock '
+                'your phone or switch apps mid-session; if you say no '
+                "(or your device doesn't support it), the session just "
+                'pauses when you leave and you resume when you come '
+                'back. Your route stays private by default, and you can '
+                'turn this down and log a session manually instead.',
               ),
             ],
           ),
@@ -295,6 +300,16 @@ class _TrackingView extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
                     ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: AscendSpacing.xs),
+                  child: Text(
+                    session.backgroundTrackingEnabled
+                        ? 'Keeps tracking if you lock your phone'
+                        : 'Will pause if you leave the app',
+                    style: theme.textTheme.bodySmall,
                   ),
                 ),
             ],
