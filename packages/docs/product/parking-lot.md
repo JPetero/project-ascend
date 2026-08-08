@@ -14,11 +14,19 @@ actually in scope for the current session.
 - **Community/Social** — superseded by Build Session 7 Part 4: the
   Community tab now has a real profiles/posts/Reels MVP (posting,
   likes, comments, saves, follows, blocks, reports) — see
-  `build-session-7.md` Part 4. Still deferred: an in-app camera/photo/
-  video capture and upload pipeline (IMAGE/VIDEO posts currently require
-  an externally-hosted URL), a moderation review queue/admin UI (Part
-  10), and native device-share-sheet sharing of achievements/posts out
-  of the app.
+  `build-session-7.md` Part 4. A moderation review queue/admin UI
+  shipped in Part 10 (`AdminService`, `apps/admin/src/pages/
+  CommunityReportsPage.tsx`), and native device-share-sheet sharing of
+  achievements/posts shipped in Build Session 9 Part 3
+  (`features/sharing/`, `AscendShareService` wraps `share_plus`'s
+  `Share.shareXFiles`). Still deferred: an in-app camera/photo/video
+  capture and upload pipeline — IMAGE/VIDEO posts still require an
+  externally-hosted URL, not a device-native picker/recorder feeding a
+  server upload.
+  A dedicated full-screen vertical-swipe Reel viewer is also still open
+  — Reels currently play inline in the feed only, never in their own
+  swipeable viewer (Build Session 9 Part 20/21's UX audit flagged this
+  as the next well-scoped Community polish item, not yet built).
 - **Leaderboards** — superseded by Build Session 7 Part 6: the Rankings
   tab now has a real opt-in-only FRIENDS/REGION/GLOBAL leaderboard plus
   time-boxed, join-by-choice Challenges — see `build-session-7.md` Part
@@ -119,12 +127,15 @@ extension points exist.
 - **Achievements (11)** — ✅ core build-out shipped in `build-session-4.md`:
   `Achievement`/`AchievementAward` models, an idempotent
   `AchievementsService` (workout/streak/PR/nutrition/cardio triggers), a
-  10-item seeded catalog, and an `AchievementsScreen`. Still open:
-  Google Play Games / Game Center sync (explicitly deferred, not
-  "not started" — see that session's notes), a proper celebration
-  moment surfaced at the point an achievement is newly earned (rather
-  than only visible next time the screen is opened), and Recovery-
-  category achievements once deload has a countable trigger.
+  10-item seeded catalog, and an `AchievementsScreen`. A real
+  celebration moment shipped in Build Session 5 Part 2
+  (`AchievementCelebrationController` + `AchievementCelebrationOverlay`
+  — an offline-first, durable queue of newly earned achievements shown
+  the moment they're earned, not only next time the screen is opened;
+  see `build-session-5.md`). Still open: Google Play Games / Game
+  Center sync (explicitly deferred, not "not started" — see that
+  session's notes), and Recovery-category achievements once deload has
+  a countable trigger.
 - **GPS cardio tracking (12)** — ✅ manual/summary logging shipped in
   `build-session-4.md`; ✅ live GPS tracking (permission flow, start/
   pause/resume/finish/abandon, live distance/duration/pace, route-point

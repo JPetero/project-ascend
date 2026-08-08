@@ -171,6 +171,7 @@ model User {
   trainerGroupInvitesSent          TrainerGroupInvitation[]        @relation("TrainerGroupInviter")
   trainerGroupInvitesReceived      TrainerGroupInvitation[]        @relation("TrainerGroupInvitee")
   trainerGroupSharedPlans          TrainerGroupSharedPlan[]
+  trainerGroupAnnouncements        TrainerGroupAnnouncement[]
   rankingOptIn                     RankingOptIn?
   createdChallenges                Challenge[]
   challengeParticipations          ChallengeParticipant[]
@@ -1496,14 +1497,19 @@ model CommunityReport {
 // per-widget" per the scenario), text chat, safe image sharing (same
 // media policy as Community — see wellness-ethics-bible.md; no upload
 // pipeline or content scanning exists yet, matching Community's Reels),
-// shared workout plans, and invitations. Premium-future (more groups,
-// larger groups, announcements, scheduled sessions, assignments,
-// distinct roles) is not implemented — TrainerGroupMemberRole only has
-// OWNER/MEMBER for now, deliberately leaving room to add
-// MODERATOR/TRAINER later without a breaking migration.
-
+// shared workout plans, and invitations. Premium-future — more groups,
+// larger groups, announcements, and distinct roles — shipped in Build
+// Session 9 Part 20, gated on the group OWNER's
+// AppCapability.TRAINER_GROUPS_EXPANDED (read fresh per request, same
+// "no cached trust" posture as every other capability check in this
+// codebase): a Premium owner's group gets the larger limits, can
+// promote a MEMBER to MODERATOR (who can then invite/remove members
+// and post announcements alongside the owner), and unlocks
+// announcements. Still not implemented: scheduled sessions and
+// assignments — see parking-lot.md.
 enum TrainerGroupMemberRole {
   OWNER
+  MODERATOR
   MEMBER
 }
 
@@ -1522,11 +1528,12 @@ model TrainerGroup {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner       User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  members     TrainerGroupMember[]
-  messages    TrainerGroupMessage[]
-  invitations TrainerGroupInvitation[]
-  sharedPlans TrainerGroupSharedPlan[]
+  owner         User                       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members       TrainerGroupMember[]
+  messages      TrainerGroupMessage[]
+  invitations   TrainerGroupInvitation[]
+  sharedPlans   TrainerGroupSharedPlan[]
+  announcements TrainerGroupAnnouncement[]
 
   @@index([ownerId])
   @@map("trainer_groups")
@@ -1603,6 +1610,27 @@ model TrainerGroupSharedPlan {
 
   @@unique([groupId, workoutPlanId])
   @@map("trainer_group_shared_plans")
+}
+
+// Premium-tier broadcast messages (Build Session 9 Part 20) — only the
+// group owner or a MODERATOR can post one, and only when the group
+// owner currently holds TRAINER_GROUPS_EXPANDED (checked in
+// TrainerGroupsService, not enforced by the schema itself). Kept as its
+// own model rather than a flag on TrainerGroupMessage so a group's
+// announcement history stays queryable independent of its much
+// higher-volume chat history.
+model TrainerGroupAnnouncement {
+  id        String   @id @default(uuid())
+  groupId   String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  group  TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
+  @@map("trainer_group_announcements")
 }
 
 // --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by

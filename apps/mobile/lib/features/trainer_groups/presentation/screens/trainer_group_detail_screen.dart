@@ -77,6 +77,44 @@ class _TrainerGroupDetailScreenState
     );
   }
 
+  Future<void> _postAnnouncement() async {
+    final controller = ref.read(
+      trainerGroupDetailControllerProvider(widget.groupId).notifier,
+    );
+    final bodyController = TextEditingController();
+    final body = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Post an announcement'),
+        content: TextField(
+          controller: bodyController,
+          maxLines: 3,
+          decoration: const InputDecoration(hintText: "What's the news?"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, bodyController.text.trim()),
+            child: const Text('Post'),
+          ),
+        ],
+      ),
+    );
+    if (body == null || body.isEmpty) return;
+    final ok = await controller.postAnnouncement(body);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Announcement posted.' : "Couldn't post — try again.",
+        ),
+      ),
+    );
+  }
+
   Future<void> _sharePlan() async {
     final controller = ref.read(
       trainerGroupDetailControllerProvider(widget.groupId).notifier,
@@ -126,6 +164,14 @@ class _TrainerGroupDetailScreenState
       authControllerProvider.select((s) => s.user?.id),
     );
     final isOwner = state.group?.ownerId == viewerId;
+    TrainerGroupMemberRole? viewerRole;
+    for (final member in state.group?.members ?? const <TrainerGroupMember>[]) {
+      if (member.userId == viewerId) {
+        viewerRole = member.role;
+        break;
+      }
+    }
+    final isModerator = viewerRole == TrainerGroupMemberRole.moderator;
 
     if (state.isLoading) {
       return const Scaffold(body: SafeArea(child: AscendLoadingIndicator()));
@@ -146,19 +192,21 @@ class _TrainerGroupDetailScreenState
     }
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(state.group!.name),
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Chat'),
               Tab(text: 'Members'),
               Tab(text: 'Shared plans'),
+              Tab(text: 'Announcements'),
             ],
           ),
           actions: [
-            if (isOwner)
+            if (isOwner || isModerator)
               IconButton(
                 icon: const Icon(Icons.person_add_alt_1),
                 onPressed: _inviteMember,
@@ -179,6 +227,7 @@ class _TrainerGroupDetailScreenState
                 viewerId: viewerId,
                 isOwner: isOwner,
                 onRemove: controller.removeMember,
+                onSetRole: controller.setMemberRole,
               ),
               _SharedPlansTab(
                 sharedPlans: state.sharedPlans,
@@ -186,6 +235,13 @@ class _TrainerGroupDetailScreenState
                 isOwner: isOwner,
                 onShare: _sharePlan,
                 onUnshare: controller.unsharePlan,
+              ),
+              _AnnouncementsTab(
+                announcements: state.announcements,
+                isExpanded: state.group!.isExpanded,
+                canPost: isOwner || isModerator,
+                isPosting: state.isPostingAnnouncement,
+                onPost: _postAnnouncement,
               ),
             ],
           ),
@@ -309,12 +365,26 @@ class _MembersTab extends StatelessWidget {
     required this.viewerId,
     required this.isOwner,
     required this.onRemove,
+    required this.onSetRole,
   });
 
   final TrainerGroup group;
   final String? viewerId;
   final bool isOwner;
   final Future<bool> Function(String userId) onRemove;
+  final Future<bool> Function(String userId, TrainerGroupMemberRole role)
+  onSetRole;
+
+  String _roleLabel(TrainerGroupMemberRole role) {
+    switch (role) {
+      case TrainerGroupMemberRole.owner:
+        return 'Owner';
+      case TrainerGroupMemberRole.moderator:
+        return 'Moderator';
+      case TrainerGroupMemberRole.member:
+        return 'Member';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -322,6 +392,16 @@ class _MembersTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(AscendSpacing.md),
       children: [
+        // Distinct trainer/moderator roles are an expanded (Premium)
+        // capability — see TrainerGroup.isExpanded.
+        if (isOwner && !group.isExpanded)
+          const Padding(
+            padding: EdgeInsets.only(bottom: AscendSpacing.sm),
+            child: Text(
+              'Upgrade to Premium to assign a moderator to help run this group.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
         for (final member in members)
           ListTile(
             leading: CircleAvatar(
@@ -333,13 +413,32 @@ class _MembersTab extends StatelessWidget {
                   : null,
             ),
             title: Text(member.displayName ?? 'Ascend member'),
-            subtitle: Text(
-              member.role == TrainerGroupMemberRole.owner ? 'Owner' : 'Member',
-            ),
-            trailing:
-                (isOwner && member.role != TrainerGroupMemberRole.owner) ||
-                    member.userId == viewerId
-                ? IconButton(
+            subtitle: Text(_roleLabel(member.role)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isOwner &&
+                    group.isExpanded &&
+                    member.role != TrainerGroupMemberRole.owner)
+                  IconButton(
+                    icon: Icon(
+                      member.role == TrainerGroupMemberRole.moderator
+                          ? Icons.remove_moderator_outlined
+                          : Icons.add_moderator_outlined,
+                    ),
+                    tooltip: member.role == TrainerGroupMemberRole.moderator
+                        ? 'Remove as moderator'
+                        : 'Make moderator',
+                    onPressed: () => onSetRole(
+                      member.userId,
+                      member.role == TrainerGroupMemberRole.moderator
+                          ? TrainerGroupMemberRole.member
+                          : TrainerGroupMemberRole.moderator,
+                    ),
+                  ),
+                if ((isOwner && member.role != TrainerGroupMemberRole.owner) ||
+                    member.userId == viewerId)
+                  IconButton(
                     icon: Icon(
                       member.userId == viewerId
                           ? Icons.exit_to_app
@@ -349,8 +448,76 @@ class _MembersTab extends StatelessWidget {
                         ? 'Leave group'
                         : 'Remove member',
                     onPressed: () => onRemove(member.userId),
-                  )
-                : null,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AnnouncementsTab extends StatelessWidget {
+  const _AnnouncementsTab({
+    required this.announcements,
+    required this.isExpanded,
+    required this.canPost,
+    required this.isPosting,
+    required this.onPost,
+  });
+
+  final List<TrainerGroupAnnouncement> announcements;
+  final bool isExpanded;
+  final bool canPost;
+  final bool isPosting;
+  final Future<void> Function() onPost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: !isExpanded
+              ? const AscendEmptyState(
+                  icon: Icons.campaign_outlined,
+                  title: 'Announcements are a Premium feature',
+                  message:
+                      'Upgrade to Premium to post group-wide announcements.',
+                )
+              : announcements.isEmpty
+              ? const AscendEmptyState(
+                  icon: Icons.campaign_outlined,
+                  title: 'No announcements yet',
+                  message: 'The owner or a moderator can post one here.',
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(AscendSpacing.md),
+                  children: [
+                    for (final announcement in announcements)
+                      AscendCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(announcement.body),
+                            const SizedBox(height: AscendSpacing.xs),
+                            Text(
+                              announcement.createdAt.toLocal().toString(),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        if (isExpanded && canPost)
+          Padding(
+            padding: const EdgeInsets.all(AscendSpacing.md),
+            child: AscendSecondaryButton(
+              label: 'Post an announcement',
+              isLoading: isPosting,
+              onPressed: onPost,
+            ),
           ),
       ],
     );

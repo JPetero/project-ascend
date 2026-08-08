@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -13,9 +14,11 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { CreateTrainerGroupAnnouncementDto } from './dto/create-trainer-group-announcement.dto';
 import { CreateTrainerGroupDto } from './dto/create-trainer-group.dto';
 import { InviteTrainerGroupMemberDto } from './dto/invite-trainer-group-member.dto';
 import { SendTrainerGroupMessageDto } from './dto/send-trainer-group-message.dto';
+import { SetTrainerGroupMemberRoleDto } from './dto/set-trainer-group-member-role.dto';
 import { ShareTrainerGroupPlanDto } from './dto/share-trainer-group-plan.dto';
 import { TrainerGroupsService } from './trainer-groups.service';
 
@@ -95,6 +98,30 @@ export class TrainerGroupsController {
     @Param('userId') targetUserId: string,
   ) {
     return this.trainerGroupsService.removeMember(user.id, id, targetUserId);
+  }
+
+  @Patch(':id/members/:userId/role')
+  setMemberRole(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('userId') targetUserId: string,
+    @Body() dto: SetTrainerGroupMemberRoleDto,
+  ) {
+    return this.trainerGroupsService.setMemberRole(user.id, id, targetUserId, dto);
+  }
+
+  @Post(':id/announcements')
+  postAnnouncement(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateTrainerGroupAnnouncementDto,
+  ) {
+    return this.trainerGroupsService.postAnnouncement(user.id, id, dto);
+  }
+
+  @Get(':id/announcements')
+  listAnnouncements(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.trainerGroupsService.listAnnouncements(user.id, id);
   }
 
   @Post(':id/messages')
