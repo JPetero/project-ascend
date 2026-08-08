@@ -56,6 +56,11 @@ describe('Ascend Promote (e2e)', () => {
     const admin = await register('promote-admin@example.com', 'Staff');
     tokenAdmin = admin.token;
     await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN' } });
+    // Build Session 9 Part 19 — REVIEW_PROMOTIONS is what actually lets
+    // this account use /admin/promoted-campaigns below.
+    await prisma.adminPermissionGrant.create({
+      data: { userId: admin.id, permission: 'REVIEW_PROMOTIONS' },
+    });
 
     // No live billing exists this session — promoting to PREMIUM is an
     // out-of-band DB write, same pattern as admin.e2e-spec.ts's role

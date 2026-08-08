@@ -1,10 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { AuditService } from '../../common/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminService } from './admin.service';
 
 describe('AdminService', () => {
   let service: AdminService;
+  let auditService: { record: jest.Mock };
   let prisma: {
     communityReport: {
       findMany: jest.Mock;
@@ -21,6 +23,12 @@ describe('AdminService', () => {
       count: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+    };
+    user: { findMany: jest.Mock; findUnique: jest.Mock };
+    adminPermissionGrant: {
+      findMany: jest.Mock;
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -43,11 +51,22 @@ describe('AdminService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      user: { findMany: jest.fn(), findUnique: jest.fn() },
+      adminPermissionGrant: {
+        findMany: jest.fn().mockResolvedValue([]),
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+      },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
+    auditService = { record: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [AdminService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AdminService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: auditService },
+      ],
     }).compile();
 
     service = moduleRef.get(AdminService);
@@ -161,6 +180,106 @@ describe('AdminService', () => {
       expect(prisma.promotedCampaign.update).toHaveBeenCalledWith({
         where: { id: 'campaign-1' },
         data: expect.objectContaining({ status: 'ACTIVE', reviewedBy: 'admin-1' }),
+      });
+    });
+  });
+
+  describe('listAdmins', () => {
+    it('flattens each admin user with its granted permissions', async () => {
+      prisma.user.findMany.mockResolvedValue([
+        {
+          id: 'admin-1',
+          email: 'a@example.com',
+          adminPermissionGrants: [{ permission: 'MODERATE_COMMUNITY' }],
+        },
+      ]);
+
+      const admins = await service.listAdmins();
+
+      expect(admins).toEqual([
+        { id: 'admin-1', email: 'a@example.com', permissions: ['MODERATE_COMMUNITY'] },
+      ]);
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { role: 'ADMIN' } }),
+      );
+    });
+  });
+
+  describe('grantPermission', () => {
+    it('404s a user that does not exist', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.grantPermission('granter-1', 'user-1', {
+          permission: 'MODERATE_COMMUNITY' as never,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('refuses to grant an admin permission to a non-ADMIN account', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'MEMBER' });
+
+      await expect(
+        service.grantPermission('granter-1', 'user-1', {
+          permission: 'MODERATE_COMMUNITY' as never,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.adminPermissionGrant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('upserts the grant and records an audit event', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', role: 'ADMIN' });
+
+      await service.grantPermission('granter-1', 'user-1', {
+        permission: 'MODERATE_COMMUNITY' as never,
+      });
+
+      expect(prisma.adminPermissionGrant.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId_permission: { userId: 'user-1', permission: 'MODERATE_COMMUNITY' } },
+        }),
+      );
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'granter-1',
+          action: 'admin_permission.granted',
+          entityId: 'user-1',
+          metadata: { permission: 'MODERATE_COMMUNITY' },
+        }),
+      );
+    });
+  });
+
+  describe('revokePermission', () => {
+    it('deletes the grant and records an audit event', async () => {
+      await service.revokePermission('revoker-1', 'user-1', 'MODERATE_COMMUNITY' as never);
+
+      expect(prisma.adminPermissionGrant.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', permission: 'MODERATE_COMMUNITY' },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'revoker-1',
+          action: 'admin_permission.revoked',
+          entityId: 'user-1',
+          metadata: { permission: 'MODERATE_COMMUNITY' },
+        }),
+      );
+    });
+  });
+
+  describe('getMyPermissions', () => {
+    it('returns the flat permission list for a given user', async () => {
+      prisma.adminPermissionGrant.findMany.mockResolvedValue([
+        { permission: 'MODERATE_COMMUNITY' },
+        { permission: 'MANAGE_SUPPORT' },
+      ]);
+
+      const result = await service.getMyPermissions('user-1');
+
+      expect(result).toEqual({
+        userId: 'user-1',
+        permissions: ['MODERATE_COMMUNITY', 'MANAGE_SUPPORT'],
       });
     });
   });

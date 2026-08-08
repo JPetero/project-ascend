@@ -63,6 +63,29 @@ interface Page<T> {
   meta: PaginationMeta;
 }
 
+// Granular admin RBAC — Build Session 9 Part 19. Kept in sync with
+// services/api's AdminPermission enum.
+export type AdminPermission =
+  | 'MODERATE_COMMUNITY'
+  | 'REVIEW_ELIGIBILITY'
+  | 'MANAGE_SUPPORT'
+  | 'REVIEW_PROMOTIONS'
+  | 'MANAGE_ADMINS';
+
+export const ADMIN_PERMISSIONS: AdminPermission[] = [
+  'MODERATE_COMMUNITY',
+  'REVIEW_ELIGIBILITY',
+  'MANAGE_SUPPORT',
+  'REVIEW_PROMOTIONS',
+  'MANAGE_ADMINS',
+];
+
+export interface AdminAccount {
+  id: string;
+  email: string;
+  permissions: AdminPermission[];
+}
+
 export const adminApi = {
   listReports: (status?: CommunityReportStatus) =>
     apiClient.get<Page<CommunityReport>>('/admin/community-reports', {
@@ -101,4 +124,17 @@ export const adminApi = {
     apiClient.patch<PromotedCampaign>(`/admin/promoted-campaigns/${id}`, {
       status,
     }),
+
+  getMyPermissions: () =>
+    apiClient.get<{ userId: string; permissions: AdminPermission[] }>('/admin/me/permissions'),
+  listAdmins: () => apiClient.get<AdminAccount[]>('/admin/admins'),
+  grantPermission: (userId: string, permission: AdminPermission) =>
+    apiClient.post<{ userId: string; permissions: AdminPermission[] }>(
+      `/admin/admins/${userId}/permissions`,
+      { permission },
+    ),
+  revokePermission: (userId: string, permission: AdminPermission) =>
+    apiClient.delete<{ userId: string; permissions: AdminPermission[] }>(
+      `/admin/admins/${userId}/permissions/${permission}`,
+    ),
 };

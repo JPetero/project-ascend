@@ -36,21 +36,29 @@ describe('LoginPage', () => {
   });
 
   it('navigates to the support tickets page on successful login', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      jsonResponse({
-        data: {
-          user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
-          tokens: {
-            accessToken: 'tok',
-            refreshToken: 'r',
-            tokenType: 'Bearer',
-            expiresIn: '15m',
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            user: { id: 'u1', email: 'ada@example.com', role: 'ADMIN' },
+            tokens: {
+              accessToken: 'tok',
+              refreshToken: 'r',
+              tokenType: 'Bearer',
+              expiresIn: '15m',
+            },
           },
-        },
-        meta: {},
-        error: null,
-      }),
-    );
+          meta: {},
+          error: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: { userId: 'u1', permissions: ['MANAGE_SUPPORT'] },
+          meta: {},
+          error: null,
+        }),
+      );
     renderLoginPage();
 
     await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
