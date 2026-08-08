@@ -268,10 +268,21 @@ architecture-only below).
   never a real charge.
 - **Trainer groups (24)** — **free basic tier implemented in Part 5**
   (one owned group per user, a centrally-configured member limit, text/
-  image chat, shared workout plans, invitations). Premium expanded tier
-  (more/larger groups, announcements, scheduled sessions, assignments,
-  distinct roles) is architecture-only until Premium billing exists —
-  `TrainerGroupMemberRole` only has OWNER/MEMBER so far.
+  image chat, shared workout plans, invitations). **Premium expanded
+  tier implemented in Build Session 9 Part 20**: a Premium owner's
+  groups report a larger owned-group limit and member limit
+  (`TRAINER_GROUP_OWNED_LIMIT_PREMIUM`/`_MEMBER_LIMIT_PREMIUM` in
+  `trainer-group-policy.ts`, both disclosed as illustrative, non-final
+  numbers), `TrainerGroupMemberRole` gained a distinct `MODERATOR` role
+  (owner-promotable, can invite/remove members and post announcements
+  but not manage roles), and Premium owners/moderators can post
+  broadcast announcements to the group. A group's expanded-ness always
+  follows its *owner's* subscription tier, never the acting member's —
+  see `TrainerGroupsService`'s doc comment. Still architecture-only:
+  scheduled sessions (would need to integrate with the existing Joint
+  Workout Sessions system rather than duplicate it) and assignments —
+  both deliberately deferred as separate, meaningfully-sized features
+  rather than shipped as shallow stubs.
 - **Sports scoring (25)** — manual match creation/confirmation/dispute
   flow; camera-assisted suggestion depends on the Premium Vision Shell.
 - **Expanded cardio and Nutrition Library (26)** — new free activity
@@ -307,8 +318,13 @@ architecture-only below).
 
 ## Ideas not yet scheduled
 
-- Data export (capability defined, not implemented).
 - Account switching / multi-profile on one device.
+- Per-device session listing and single-session revocation — today's
+  Account & Security Center (Build Session 9 Part 5/6) can only "sign
+  out everywhere" (revoke every refresh-token family at once), not list
+  individual sessions/devices and revoke just one; `RefreshToken`
+  already records a `deviceName` at issuance, so the data needed exists,
+  the listing/single-revoke UI and endpoint do not.
 - Push-notification strategy that stays consistent with the
   no-manipulative-engagement principle.
 - Localization beyond English copy.

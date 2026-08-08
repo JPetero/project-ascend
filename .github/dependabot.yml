@@ -1,0 +1,48 @@
+version: 2
+updates:
+  # Backend (NestJS) — pnpm-managed but Dependabot's "npm" ecosystem
+  # understands the pnpm-lock.yaml lockfile.
+  - package-ecosystem: "npm"
+    directory: "/services/api"
+    schedule:
+      interval: "weekly"
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
+
+  # Admin web app (Vite/React).
+  - package-ecosystem: "npm"
+    directory: "/apps/admin"
+    schedule:
+      interval: "weekly"
+    groups:
+      admin-dependencies:
+        patterns:
+          - "*"
+
+  # Workspace root (tooling shared across the monorepo).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      root-dependencies:
+        patterns:
+          - "*"
+
+  # Mobile app (Flutter/Dart).
+  - package-ecosystem: "pub"
+    directory: "/apps/mobile"
+    schedule:
+      interval: "weekly"
+    groups:
+      mobile-dependencies:
+        patterns:
+          - "*"
+
+  # The CI workflows themselves (actions/checkout, docker/build-push-action, etc.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
