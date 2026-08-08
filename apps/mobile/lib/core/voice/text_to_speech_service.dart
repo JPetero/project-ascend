@@ -16,9 +16,19 @@ abstract class TextToSpeechService {
 /// testing gap.
 class PluginTextToSpeechService implements TextToSpeechService {
   final _tts = tts.FlutterTts();
+  bool _awaitCompletionConfigured = false;
 
   @override
   Future<void> speak(String text) async {
+    // Without this, flutter_tts's speak() future resolves as soon as
+    // playback is *requested*, not when it finishes — the caller
+    // (CompanionVoiceController.speak) would flip `isSpeaking` back to
+    // false while the device is still talking, hiding the Stop button
+    // mid-speech. Only needs to be set once per engine instance.
+    if (!_awaitCompletionConfigured) {
+      await _tts.awaitSpeakCompletion(true);
+      _awaitCompletionConfigured = true;
+    }
     await _tts.speak(text);
   }
 
