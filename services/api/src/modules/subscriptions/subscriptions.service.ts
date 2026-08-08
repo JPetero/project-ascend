@@ -6,16 +6,16 @@ import { ApplyEligibilityDto } from './dto/apply-eligibility.dto';
 
 /**
  * Subscription/entitlement and affordability foundation — Founder
- * Scenario 27. No billing integration exists this session (see
- * packages/docs/product/parking-lot.md): there is deliberately no
- * self-service "upgrade to Premium" endpoint here, because faking one
- * would mean either a fabricated success response or a fabricated
- * payment flow — both dishonest. What this module does provide: a real
- * per-user tier read (via CapabilityService), centralized pricing (no
- * literal duplicated anywhere else), and the affordability-program
- * application pipeline so Student/Accessibility/Senior/Regional
- * requests have somewhere real to go once review tooling exists
- * (Part 10).
+ * Scenario 27. There is deliberately no self-service "upgrade to
+ * Premium" endpoint *here* — the real purchase/verification flow lives
+ * in PurchasesModule (`POST /purchases/verify`), which is the only
+ * thing that ever writes a PREMIUM UserSubscription row, always gated
+ * on a real Apple/Google server check (Build Session 9 Part 17/18).
+ * This module provides the read side: a real per-user tier read (via
+ * CapabilityService), centralized pricing (no literal duplicated
+ * anywhere else), and the affordability-program application pipeline,
+ * reviewed by admins via AdminModule's eligibility-applications
+ * endpoints.
  */
 @Injectable()
 export class SubscriptionsService {

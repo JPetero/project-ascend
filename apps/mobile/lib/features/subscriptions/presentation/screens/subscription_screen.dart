@@ -3,14 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/entitlements/capability.dart';
+import '../../../../core/entitlements/capability_provider.dart';
+import '../../../purchases/domain/store_product.dart';
+import '../../../purchases/presentation/providers/purchase_controller.dart';
 import '../../domain/subscription_status.dart';
 import '../providers/subscription_controller.dart';
 
 /// Membership/pricing screen — Founder Scenario 27. Shows the caller's
-/// real tier, centralized (non-final) pricing, and lets them apply for
-/// an affordability program. There is deliberately no "Upgrade" button
-/// here: no billing integration exists this session, and a fake one
-/// would mean either a fabricated success or a fabricated payment flow.
+/// real tier, centralized (non-final) pricing, an "Upgrade to Premium"
+/// flow backed by a real Store purchase (Build Session 9 Part 17/18 —
+/// see PurchaseController), and lets them apply for an affordability
+/// program.
 class SubscriptionScreen extends ConsumerWidget {
   const SubscriptionScreen({super.key});
 
@@ -18,6 +21,14 @@ class SubscriptionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(subscriptionControllerProvider);
     final controller = ref.read(subscriptionControllerProvider.notifier);
+    final purchaseState = ref.watch(purchaseControllerProvider);
+
+    ref.listen<PurchaseState>(purchaseControllerProvider, (previous, next) {
+      if (next.justUnlockedPremium && previous?.justUnlockedPremium != true) {
+        ref.invalidate(fetchedPlanTierProvider);
+        controller.refresh();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Membership')),
@@ -46,14 +57,31 @@ class SubscriptionScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (state.status?.tier != PlanTier.premium) ...[
+                      const SizedBox(height: AscendSpacing.lg),
+                      Text(
+                        'Upgrade',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: AscendSpacing.sm),
+                      _UpgradeSection(
+                        purchaseState: purchaseState,
+                        isEligible:
+                            state.status?.eligibility?.status ==
+                            AffordabilityStatus.approved,
+                        onBuy: (product) => ref
+                            .read(purchaseControllerProvider.notifier)
+                            .buy(product),
+                      ),
+                    ],
                     const SizedBox(height: AscendSpacing.lg),
                     Text(
                       'Pricing',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const Text(
-                      'Non-final hypotheses — not live store prices. Billing '
-                      'is not yet available in this build.',
+                      'Non-final hypotheses — actual store prices are shown '
+                      'above once the Store connection is available.',
                       style: TextStyle(fontSize: 12),
                     ),
                     const SizedBox(height: AscendSpacing.sm),
@@ -98,6 +126,90 @@ class SubscriptionScreen extends ConsumerWidget {
                 ),
               ),
       ),
+    );
+  }
+}
+
+/// Shows the real Store product/price and a Buy button once a live
+/// StoreKit/Play Billing connection exists, or an honest explanation
+/// when it doesn't — never a fabricated price or a fake success.
+class _UpgradeSection extends StatelessWidget {
+  const _UpgradeSection({
+    required this.purchaseState,
+    required this.isEligible,
+    required this.onBuy,
+  });
+
+  final PurchaseState purchaseState;
+  final bool isEligible;
+  final void Function(StoreProduct product) onBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    if (purchaseState.isLoadingProducts) {
+      return const AscendLoadingIndicator();
+    }
+    if (!purchaseState.isStoreAvailable) {
+      return const Text(
+        "In-app purchases aren't available on this device or build.",
+        style: TextStyle(fontSize: 12),
+      );
+    }
+
+    final wantedId = isEligible
+        ? PurchaseProductIds.premiumEligible
+        : PurchaseProductIds.premiumStandard;
+    StoreProduct? product;
+    for (final candidate in purchaseState.products) {
+      if (candidate.id == wantedId) {
+        product = candidate;
+        break;
+      }
+    }
+    product ??= purchaseState.products.isEmpty
+        ? null
+        : purchaseState.products.first;
+
+    if (product == null) {
+      return const Text(
+        'No Premium product is configured in the store yet.',
+        style: TextStyle(fontSize: 12),
+      );
+    }
+
+    final isPurchasing = purchaseState.purchasingProductId == product.id;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AscendCard(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: Text(product.title)),
+              Text(
+                product.price,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AscendSpacing.sm),
+        AscendPrimaryButton(
+          label: 'Upgrade to Premium',
+          isLoading: isPurchasing,
+          onPressed: isPurchasing ? null : () => onBuy(product!),
+        ),
+        if (purchaseState.error != null) ...[
+          const SizedBox(height: AscendSpacing.sm),
+          Text(
+            purchaseState.error!,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

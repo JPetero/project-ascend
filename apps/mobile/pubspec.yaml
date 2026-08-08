@@ -62,6 +62,14 @@ dependencies:
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
 
+  # Store purchases (Build Session 9 Part 17/18) — the official Flutter
+  # plugin wrapping StoreKit (iOS) and Google Play Billing (Android). The
+  # client only ever collects a platform receipt/purchase token; the
+  # backend's PurchasesModule does the actual verification against
+  # Apple/Google before any entitlement changes — see
+  # features/purchases/data/purchase_service.dart.
+  in_app_purchase: ^3.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

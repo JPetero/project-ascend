@@ -27,17 +27,31 @@ actually in scope for the current session.
   deliberate simplification: 3 scopes instead of Scenario 16a's full
   local/city/region/state/national/global granularity, and no seasonal
   rewards/badges beyond the season's point total.
-- **Subscriptions/payment processing** — superseded in part by Build
-  Session 7 Part 7: `CapabilityService.getPlanTier` now reads a real
-  per-user `UserSubscription` row (defaulting FREE) instead of a
-  hardcoded literal, centralized pricing exists
-  (`common/config/pricing.config.ts`), and the Student/Accessibility/
-  Senior/Regional Affordability application pipeline is live — see
-  `build-session-7.md` Part 7. Still deferred: no billing integration,
-  receipt validation, or store integration exists, so nothing can
-  actually write a PREMIUM row yet, and there is deliberately no
-  self-service "upgrade" endpoint (faking one would mean a fabricated
-  payment flow).
+- **Subscriptions/payment processing** — superseded by Build Session 7
+  Part 7 and Build Session 9 Part 17/18. `CapabilityService.getPlanTier`
+  reads a real per-user `UserSubscription` row (defaulting FREE),
+  centralized pricing exists (`common/config/pricing.config.ts`), and
+  the Student/Accessibility/Senior/Regional Affordability application
+  pipeline is live, including admin review (`GET`/`PATCH
+  /admin/eligibility-applications`, `apps/admin/src/pages/
+  EligibilityPage.tsx`). As of Part 17/18, real purchase verification
+  also exists: `POST /purchases/verify`
+  (`services/api/src/modules/purchases`) checks an iOS receipt against
+  Apple's `verifyReceipt` endpoint or an Android purchase token against
+  the Google Play Developer API, and only a real verified purchase ever
+  upserts a `Purchase` row and flips `UserSubscription.tier` to PREMIUM
+  — there is still no self-service endpoint that grants PREMIUM without
+  a checked receipt/token. The mobile app's `features/purchases/` uses
+  the official `in_app_purchase` plugin to query the live catalog and
+  drive a real buy flow from SubscriptionScreen; an approved
+  affordability application selects the discounted
+  `premium.monthly.eligible` product instead of the standard one. No
+  live `APPLE_IAP_SHARED_SECRET` or `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`
+  exists in this environment (no App Store Connect/Google Play Console
+  account has been configured this session), and no real store
+  connection exists in this Linux CI/dev environment either, so both
+  verifiers and the purchase flow are real but unexercised against a
+  live store — see `build-session-9.md`.
 - **Scanners** (food/body) — premium capability placeholder only.
 - **Live AI provider integration** — **shipped in Build Session 9 Part
   15/16**, gated behind the pre-existing `AppCapability.advancedAiConversations`
@@ -262,8 +276,12 @@ architecture-only below).
   (no consciousness claims, no NSFW, no therapy replacement) were
   already true of the existing deterministic dialogue and remain so.
   Centralized, configurable pricing with Student/Accessibility/Senior/
-  Regional Affordability programs shipped in Part 7 — still no live
-  store billing.
+  Regional Affordability programs shipped in Part 7; real Store
+  purchase verification (`POST /purchases/verify`, backed by Apple's
+  `verifyReceipt` and the Google Play Developer API) shipped in Build
+  Session 9 Part 17/18 — see the "Subscriptions/payment processing"
+  entry above. Not yet exercised against a live store in this
+  environment.
 
 ## Ideas not yet scheduled
 
