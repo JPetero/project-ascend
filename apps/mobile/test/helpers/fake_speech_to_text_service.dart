@@ -8,6 +8,7 @@ class FakeSpeechToTextService implements SpeechToTextService {
   SpeechAvailability availability;
   bool _isListening = false;
   void Function(String text, bool isFinal)? _onResult;
+  void Function()? _onListeningEnded;
 
   int initializeCallCount = 0;
   int startListeningCallCount = 0;
@@ -17,8 +18,11 @@ class FakeSpeechToTextService implements SpeechToTextService {
   bool get isListening => _isListening;
 
   @override
-  Future<SpeechAvailability> initialize() async {
+  Future<SpeechAvailability> initialize({
+    void Function()? onListeningEnded,
+  }) async {
     initializeCallCount++;
+    _onListeningEnded = onListeningEnded;
     return availability;
   }
 
@@ -42,5 +46,13 @@ class FakeSpeechToTextService implements SpeechToTextService {
   void emitResult(String text, {required bool isFinal}) {
     if (isFinal) _isListening = false;
     _onResult?.call(text, isFinal);
+  }
+
+  /// Test hook — simulate the platform silently ending the listening
+  /// session (timeout, no speech detected, a mid-session error) without
+  /// ever delivering a final result.
+  void simulateListeningEndedWithoutResult() {
+    _isListening = false;
+    _onListeningEnded?.call();
   }
 }

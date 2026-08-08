@@ -79,6 +79,35 @@ void main() {
     expect(finalTranscripts, ['log a meal']);
   });
 
+  test('the platform silently ending listening (timeout/error, no final '
+      'result) returns to idle instead of getting stuck', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await controller.startListening();
+    speechToText.emitResult('log a', isFinal: false);
+
+    speechToText.simulateListeningEndedWithoutResult();
+
+    expect(controller.state.listeningStatus, VoiceListeningStatus.idle);
+    expect(controller.state.partialTranscript, isEmpty);
+    expect(finalTranscripts, isEmpty);
+  });
+
+  test(
+    'listening ending after a final result already returned to idle is a harmless no-op',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await controller.startListening();
+      speechToText.emitResult('log a meal', isFinal: true);
+
+      speechToText.simulateListeningEndedWithoutResult();
+
+      expect(controller.state.listeningStatus, VoiceListeningStatus.idle);
+      expect(finalTranscripts, ['log a meal']);
+    },
+  );
+
   test('a blank final result is not handed to onFinalTranscript', () async {
     final controller = buildController();
     addTearDown(controller.dispose);

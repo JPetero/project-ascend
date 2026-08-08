@@ -73,7 +73,23 @@ class CompanionVoiceController extends StateNotifier<CompanionVoiceState> {
       listeningStatus: VoiceListeningStatus.requestingPermission,
       partialTranscript: '',
     );
-    final availability = await _speechToText.initialize();
+    final availability = await _speechToText.initialize(
+      onListeningEnded: () {
+        if (!mounted) return;
+        // Only resets a session that's still actually "listening" — a
+        // final result already moved this to idle, and re-entering idle
+        // here would be a harmless no-op anyway, but this guard makes
+        // the intent explicit: this handles the *silent* end of a
+        // session (timeout, no speech detected, a mid-session error)
+        // that never produced a final transcript.
+        if (state.listeningStatus == VoiceListeningStatus.listening) {
+          state = state.copyWith(
+            listeningStatus: VoiceListeningStatus.idle,
+            partialTranscript: '',
+          );
+        }
+      },
+    );
     if (!mounted) return;
     if (availability != SpeechAvailability.available) {
       state = state.copyWith(listeningStatus: VoiceListeningStatus.unavailable);

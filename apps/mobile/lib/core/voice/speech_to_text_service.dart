@@ -12,7 +12,14 @@ abstract class SpeechToTextService {
   /// in direct response to the user tapping the mic button, never at app
   /// launch or automatically (see atlas-nova-bible.md's "no
   /// always-listening behavior by default" rule).
-  Future<SpeechAvailability> initialize();
+  ///
+  /// [onListeningEnded], if provided, fires whenever the platform ends
+  /// the current listening session without ever calling [startListening]'s
+  /// `onResult` with `isFinal: true` — a timeout with no speech detected,
+  /// a mid-session recognition error, or the OS otherwise giving up.
+  /// Without this, a caller has no way to know listening has silently
+  /// stopped and would show a "Listening…" state that never resolves.
+  Future<SpeechAvailability> initialize({void Function()? onListeningEnded});
 
   /// Starts listening; [onResult] is called every time the recognized
   /// text updates, with [isFinal] true once the platform is confident
@@ -38,8 +45,18 @@ class PluginSpeechToTextService implements SpeechToTextService {
   bool get isListening => _speech.isListening;
 
   @override
-  Future<SpeechAvailability> initialize() async {
-    final available = await _speech.initialize();
+  Future<SpeechAvailability> initialize({
+    void Function()? onListeningEnded,
+  }) async {
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (status == stt.SpeechToText.doneStatus ||
+            status == stt.SpeechToText.notListeningStatus) {
+          onListeningEnded?.call();
+        }
+      },
+      onError: (_) => onListeningEnded?.call(),
+    );
     return available
         ? SpeechAvailability.available
         : SpeechAvailability.unavailable;
