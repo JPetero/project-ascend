@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/cardio/presentation/screens/live_cardio_screen.dart';
 import 'package:mobile/features/cardio/presentation/providers/live_cardio_session_controller.dart';
 
+import '../../helpers/fake_live_location_service.dart';
 import '../../helpers/pump_helpers.dart';
 import '../../helpers/test_provider_scope.dart';
 
@@ -123,4 +124,75 @@ void main() {
 
     expect(container.read(liveCardioSessionControllerProvider), isNull);
   });
+
+  testWidgets(
+    'shows a foreground-only status line when background tracking was not '
+    'granted for this session',
+    (tester) async {
+      final container = await createTestContainer(signedIn: true);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: LiveCardioScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+      await tester.tap(find.text('Start tracking'));
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Will pause if you leave the app'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a background-tracking-capable session keeps tracking through a '
+    'background/foreground cycle instead of pausing',
+    (tester) async {
+      final locationService = FakeLiveLocationService()
+        ..backgroundCapableResult = true;
+      final container = await createTestContainer(
+        signedIn: true,
+        liveLocationService: locationService,
+      );
+      addTearDown(container.dispose);
+      addTearDown(locationService.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: LiveCardioScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+      await tester.tap(find.text('Start tracking'));
+      await pumpForAsyncSettle(tester);
+
+      expect(
+        find.text('Keeps tracking if you lock your phone'),
+        findsOneWidget,
+      );
+
+      await tester.runAsync(() async {
+        WidgetsBinding.instance.handleAppLifecycleStateChanged(
+          AppLifecycleState.paused,
+        );
+        await Future<void>.delayed(Duration.zero);
+      });
+
+      WidgetsBinding.instance.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      );
+      await pumpForAsyncSettle(tester);
+
+      final session = container.read(liveCardioSessionControllerProvider);
+      expect(session?.isTracking, isTrue);
+      expect(session?.pausedForBackground, isFalse);
+      expect(
+        find.textContaining('Paused because Ascend was in the background'),
+        findsNothing,
+      );
+    },
+  );
 }

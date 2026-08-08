@@ -26,13 +26,20 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- Live GPS cardio (Founder Scenario 12) — foreground-only, requested
-	     with an in-app explanation before this system prompt (see
+	<!-- Live GPS cardio (Founder Scenario 12) — requested with an in-app
+	     explanation before this system prompt (see
 	     apps/mobile/lib/features/cardio/data/live_location_service.dart).
-	     No "Always" location key is declared — tracking never runs outside
-	     an active session, per user-scenario-bible.md. -->
+	     Location is only ever used while a session is active, per
+	     user-scenario-bible.md's "no tracking outside a session" rule. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ascend uses your location only while you're recording a live cardio session, to track your route, distance, and pace. Your route stays private by default.</string>
+	<!-- Build Session 9 Part 10 — a second, separate ask, made only once a
+	     live cardio session has actually started: whether tracking may
+	     keep going if you lock your phone or switch apps mid-session. If
+	     declined, the session falls back to pausing when backgrounded,
+	     same as before this key existed. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>If you allow it, Ascend can keep recording your route during a live cardio session even if you lock your phone or switch apps. This is only ever used while a session you started is in progress.</string>
 	<!-- Media Platform (Build Session 8 Part 3) — requested only when you
 	     choose to take a photo/video (a Community post, profile photo,
 	     meal photo, progress photo, or Vision capture). Never runs in the
@@ -43,6 +50,16 @@
 	<string>Ascend uses your microphone only when you choose to record a video with sound, such as a Community Reel.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ascend uses your photo library only when you choose to select an existing photo or video to attach.</string>
+	<!-- Build Session 9 Part 10 — required for iOS to deliver location
+	     updates while Ascend is backgrounded. Only takes effect for a
+	     stream started with AppleSettings.allowBackgroundLocationUpdates,
+	     which GeolocatorLiveLocationService only does for an active live
+	     cardio session that was granted "Always" authorization; Ascend
+	     never runs any other background work. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

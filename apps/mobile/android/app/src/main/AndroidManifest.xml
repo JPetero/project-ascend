@@ -1,13 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Live GPS cardio (Founder Scenario 12) — foreground-only location,
-         requested with an explanation before the OS prompt (see
+    <!-- Live GPS cardio (Founder Scenario 12) — location is only ever
+         requested with an explanation before the OS prompt, and only
+         while a session is active (see
          apps/mobile/lib/features/cardio/data/live_location_service.dart).
-         No background/"always" location permission is requested: tracking
-         only runs while a session is active and the app is in the
-         foreground, per user-scenario-bible.md's "no location tracking
-         outside an active session" rule. -->
+         No ACCESS_BACKGROUND_LOCATION is requested or needed: Build
+         Session 9 Part 10's active-session background tracking uses a
+         foreground service (below) instead, which only needs the
+         permissions already granted here plus the two below it. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Lets a live cardio session keep recording GPS fixes if the app is
+         backgrounded or the phone is locked mid-session — geolocator's
+         Android foreground-service technique
+         (AndroidSettings.foregroundNotificationConfig), only started once
+         the user has an active session and it's confirmed available (see
+         GeolocatorLiveLocationService.requestBackgroundCapablePermission).
+         android:foregroundServiceType="location" is declared by the
+         geolocator_android plugin's own manifest, merged automatically. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Media Platform (Build Session 8 Part 3) — requested only when the
          user chooses to take a photo/video via image_picker. -->
     <uses-permission android:name="android.permission.CAMERA" />

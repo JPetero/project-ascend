@@ -312,4 +312,86 @@ void main() {
       );
     },
   );
+
+  test(
+    'start() defaults to backgroundTrackingEnabled false when the escalation '
+    "isn't granted, and requests a foreground-only GPS stream",
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+
+      await controller.start(CardioActivityType.run);
+
+      expect(controller.state!.backgroundTrackingEnabled, isFalse);
+      expect(locationService.lastKeepAliveInBackground, isFalse);
+      expect(locationService.requestBackgroundCapablePermissionCallCount, 1);
+    },
+  );
+
+  test(
+    'start() records backgroundTrackingEnabled true and requests a '
+    'background-capable GPS stream once the escalation is granted',
+    () async {
+      locationService.backgroundCapableResult = true;
+      final controller = buildController();
+      addTearDown(controller.dispose);
+
+      await controller.start(CardioActivityType.run);
+
+      expect(controller.state!.backgroundTrackingEnabled, isTrue);
+      expect(locationService.lastKeepAliveInBackground, isTrue);
+    },
+  );
+
+  test(
+    'pauseForBackground() is a no-op when background tracking is enabled — '
+    'the session keeps tracking and fixes keep being recorded',
+    () async {
+      locationService.backgroundCapableResult = true;
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await controller.start(CardioActivityType.run);
+      final startedAt = controller.state!.startedAt;
+
+      await controller.pauseForBackground();
+
+      expect(controller.state!.isTracking, isTrue);
+      expect(controller.state!.pausedForBackground, isFalse);
+
+      locationService.emit(
+        LiveLocationFix(
+          latitude: 14.6,
+          longitude: 121.0,
+          accuracyMeters: 5,
+          timestamp: startedAt.add(const Duration(seconds: 5)),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state!.routePoints, hasLength(1));
+    },
+  );
+
+  test(
+    'a recovered (killed-and-restarted) session always lands paused even '
+    'when it was background-tracking capable',
+    () async {
+      locationService.backgroundCapableResult = true;
+      final before = buildController();
+      await before.start(CardioActivityType.run);
+      expect(before.state!.backgroundTrackingEnabled, isTrue);
+      before.dispose();
+
+      final afterRestart = LiveCardioSessionController(
+        repository: repository,
+        locationService: FakeLiveLocationService(),
+        database: db,
+        userId: 'user-1',
+      );
+      addTearDown(afterRestart.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(afterRestart.state!.isTracking, isFalse);
+      expect(afterRestart.state!.backgroundTrackingEnabled, isTrue);
+    },
+  );
 }

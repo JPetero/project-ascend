@@ -10,12 +10,19 @@ class FakeLiveLocationService implements LiveLocationService {
       LiveLocationPermissionResult.granted;
   bool serviceEnabled = true;
 
+  /// Defaults to false (conservative) so existing tests exercising the
+  /// foreground-only fallback path don't need to opt out explicitly —
+  /// only tests of the background-capable path need to set this true.
+  bool backgroundCapableResult = false;
+
   final _controller = StreamController<LiveLocationFix>.broadcast();
 
   /// Test hook — push a fix as if the OS location provider reported it.
   void emit(LiveLocationFix fix) => _controller.add(fix);
 
   int watchPositionCallCount = 0;
+  int requestBackgroundCapablePermissionCallCount = 0;
+  bool? lastKeepAliveInBackground;
 
   @override
   Future<bool> isLocationServiceEnabled() async => serviceEnabled;
@@ -29,8 +36,18 @@ class FakeLiveLocationService implements LiveLocationService {
       permissionResult;
 
   @override
-  Stream<LiveLocationFix> watchPosition({double distanceFilterMeters = 5}) {
+  Future<bool> requestBackgroundCapablePermission() async {
+    requestBackgroundCapablePermissionCallCount++;
+    return backgroundCapableResult;
+  }
+
+  @override
+  Stream<LiveLocationFix> watchPosition({
+    double distanceFilterMeters = 5,
+    bool keepAliveInBackground = false,
+  }) {
     watchPositionCallCount++;
+    lastKeepAliveInBackground = keepAliveInBackground;
     return _controller.stream;
   }
 
