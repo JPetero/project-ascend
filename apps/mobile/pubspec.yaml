@@ -44,6 +44,15 @@ dependencies:
   geolocator: ^14.0.2
   health: ^13.3.1
 
+  # Local, device-scheduled notifications (Build Session 9 Part 9) — the
+  # OS delivers these even if the app process isn't running, so no
+  # background service/isolate is needed. Real push delivery (Firebase/
+  # APNs) is a separate, currently-unconfigured concern — see
+  # NotificationsService's Noop push provider on the backend.
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+  flutter_timezone: ^5.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

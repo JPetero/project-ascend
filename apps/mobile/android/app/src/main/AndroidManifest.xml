@@ -13,6 +13,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Local, device-scheduled reminders (Build Session 9 Part 9) — no
+         "always"/background permission, just Android 13+'s runtime
+         notification-display permission, requested before scheduling. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Inexact scheduling only (AndroidScheduleMode.inexactAllowWhileIdle
+         in LocalNotificationSchedulingService) — deliberately does not
+         request SCHEDULE_EXACT_ALARM, which needs its own extra user
+         consent flow for a feature where exact-to-the-minute delivery
+         doesn't matter. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
         android:label="mobile"
         android:name="${applicationName}"

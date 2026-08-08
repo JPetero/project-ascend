@@ -2,22 +2,75 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../profile/presentation/providers/profile_controller.dart';
 import '../providers/notifications_controller.dart';
+import '../providers/workout_reminder_controller.dart';
 
 /// Per-category reminder/notification toggles — Build Session 8 Part 12.
 /// The global on/off switch lives on the Dashboard's Settings card
 /// (`PreferencesModel.notificationsEnabled`); these six only matter
 /// while that switch is on. Copy here is deliberately encouraging, never
 /// guilt-based — see NotificationsService.notify's doc comment.
-class NotificationPreferencesScreen extends ConsumerWidget {
+///
+/// Build Session 9 Part 9 adds real, device-scheduled local
+/// notifications for workout reminders — the one category with a real
+/// day-of-week schedule to draw from (`WorkoutSchedule.daysOfWeek`).
+class NotificationPreferencesScreen extends ConsumerStatefulWidget {
   const NotificationPreferencesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationPreferencesScreen> createState() =>
+      _NotificationPreferencesScreenState();
+}
+
+class _NotificationPreferencesScreenState
+    extends ConsumerState<NotificationPreferencesScreen> {
+  List<String> get _daysOfWeek =>
+      ref.read(profileControllerProvider).asData?.value?.workoutSchedule?.daysOfWeek ??
+      const [];
+
+  Future<void> _syncWorkoutReminders(bool enabled) async {
+    await ref
+        .read(workoutReminderControllerProvider.notifier)
+        .sync(enabled: enabled, daysOfWeek: _daysOfWeek);
+  }
+
+  Future<void> _pickReminderTime(TimeOfDay current, bool enabled) async {
+    final picked = await showTimePicker(context: context, initialTime: current);
+    if (picked == null) return;
+    await ref
+        .read(workoutReminderControllerProvider.notifier)
+        .setReminderTime(picked, enabled: enabled, daysOfWeek: _daysOfWeek);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(notificationPreferencesControllerProvider);
-    final controller = ref.read(
-      notificationPreferencesControllerProvider.notifier,
-    );
+    final controller = ref.read(notificationPreferencesControllerProvider.notifier);
+    final reminderState = ref.watch(workoutReminderControllerProvider);
+
+    // Resyncing the on-device schedule depends on two independently-async
+    // providers: the "reminders on?" toggle (notificationPreferencesController)
+    // and the workout days (profileController). Whichever settles second
+    // is the one that actually has both values available, so both listen
+    // for the other's already-resolved state rather than assuming a load
+    // order.
+    ref.listen<AsyncValue<dynamic>>(notificationPreferencesControllerProvider, (
+      previous,
+      next,
+    ) {
+      final enabled = next.asData?.value?.workoutReminders as bool?;
+      if (enabled != null) _syncWorkoutReminders(enabled);
+    });
+    ref.listen<AsyncValue<dynamic>>(profileControllerProvider, (previous, next) {
+      if (!next.hasValue) return;
+      final enabled = ref
+          .read(notificationPreferencesControllerProvider)
+          .asData
+          ?.value
+          .workoutReminders;
+      if (enabled != null) _syncWorkoutReminders(enabled);
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notification preferences')),
@@ -42,9 +95,42 @@ class NotificationPreferencesScreen extends ConsumerWidget {
                       title: const Text('Workout reminders'),
                       subtitle: const Text("Ready for today's workout?"),
                       value: preferences.workoutReminders,
-                      onChanged: (value) =>
-                          controller.update({'workoutReminders': value}),
+                      // Resyncing the on-device schedule happens via the
+                      // ref.listen below, which fires for this change too
+                      // (as well as the very first successful load) —
+                      // one path, not a duplicate call here.
+                      onChanged: (value) => controller.update({'workoutReminders': value}),
                     ),
+                    if (preferences.workoutReminders) ...[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.schedule_outlined),
+                        title: const Text('Reminder time'),
+                        subtitle: Text(
+                          _daysOfWeek.isEmpty
+                              ? 'Set your workout days in onboarding to enable this.'
+                              : reminderState.time.format(context),
+                        ),
+                        onTap: _daysOfWeek.isEmpty
+                            ? null
+                            : () => _pickReminderTime(
+                                reminderState.time,
+                                preferences.workoutReminders,
+                              ),
+                      ),
+                      if (reminderState.permissionDenied)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+                          child: Text(
+                            'Notifications are turned off for Ascend in your '
+                            'device settings, so this reminder cannot be '
+                            'scheduled yet.',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                    ],
                     const Divider(),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
