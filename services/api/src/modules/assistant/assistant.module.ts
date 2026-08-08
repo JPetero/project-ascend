@@ -1,17 +1,52 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AiConfig } from '../../config/configuration';
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
+import { AnthropicReplyProvider } from './providers/anthropic-reply-provider';
+import { AI_REPLY_PROVIDER } from './providers/ai-reply-provider.interface';
+import { GeminiReplyProvider } from './providers/gemini-reply-provider';
+import { OpenAiReplyProvider } from './providers/openai-reply-provider';
 
 /**
- * Build Session 9 Part 15/16 — the first backend AI provider (see
- * AssistantService's doc comment). Deliberately not exported for other
+ * Build Session 9 Part 15/16 built the first backend AI provider
+ * (Anthropic); Build Session 10 Part 14 added Openai/Gemini as
+ * alternatives. Selects the active `AiReplyProvider` from `ai.provider`
+ * (`AI_PROVIDER` env, default `'anthropic'`) — the same config-driven-
+ * factory pattern MediaStorageModule/NotificationsModule use. Every
+ * adapter is still constructed (each is cheap — no network call happens
+ * until `generateReply` runs), so switching providers is just an env
+ * change, never a code change. Deliberately not exported for other
  * modules to inject: the mobile app is the only caller, via
  * `POST /assistant/reply`.
  */
 @Module({
   imports: [ConfigModule],
   controllers: [AssistantController],
-  providers: [AssistantService],
+  providers: [
+    AssistantService,
+    AnthropicReplyProvider,
+    OpenAiReplyProvider,
+    GeminiReplyProvider,
+    {
+      provide: AI_REPLY_PROVIDER,
+      useFactory: (
+        configService: ConfigService,
+        anthropic: AnthropicReplyProvider,
+        openai: OpenAiReplyProvider,
+        gemini: GeminiReplyProvider,
+      ) => {
+        switch (configService.get<AiConfig>('ai')!.provider) {
+          case 'openai':
+            return openai;
+          case 'gemini':
+            return gemini;
+          default:
+            return anthropic;
+        }
+      },
+      inject: [ConfigService, AnthropicReplyProvider, OpenAiReplyProvider, GeminiReplyProvider],
+    },
+  ],
 })
 export class AssistantModule {}

@@ -44,11 +44,18 @@ export interface SocialAuthConfig {
 }
 
 export interface AiConfig {
-  // Undefined means no live AI provider is configured this environment —
-  // AssistantService honestly rejects with "not configured" rather than
-  // pretending to generate a reply (see AssistantService's doc comment).
+  // Which AiReplyProvider AssistantModule's factory selects (Build
+  // Session 10 Part 14). Defaults to 'anthropic' to preserve Session 9's
+  // original behavior. Whichever provider is selected still honestly
+  // rejects with "not configured" if its own API key below is unset —
+  // this only chooses which one is asked.
+  provider: 'anthropic' | 'openai' | 'gemini';
   anthropicApiKey?: string;
   anthropicModel: string;
+  openaiApiKey?: string;
+  openaiModel: string;
+  geminiApiKey?: string;
+  geminiModel: string;
 }
 
 export interface PushConfig {
@@ -125,8 +132,13 @@ export default (): {
     appleClientId: process.env.APPLE_CLIENT_ID,
   },
   ai: {
+    provider: (process.env.AI_PROVIDER as 'anthropic' | 'openai' | 'gemini') ?? 'anthropic',
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash-001',
   },
   push: {
     fcmServiceAccountJson: process.env.FCM_SERVICE_ACCOUNT_JSON,
