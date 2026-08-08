@@ -14,6 +14,7 @@ import 'package:mobile/features/community/presentation/providers/community_feed_
 import 'package:mobile/features/companion/data/ai_provider.dart';
 import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
+import 'package:mobile/features/companion/presentation/providers/companion_voice_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
 import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
 import 'package:mobile/features/support/presentation/providers/support_controller.dart';
@@ -67,6 +68,8 @@ import 'fake_messages_repository.dart';
 import 'fake_data_export_repository.dart';
 import 'fake_local_notification_scheduling_service.dart';
 import 'fake_notifications_repository.dart';
+import 'fake_speech_to_text_service.dart';
+import 'fake_text_to_speech_service.dart';
 import 'fake_nutrition_library_repository.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_promote_repository.dart';
@@ -125,6 +128,8 @@ Future<ProviderContainer> createTestContainer({
   FakeDataExportShareService? dataExportShareService,
   FakeGalleryRepository? galleryRepository,
   FakeLocalNotificationSchedulingService? localNotificationSchedulingService,
+  FakeSpeechToTextService? speechToTextService,
+  FakeTextToSpeechService? textToSpeechService,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -280,6 +285,12 @@ Future<ProviderContainer> createTestContainer({
       localNotificationSchedulingServiceProvider.overrideWithValue(
         localNotificationSchedulingService ??
             FakeLocalNotificationSchedulingService(),
+      ),
+      speechToTextServiceProvider.overrideWithValue(
+        speechToTextService ?? FakeSpeechToTextService(),
+      ),
+      textToSpeechServiceProvider.overrideWithValue(
+        textToSpeechService ?? FakeTextToSpeechService(),
       ),
     ],
   );

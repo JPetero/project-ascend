@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/entitlements/capability.dart';
+import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/routing/app_shell.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../domain/companion_dialogue.dart';
 import '../providers/companion_chat_controller.dart';
+import '../providers/companion_voice_controller.dart';
 import '../widgets/companion_avatar.dart';
 import 'research_mode_screen.dart';
 
@@ -55,6 +60,56 @@ class _AscendCommandCenterScreenState
     }
   }
 
+  Future<void> _showVoiceUpgradePrompt() async {
+    final upgrade = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Voice conversation is Premium'),
+        content: const Text(
+          'Talking to your companion out loud, and having replies read '
+          'back to you, unlocks with Premium. Typed chat stays free.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('See Premium'),
+          ),
+        ],
+      ),
+    );
+    if (upgrade == true && mounted) {
+      context.push(RoutePaths.subscription);
+    }
+  }
+
+  Future<void> _toggleListening(bool hasVoiceAccess) async {
+    if (!hasVoiceAccess) {
+      await _showVoiceUpgradePrompt();
+      return;
+    }
+    final voiceController = ref.read(companionVoiceControllerProvider.notifier);
+    final status = ref.read(companionVoiceControllerProvider).listeningStatus;
+    if (status == VoiceListeningStatus.listening) {
+      await voiceController.stopListening();
+    } else {
+      await voiceController.startListening();
+    }
+  }
+
+  Future<void> _toggleSpeakReplies(bool hasVoiceAccess) async {
+    if (!hasVoiceAccess) {
+      await _showVoiceUpgradePrompt();
+      return;
+    }
+    final voiceController = ref.read(companionVoiceControllerProvider.notifier);
+    final enabled = ref.read(companionVoiceControllerProvider).speakRepliesEnabled;
+    voiceController.setSpeakRepliesEnabled(!enabled);
+  }
+
   @override
   Widget build(BuildContext context) {
     final companion = ref.watch(
@@ -73,11 +128,32 @@ class _AscendCommandCenterScreenState
       ),
     );
     final chatState = ref.watch(companionChatControllerProvider);
+    final hasVoiceAccess = ref.watch(
+      capabilityProvider(AppCapability.premiumCompanionVoices),
+    );
+    final voiceState = ref.watch(companionVoiceControllerProvider);
+    final isListening =
+        voiceState.listeningStatus == VoiceListeningStatus.listening;
+    final isRequestingVoicePermission =
+        voiceState.listeningStatus == VoiceListeningStatus.requestingPermission;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(companion == Companion.atlas ? 'Atlas' : 'Nova'),
         actions: [
+          IconButton(
+            onPressed: () => _toggleSpeakReplies(hasVoiceAccess),
+            icon: Icon(
+              voiceState.speakRepliesEnabled
+                  ? Icons.volume_up_rounded
+                  : Icons.volume_off_rounded,
+            ),
+            tooltip: hasVoiceAccess
+                ? (voiceState.speakRepliesEnabled
+                      ? 'Stop speaking replies aloud'
+                      : 'Speak replies aloud (Premium)')
+                : 'Speak replies aloud (Premium)',
+          ),
           IconButton(
             onPressed: () {
               Navigator.of(context).push(
@@ -128,6 +204,45 @@ class _AscendCommandCenterScreenState
                       },
                     ),
             ),
+            if (isListening || voiceState.isSpeaking)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AscendSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.graphic_eq_rounded, size: 18),
+                    const SizedBox(width: AscendSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        isListening
+                            ? (voiceState.partialTranscript.isEmpty
+                                  ? 'Listening…'
+                                  : voiceState.partialTranscript)
+                            : 'Speaking…',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (voiceState.isSpeaking)
+                      TextButton(
+                        onPressed: () => ref
+                            .read(companionVoiceControllerProvider.notifier)
+                            .stopSpeaking(),
+                        child: const Text('Stop'),
+                      ),
+                  ],
+                ),
+              ),
+            if (voiceState.listeningStatus == VoiceListeningStatus.unavailable)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: AscendSpacing.md),
+                child: Text(
+                  "Ascend couldn't start voice recognition — check your "
+                  "device's microphone/speech permission for Ascend and try "
+                  'again.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(AscendSpacing.md),
               child: Row(
@@ -142,15 +257,17 @@ class _AscendCommandCenterScreenState
                   ),
                   const SizedBox(width: AscendSpacing.sm),
                   IconButton.filled(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Voice input is coming soon.'),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.mic_none_rounded),
-                    tooltip: 'Voice input (coming soon)',
+                    onPressed: isRequestingVoicePermission
+                        ? null
+                        : () => _toggleListening(hasVoiceAccess),
+                    icon: Icon(
+                      isListening
+                          ? Icons.mic_rounded
+                          : Icons.mic_none_rounded,
+                    ),
+                    tooltip: hasVoiceAccess
+                        ? (isListening ? 'Stop listening' : 'Voice input')
+                        : 'Voice input (Premium)',
                   ),
                   const SizedBox(width: AscendSpacing.xs),
                   IconButton.filled(
