@@ -39,13 +39,42 @@ actually in scope for the current session.
   self-service "upgrade" endpoint (faking one would mean a fabricated
   payment flow).
 - **Scanners** (food/body) — premium capability placeholder only.
-- **Live AI provider integration** — Atlas/Nova still use deterministic
-  local dialogue; no live LLM call happens anywhere. Build Session 7
-  Part 9 added the provider-independent architecture that a live
-  integration will plug into (`AiProvider`, its shared safety gate, and
-  `LocalDeterministicAiProvider` as the only implementation so far) —
-  see `build-session-7.md` Part 9 and `atlas-nova-bible.md`'s "Future:
-  live AI" section for the intended architecture this now realizes.
+- **Live AI provider integration** — **shipped in Build Session 9 Part
+  15/16**, gated behind the pre-existing `AppCapability.advancedAiConversations`
+  (a Free account never attempts the network call, per Scenario 18's
+  "free deterministic dialogue... stays free"). Backend: a new
+  `AssistantModule` (`POST /assistant/reply`) proxies to Anthropic via
+  `@anthropic-ai/sdk` when `ANTHROPIC_API_KEY` is configured — no key
+  exists in this environment, so this honestly rejects with "not
+  configured" (503) rather than fabricating a reply; see
+  `AssistantService`'s doc comment. A single shared system prompt
+  (`buildSystemPrompt`) carries the same hard safety rules regardless of
+  companion/coaching style, per atlas-nova-bible.md's "a shared
+  system-prompt safety layer, not a per-companion one" requirement —
+  defense-in-depth only, since the client's `AiProvider.reply()` gate
+  already intercepts red-flag/pain input before this endpoint is ever
+  called. Mobile: `LiveAiProvider extends AiProvider` (never wraps
+  `LocalDeterministicAiProvider` as a base, so `reply()`'s safety gate
+  stays structurally un-bypassable), falling back to the local
+  deterministic provider on any error — not configured, offline, or a
+  server error — so a Premium account never sees a raw error bubble.
+  Not exercised against a live Anthropic call in this environment — no
+  API key available this session; see build-session-9.md.
+  `AiProvider.generateReply` also gained a `history` parameter (an
+  additive, backward-compatible widening) so the live provider can give
+  the model real conversational context, which
+  `LocalDeterministicAiProvider` simply ignores.
+  **Deliberately still open: Research Mode's live, source-verified
+  answers.** Scenario 19's hard rule — "must never invent a citation...
+  must include source verification before it ships" — isn't satisfied by
+  an LLM call alone (no real web-search or citation-verification
+  pipeline exists), so `LiveAiProvider` does not override
+  `researchReply`; it inherits the same honest "not available" default
+  `LocalDeterministicAiProvider` already had. Shipping an LLM-generated
+  answer with no verified sources would be exactly the fabrication this
+  rule exists to prevent — see `build-session-7.md` Part 9 and
+  `atlas-nova-bible.md`'s "Future: live AI" section for the architecture
+  this now realizes.
 - **Voice integration** — **on-device speech input/output shipped in
   Build Session 9 Part 14** (see the Scenario 18 entry below); the
   underlying conversation is still the same deterministic local dialogue
@@ -167,8 +196,11 @@ extension points exist.
   separate from this voice I/O layer. Not exercised on a physical device
   — no device available this session; see build-session-9.md.
 - **Assistant research mode with citations (19)** — live web-backed
-  research with source verification; today's Assistant is deterministic
-  local dialogue only.
+  research with source verification; still not available (see the "Live
+  AI provider integration" entry above for the Build Session 9 Part
+  15/16 decision to keep this honestly unavailable rather than ship
+  unverified LLM answers). Ordinary companion chat now has a real live
+  provider option; research mode specifically does not yet.
 - **Deep adaptive scheduling (20)** — advanced calendar automation,
   clinician/trainer collaboration tools; basic accessible scheduling
   stays free and is a smaller, nearer-term item.

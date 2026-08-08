@@ -117,6 +117,19 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   APPLE_CLIENT_ID?: string;
+
+  // Live AI provider (Build Session 9 Part 15/16) — optional. Undefined
+  // means AssistantService honestly rejects with "not configured" and
+  // the mobile app's aiProviderProvider falls back to the free,
+  // deterministic local companion — see AssistantService and
+  // LiveAiProvider's doc comments.
+  @IsString()
+  @IsOptional()
+  ANTHROPIC_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  ANTHROPIC_MODEL?: string;
 }
 
 /**

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/companion/data/ai_provider.dart';
+import 'package:mobile/features/companion/domain/chat_message.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 
@@ -17,6 +18,7 @@ class _FakeProvider extends AiProvider {
     required String input,
     required Companion companion,
     required CoachingStyle style,
+    List<ChatMessage> history = const [],
   }) async {
     return 'FAKE PROVIDER REPLY: $input';
   }

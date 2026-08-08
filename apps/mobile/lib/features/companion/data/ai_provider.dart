@@ -146,16 +146,25 @@ abstract class AiProvider {
       return _painFollowUpQuestion;
     }
 
-    return generateReply(input: input, companion: companion, style: style);
+    return generateReply(
+      input: input,
+      companion: companion,
+      style: style,
+      history: history,
+    );
   }
 
   /// Provider-specific dialogue generation. Never call this directly —
   /// always go through [reply], which enforces the shared safety gate
-  /// above before any provider ever sees safety-critical input.
+  /// above before any provider ever sees safety-critical input. [history]
+  /// is everything before this turn (same list [reply] received) — a
+  /// provider that only produces one-shot replies (like
+  /// [LocalDeterministicAiProvider]) can simply ignore it.
   Future<String> generateReply({
     required String input,
     required Companion companion,
     required CoachingStyle style,
+    List<ChatMessage> history = const [],
   });
 
   /// Premium future "research mode" per user-scenario-bible.md Scenario

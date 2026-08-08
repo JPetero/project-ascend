@@ -43,11 +43,20 @@ export interface SocialAuthConfig {
   appleClientId?: string;
 }
 
+export interface AiConfig {
+  // Undefined means no live AI provider is configured this environment —
+  // AssistantService honestly rejects with "not configured" rather than
+  // pretending to generate a reply (see AssistantService's doc comment).
+  anthropicApiKey?: string;
+  anthropicModel: string;
+}
+
 export default (): {
   app: AppConfig;
   media: MediaConfig;
   email: EmailConfig;
   socialAuth: SocialAuthConfig;
+  ai: AiConfig;
 } => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -83,5 +92,9 @@ export default (): {
   socialAuth: {
     googleClientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
     appleClientId: process.env.APPLE_CLIENT_ID,
+  },
+  ai: {
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
   },
 });

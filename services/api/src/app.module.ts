@@ -6,6 +6,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { AchievementsModule } from './modules/achievements/achievements.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AssistantModule } from './modules/assistant/assistant.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthIdentitiesModule } from './modules/auth-identities/auth-identities.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -113,6 +114,7 @@ import { PrismaModule } from './prisma/prisma.module';
     NutritionLibraryModule,
     NotificationsModule,
     DataExportModule,
+    AssistantModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
