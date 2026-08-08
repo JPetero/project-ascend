@@ -205,6 +205,7 @@ model User {
   galleryAlbums                    GalleryAlbum[]
   purchases                        Purchase[]
   adminPermissionGrants            AdminPermissionGrant[]
+  visionAnalysisSessions           VisionAnalysisSession[]
 
   @@index([status])
   @@map("users")
@@ -2848,4 +2849,74 @@ model NotificationDelivery {
 
   @@index([eventId])
   @@map("notification_deliveries")
+}
+
+// Build Session 10 Part 6 — private, user-owned results from a live
+// on-device pose-analysis session (Form Coach / Rep Counter, Part 2-5).
+// One row per session rather than the separately-suggested
+// Session/ExerciseResult/RepResult split: V1 always analyzes exactly one
+// exercise per live session (see SupportedExercise), so a per-exercise
+// child table would be empty normalization overhead this app doesn't
+// need yet — the exercise/rep-count fields live directly on the session
+// row instead. `mediaAssetId`/`workoutSessionId` are deliberately loose
+// references (no typed Prisma relation), matching MediaUsage's existing
+// "don't make MediaAsset know about every consumer" precedent — see
+// MediaUsage's doc comment above.
+enum VisionExercise {
+  BODYWEIGHT_SQUAT
+  BICEPS_CURL
+  SHOULDER_PRESS
+}
+
+enum FormObservationSeverity {
+  INFO
+  COACHING_CUE
+  CHECK_FORM
+}
+
+model VisionAnalysisSession {
+  id                String         @id @default(uuid())
+  userId            String
+  exercise          VisionExercise
+  startedAt         DateTime
+  completedAt       DateTime?
+  // The analyzer's own count vs. the count after any manual +1/-1
+  // correction — kept separate so a user's correction is visible as a
+  // correction, never silently overwriting what was actually detected.
+  autoRepCount      Int
+  correctedRepCount Int
+  // A short tag for which analyzer build produced this result (e.g.
+  // "pose-v1") — lets a future analyzer change be distinguished from
+  // this one in stored history without guessing from the date alone.
+  analysisVersion   String
+  // Loose references, not typed relations — see the model group's doc
+  // comment above.
+  mediaAssetId      String?
+  workoutSessionId  String?
+  createdAt         DateTime       @default(now())
+
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  observations VisionFormObservation[]
+
+  @@index([userId, createdAt])
+  @@index([userId, exercise])
+  @@map("vision_analysis_sessions")
+}
+
+model VisionFormObservation {
+  id         String                  @id @default(uuid())
+  sessionId  String
+  // A short machine-stable identifier (e.g. "squat_depth",
+  // "knee_tracking") — see FormObservation's doc comment on the Flutter
+  // side for why this is distinct from the human-readable message.
+  type       String
+  message    String
+  severity   FormObservationSeverity
+  confidence Float
+  occurredAt DateTime
+
+  session VisionAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("vision_form_observations")
 }

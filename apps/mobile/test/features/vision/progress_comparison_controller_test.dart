@@ -23,16 +23,31 @@ void main() {
   test('loads PROGRESS-category album media, sorted oldest first', () async {
     final repository = FakeGalleryRepository(
       albums: [
-        sampleGalleryAlbum(id: 'progress-1', category: GalleryCategory.progress),
+        sampleGalleryAlbum(
+          id: 'progress-1',
+          category: GalleryCategory.progress,
+        ),
         sampleGalleryAlbum(id: 'private-1', category: GalleryCategory.private_),
       ],
     );
     repository.mediaByAlbum['progress-1'] = [
-      _mediaAt(id: 'newer', albumId: 'progress-1', createdAt: DateTime.utc(2026, 2)),
-      _mediaAt(id: 'older', albumId: 'progress-1', createdAt: DateTime.utc(2026, 1)),
+      _mediaAt(
+        id: 'newer',
+        albumId: 'progress-1',
+        createdAt: DateTime.utc(2026, 2),
+      ),
+      _mediaAt(
+        id: 'older',
+        albumId: 'progress-1',
+        createdAt: DateTime.utc(2026, 1),
+      ),
     ];
     repository.mediaByAlbum['private-1'] = [
-      _mediaAt(id: 'ignored', albumId: 'private-1', createdAt: DateTime.utc(2026, 3)),
+      _mediaAt(
+        id: 'ignored',
+        albumId: 'private-1',
+        createdAt: DateTime.utc(2026, 3),
+      ),
     ];
 
     final controller = ProgressComparisonController(repository: repository);
@@ -41,7 +56,10 @@ void main() {
 
     expect(controller.state.isLoading, isFalse);
     expect(controller.state.error, isNull);
-    expect(controller.state.photos.map((m) => m.id).toList(), ['older', 'newer']);
+    expect(controller.state.photos.map((m) => m.id).toList(), [
+      'older',
+      'newer',
+    ]);
   });
 
   test('selecting before/after tracks both selections independently', () async {
@@ -71,16 +89,19 @@ void main() {
     expect(controller.state.hasBothSelected, isFalse);
   });
 
-  test('surfaces a repository error honestly instead of an empty list', () async {
-    final repository = _ThrowingGalleryRepository();
-    final controller = ProgressComparisonController(repository: repository);
-    addTearDown(controller.dispose);
-    await Future<void>.delayed(Duration.zero);
+  test(
+    'surfaces a repository error honestly instead of an empty list',
+    () async {
+      final repository = _ThrowingGalleryRepository();
+      final controller = ProgressComparisonController(repository: repository);
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
 
-    expect(controller.state.isLoading, isFalse);
-    expect(controller.state.error, isNotNull);
-    expect(controller.state.photos, isEmpty);
-  });
+      expect(controller.state.isLoading, isFalse);
+      expect(controller.state.error, isNotNull);
+      expect(controller.state.photos, isEmpty);
+    },
+  );
 }
 
 class _ThrowingGalleryRepository extends FakeGalleryRepository {

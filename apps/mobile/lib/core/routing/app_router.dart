@@ -58,6 +58,9 @@ import '../../features/support/presentation/screens/create_ticket_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/support/presentation/screens/support_ticket_detail_screen.dart';
 import '../../features/vision/domain/vision_module.dart';
+import '../../features/vision/pose_analysis/domain/supported_exercise.dart';
+import '../../features/vision/pose_analysis/presentation/screens/vision_live_session_screen.dart';
+import '../../features/vision/pose_analysis/presentation/screens/vision_results_history_screen.dart';
 import '../../features/vision/presentation/screens/progress_comparison_screen.dart';
 import '../../features/vision/presentation/screens/vision_module_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
@@ -210,6 +213,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.progressComparison,
         builder: (context, state) => const ProgressComparisonScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.visionLiveSession,
+        builder: (context, state) {
+          final exerciseId = state.pathParameters['exercise']!;
+          final exercise =
+              supportedExerciseFromRouteId(exerciseId) ??
+              SupportedExercise.bodyweightSquat;
+          return VisionLiveSessionScreen(exercise: exercise);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.visionResultsHistory,
+        builder: (context, state) => const VisionResultsHistoryScreen(),
       ),
       GoRoute(
         path: RoutePaths.notificationsInbox,

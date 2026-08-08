@@ -9,6 +9,7 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../nutrition/domain/meal_type.dart';
 import '../../domain/vision_module.dart';
+import '../../pose_analysis/domain/supported_exercise.dart';
 import '../providers/vision_capture_controller.dart';
 
 /// A single Vision mode's screen — reachable only once a Premium account
@@ -74,6 +75,27 @@ class VisionModuleScreen extends ConsumerWidget {
     context.push(RoutePaths.foodSearch, extra: mealType);
   }
 
+  Future<void> _pickExerciseAndStart(BuildContext context) async {
+    final exercise = await showAscendBottomSheet<SupportedExercise>(
+      context: context,
+      title: 'Choose an exercise',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final exercise in SupportedExercise.values)
+            ListTile(
+              title: Text(supportedExerciseLabel(exercise)),
+              onTap: () => Navigator.of(context).pop(exercise),
+            ),
+        ],
+      ),
+    );
+    if (exercise == null || !context.mounted) return;
+    context.push(
+      RoutePaths.visionLiveSessionPath(supportedExerciseRouteId(exercise)),
+    );
+  }
+
   Future<void> _showFormCues(BuildContext context) {
     return showAscendBottomSheet<void>(
       context: context,
@@ -110,8 +132,21 @@ class VisionModuleScreen extends ConsumerWidget {
       visionCaptureControllerProvider(module).notifier,
     );
 
+    final hasLiveAnalysis =
+        module == VisionModule.formCoach || module == VisionModule.repCounter;
+
     return Scaffold(
-      appBar: AppBar(title: Text(info.title)),
+      appBar: AppBar(
+        title: Text(info.title),
+        actions: [
+          if (hasLiveAnalysis)
+            IconButton(
+              icon: const Icon(Icons.history_outlined),
+              tooltip: 'Session history',
+              onPressed: () => context.push(RoutePaths.visionResultsHistory),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(AscendSpacing.md),
@@ -122,6 +157,34 @@ class VisionModuleScreen extends ConsumerWidget {
               message: _statusMessage(module, info.summary),
             ),
             const SizedBox(height: AscendSpacing.lg),
+            if (hasLiveAnalysis) ...[
+              AscendCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Live camera analysis',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AscendSpacing.xs),
+                    const Text(
+                      'Real on-device pose tracking and rep counting for a '
+                      'bodyweight squat, biceps curl, or shoulder press. '
+                      'Camera feedback is an estimate, not a diagnosis — '
+                      'always show your form to a qualified coach if you '
+                      "have concerns.",
+                    ),
+                    const SizedBox(height: AscendSpacing.md),
+                    AscendPrimaryButton(
+                      label: 'Choose an exercise',
+                      onPressed: () => _pickExerciseAndStart(context),
+                      expand: false,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.lg),
+            ],
             if (module == VisionModule.progressScan) ...[
               AscendCard(
                 child: Column(
@@ -178,9 +241,11 @@ class VisionModuleScreen extends ConsumerWidget {
 String _statusMessage(VisionModule module, String summary) {
   switch (module) {
     case VisionModule.formCoach:
-      return '$summary Automatic form analysis is not built yet. Capture a '
-          "video and review it against Ascend's general form checklist, or "
-          'share it with a coach.';
+      return '$summary Real on-device pose tracking is available for a '
+          'bodyweight squat, biceps curl, or shoulder press — see the live '
+          'camera analysis card below. For any other exercise, capture a '
+          "video and review it against Ascend's general form checklist "
+          'instead.';
     case VisionModule.progressScan:
       return '$summary Automatic measurement or analysis is not built yet, '
           'but you can already compare two of your saved gallery photos '
@@ -190,6 +255,9 @@ String _statusMessage(VisionModule module, String summary) {
           'capture a reference photo, then search for what you ate to log '
           'it normally.';
     case VisionModule.repCounter:
+      return '$summary Real on-device rep counting is available for a '
+          'bodyweight squat, biceps curl, or shoulder press — see the live '
+          'camera analysis card below.';
     case VisionModule.sportCapture:
     case VisionModule.outfitGuidance:
       return '$summary Nothing here is simulated — no analysis runs yet. '

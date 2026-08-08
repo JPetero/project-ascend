@@ -55,7 +55,8 @@ class ProgressComparisonState {
 /// (`packages/docs/product/user-scenario-bible.md`): never assign a
 /// fabricated muscle-development percentage, never promise a reliable
 /// body-fat estimate from a camera image.
-class ProgressComparisonController extends StateNotifier<ProgressComparisonState> {
+class ProgressComparisonController
+    extends StateNotifier<ProgressComparisonState> {
   ProgressComparisonController({required GalleryRepository repository})
     : _repository = repository,
       super(const ProgressComparisonState()) {
@@ -86,7 +87,8 @@ class ProgressComparisonController extends StateNotifier<ProgressComparisonState
     }
   }
 
-  void selectBefore(GalleryMedia media) => state = state.copyWith(before: media);
+  void selectBefore(GalleryMedia media) =>
+      state = state.copyWith(before: media);
 
   void selectAfter(GalleryMedia media) => state = state.copyWith(after: media);
 
@@ -95,11 +97,12 @@ class ProgressComparisonController extends StateNotifier<ProgressComparisonState
   void clearAfter() => state = state.copyWith(clearAfter: true);
 }
 
-final progressComparisonControllerProvider = StateNotifierProvider.autoDispose<
-  ProgressComparisonController,
-  ProgressComparisonState
->((ref) {
-  return ProgressComparisonController(
-    repository: ref.watch(galleryRepositoryProvider),
-  );
-});
+final progressComparisonControllerProvider =
+    StateNotifierProvider.autoDispose<
+      ProgressComparisonController,
+      ProgressComparisonState
+    >((ref) {
+      return ProgressComparisonController(
+        repository: ref.watch(galleryRepositoryProvider),
+      );
+    });
