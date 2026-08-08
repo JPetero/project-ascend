@@ -148,4 +148,43 @@ class TrainerGroupsRepository {
       (_) => null,
     );
   }
+
+  Future<TrainerGroupMemberRole> setMemberRole(
+    String groupId,
+    String userId,
+    TrainerGroupMemberRole role,
+  ) async {
+    final envelope = await _apiClient.patch(
+      '/trainer-groups/$groupId/members/$userId/role',
+      (data) => data as Map<String, dynamic>,
+      data: {'role': trainerGroupMemberRoleToJson(role)},
+    );
+    return trainerGroupMemberRoleFromJson(envelope.data!['role'] as String);
+  }
+
+  Future<TrainerGroupAnnouncement> postAnnouncement(
+    String groupId,
+    String body,
+  ) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/$groupId/announcements',
+      (data) => data as Map<String, dynamic>,
+      data: {'body': body},
+    );
+    return TrainerGroupAnnouncement.fromJson(envelope.data!);
+  }
+
+  Future<List<TrainerGroupAnnouncement>> listAnnouncements(
+    String groupId,
+  ) async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/$groupId/announcements',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map(
+          (a) => TrainerGroupAnnouncement.fromJson(a as Map<String, dynamic>),
+        )
+        .toList();
+  }
 }

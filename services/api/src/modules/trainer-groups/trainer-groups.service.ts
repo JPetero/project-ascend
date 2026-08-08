@@ -8,37 +8,56 @@ import {
 import { TrainerGroupInvitationStatus, TrainerGroupMemberRole } from '@prisma/client';
 import {
   TRAINER_GROUP_MEMBER_LIMIT_FREE,
+  TRAINER_GROUP_MEMBER_LIMIT_PREMIUM,
   TRAINER_GROUP_OWNED_LIMIT_FREE,
+  TRAINER_GROUP_OWNED_LIMIT_PREMIUM,
 } from '../../common/policy/trainer-group-policy';
 import {
   PaginationQueryDto,
   paginationArgs,
   paginationMeta,
 } from '../../common/pagination/pagination-query.dto';
+import { CapabilityService } from '../../common/entitlements/capability.service';
+import { AppCapability } from '../../common/entitlements/capability.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateTrainerGroupAnnouncementDto } from './dto/create-trainer-group-announcement.dto';
 import { CreateTrainerGroupDto } from './dto/create-trainer-group.dto';
 import { InviteTrainerGroupMemberDto } from './dto/invite-trainer-group-member.dto';
 import { SendTrainerGroupMessageDto } from './dto/send-trainer-group-message.dto';
+import { SetTrainerGroupMemberRoleDto } from './dto/set-trainer-group-member-role.dto';
 import { ShareTrainerGroupPlanDto } from './dto/share-trainer-group-plan.dto';
 
 /**
- * Trainer groups (free tier) — one owned group per user, a small
- * centrally-configured member limit, text/image chat, shared workout
- * plans, and invitations. See schema.prisma's Trainer group comment and
- * packages/docs/product/user-scenario-bible.md Scenario 24. Premium
- * roles/scale (Scenario 24's Premium-future list) are not implemented.
+ * Trainer groups — see schema.prisma's Trainer group comment and
+ * packages/docs/product/user-scenario-bible.md Scenario 24. Free tier:
+ * one owned group, a small member limit, text/image chat, shared
+ * workout plans, invitations. Expanded tier (Build Session 9 Part 20):
+ * larger limits, a MODERATOR role, and announcements, all gated on the
+ * group OWNER's AppCapability.TRAINER_GROUPS_EXPANDED — a group's
+ * "premium-ness" follows its owner's tier, not the acting member's, so
+ * a MODERATOR in a Premium owner's group still gets expanded limits
+ * even though they hold no subscription of their own. Still not
+ * implemented: scheduled sessions and assignments — see
+ * parking-lot.md.
  */
 @Injectable()
 export class TrainerGroupsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capabilityService: CapabilityService,
+  ) {}
 
   // --- Groups -----------------------------------------------------------
 
   async createGroup(userId: string, dto: CreateTrainerGroupDto) {
+    const expanded = await this.isExpanded(userId);
+    const ownedLimit = expanded
+      ? TRAINER_GROUP_OWNED_LIMIT_PREMIUM
+      : TRAINER_GROUP_OWNED_LIMIT_FREE;
     const ownedCount = await this.prisma.trainerGroup.count({ where: { ownerId: userId } });
-    if (ownedCount >= TRAINER_GROUP_OWNED_LIMIT_FREE) {
+    if (ownedCount >= ownedLimit) {
       throw new ForbiddenException(
-        `You can own at most ${TRAINER_GROUP_OWNED_LIMIT_FREE} group on the free tier.`,
+        `You can own at most ${ownedLimit} group${ownedLimit === 1 ? '' : 's'}.`,
       );
     }
 
@@ -78,9 +97,7 @@ export class TrainerGroupsService {
 
   async invite(userId: string, groupId: string, dto: InviteTrainerGroupMemberDto) {
     const group = await this.findGroup(groupId);
-    if (group.ownerId !== userId) {
-      throw new ForbiddenException('Only the group owner can invite members.');
-    }
+    await this.assertCanManageMembers(userId, group.ownerId, groupId);
     if (dto.inviteeUserId === userId) {
       throw new BadRequestException('You cannot invite yourself.');
     }
@@ -90,11 +107,10 @@ export class TrainerGroupsService {
     if (alreadyMember) {
       throw new ConflictException('This person is already a member of the group.');
     }
+    const memberLimit = await this.memberLimitFor(group.ownerId);
     const memberCount = await this.prisma.trainerGroupMember.count({ where: { groupId } });
-    if (memberCount >= TRAINER_GROUP_MEMBER_LIMIT_FREE) {
-      throw new ForbiddenException(
-        `This group is at its ${TRAINER_GROUP_MEMBER_LIMIT_FREE}-member free-tier limit.`,
-      );
+    if (memberCount >= memberLimit) {
+      throw new ForbiddenException(`This group is at its ${memberLimit}-member limit.`);
     }
 
     const invitation = await this.prisma.trainerGroupInvitation.upsert({
@@ -137,13 +153,13 @@ export class TrainerGroupsService {
       return { status: TrainerGroupInvitationStatus.DECLINED };
     }
 
+    const group = await this.findGroup(invitation.groupId);
+    const memberLimit = await this.memberLimitFor(group.ownerId);
     const memberCount = await this.prisma.trainerGroupMember.count({
       where: { groupId: invitation.groupId },
     });
-    if (memberCount >= TRAINER_GROUP_MEMBER_LIMIT_FREE) {
-      throw new ForbiddenException(
-        `This group is now at its ${TRAINER_GROUP_MEMBER_LIMIT_FREE}-member free-tier limit.`,
-      );
+    if (memberCount >= memberLimit) {
+      throw new ForbiddenException(`This group is now at its ${memberLimit}-member limit.`);
     }
 
     await this.prisma.$transaction([
@@ -187,14 +203,59 @@ export class TrainerGroupsService {
         'The group owner cannot be removed — delete the group instead.',
       );
     }
+
     if (!isSelf && group.ownerId !== userId) {
-      throw new ForbiddenException('Only the group owner can remove another member.');
+      const callerRole = await this.roleOf(userId, groupId);
+      if (callerRole !== TrainerGroupMemberRole.MODERATOR) {
+        throw new ForbiddenException(
+          'Only the group owner or a moderator can remove another member.',
+        );
+      }
+      // A moderator can remove a regular member but never another
+      // moderator — only the owner can do that.
+      const targetRole = await this.roleOf(targetUserId, groupId);
+      if (targetRole !== TrainerGroupMemberRole.MEMBER) {
+        throw new ForbiddenException('A moderator can only remove a regular member.');
+      }
     }
+
     const membership = await this.prisma.trainerGroupMember.findUnique({
       where: { groupId_userId: { groupId, userId: targetUserId } },
     });
     if (!membership) throw new NotFoundException('This person is not a member of the group.');
     await this.prisma.trainerGroupMember.delete({ where: { id: membership.id } });
+  }
+
+  // --- Roles (Build Session 9 Part 20 — expanded tier) --------------------
+
+  async setMemberRole(
+    userId: string,
+    groupId: string,
+    targetUserId: string,
+    dto: SetTrainerGroupMemberRoleDto,
+  ) {
+    const group = await this.findGroup(groupId);
+    if (group.ownerId !== userId) {
+      throw new ForbiddenException('Only the group owner can change a member’s role.');
+    }
+    if (targetUserId === group.ownerId) {
+      throw new BadRequestException('The group owner’s role cannot be changed.');
+    }
+    if (!(await this.isExpanded(group.ownerId))) {
+      throw new ForbiddenException('Distinct member roles require the expanded (Premium) tier.');
+    }
+    const membership = await this.prisma.trainerGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    });
+    if (!membership) throw new NotFoundException('This person is not a member of the group.');
+
+    const role =
+      dto.role === 'MODERATOR' ? TrainerGroupMemberRole.MODERATOR : TrainerGroupMemberRole.MEMBER;
+    const updated = await this.prisma.trainerGroupMember.update({
+      where: { id: membership.id },
+      data: { role },
+    });
+    return { userId: updated.userId, role: updated.role };
   }
 
   // --- Messages ---------------------------------------------------------
@@ -293,6 +354,44 @@ export class TrainerGroupsService {
     await this.prisma.trainerGroupSharedPlan.delete({ where: { id: sharedPlanId } });
   }
 
+  // --- Announcements (Build Session 9 Part 20 — expanded tier) -----------
+
+  async postAnnouncement(userId: string, groupId: string, dto: CreateTrainerGroupAnnouncementDto) {
+    const group = await this.findGroup(groupId);
+    const role = await this.roleOf(userId, groupId);
+    if (role !== TrainerGroupMemberRole.OWNER && role !== TrainerGroupMemberRole.MODERATOR) {
+      throw new ForbiddenException('Only the group owner or a moderator can post an announcement.');
+    }
+    if (!(await this.isExpanded(group.ownerId))) {
+      throw new ForbiddenException('Announcements require the expanded (Premium) tier.');
+    }
+    const announcement = await this.prisma.trainerGroupAnnouncement.create({
+      data: { groupId, authorId: userId, body: dto.body },
+    });
+    return {
+      id: announcement.id,
+      groupId: announcement.groupId,
+      authorId: announcement.authorId,
+      body: announcement.body,
+      createdAt: announcement.createdAt,
+    };
+  }
+
+  async listAnnouncements(userId: string, groupId: string) {
+    await this.assertMember(userId, groupId);
+    const announcements = await this.prisma.trainerGroupAnnouncement.findMany({
+      where: { groupId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return announcements.map((a) => ({
+      id: a.id,
+      groupId: a.groupId,
+      authorId: a.authorId,
+      body: a.body,
+      createdAt: a.createdAt,
+    }));
+  }
+
   // --- Shared helpers -----------------------------------------------------
 
   private async findGroup(groupId: string) {
@@ -311,6 +410,41 @@ export class TrainerGroupsService {
     }
   }
 
+  private async assertCanManageMembers(
+    userId: string,
+    ownerId: string,
+    groupId: string,
+  ): Promise<void> {
+    if (userId === ownerId) return;
+    const role = await this.roleOf(userId, groupId);
+    if (role !== TrainerGroupMemberRole.MODERATOR) {
+      throw new ForbiddenException('Only the group owner or a moderator can invite members.');
+    }
+  }
+
+  private async roleOf(userId: string, groupId: string): Promise<TrainerGroupMemberRole | null> {
+    const membership = await this.prisma.trainerGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+    });
+    return membership?.role ?? null;
+  }
+
+  /** Whether `ownerId` currently holds TRAINER_GROUPS_EXPANDED — read
+   * fresh on every call, never cached, so an upgrade or downgrade takes
+   * effect on the very next request. */
+  private isExpanded(ownerId: string): Promise<boolean> {
+    return this.capabilityService.hasCapabilityForUser(
+      ownerId,
+      AppCapability.TRAINER_GROUPS_EXPANDED,
+    );
+  }
+
+  private async memberLimitFor(ownerId: string): Promise<number> {
+    return (await this.isExpanded(ownerId))
+      ? TRAINER_GROUP_MEMBER_LIMIT_PREMIUM
+      : TRAINER_GROUP_MEMBER_LIMIT_FREE;
+  }
+
   private async serializeGroup(groupId: string, viewerId: string) {
     const group = await this.prisma.trainerGroup.findUniqueOrThrow({
       where: { id: groupId },
@@ -321,12 +455,14 @@ export class TrainerGroupsService {
         },
       },
     });
+    const expanded = await this.isExpanded(group.ownerId);
     return {
       id: group.id,
       ownerId: group.ownerId,
       name: group.name,
       description: group.description,
-      memberLimit: TRAINER_GROUP_MEMBER_LIMIT_FREE,
+      memberLimit: expanded ? TRAINER_GROUP_MEMBER_LIMIT_PREMIUM : TRAINER_GROUP_MEMBER_LIMIT_FREE,
+      isExpanded: expanded,
       isOwnGroup: group.ownerId === viewerId,
       createdAt: group.createdAt,
       members: group.members.map((m) => ({

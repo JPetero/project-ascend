@@ -1,10 +1,13 @@
-enum TrainerGroupMemberRole { owner, member }
+enum TrainerGroupMemberRole { owner, moderator, member }
 
 TrainerGroupMemberRole trainerGroupMemberRoleFromJson(String value) =>
     TrainerGroupMemberRole.values.firstWhere(
       (r) => r.name.toUpperCase() == value,
       orElse: () => TrainerGroupMemberRole.member,
     );
+
+String trainerGroupMemberRoleToJson(TrainerGroupMemberRole role) =>
+    role.name.toUpperCase();
 
 enum TrainerGroupInvitationStatus { pending, accepted, declined, canceled }
 
@@ -41,11 +44,12 @@ class TrainerGroupMember {
   }
 }
 
-/// A free-tier Trainer group — see
-/// services/api/prisma/schema.prisma's Trainer group comment and
-/// packages/docs/product/user-scenario-bible.md Scenario 24.
-/// `memberLimit` is read from the backend's single source of truth
-/// (common/policy/trainer-group-policy.ts), never hard-coded here.
+/// A Trainer group — see services/api/prisma/schema.prisma's Trainer
+/// group comment and packages/docs/product/user-scenario-bible.md
+/// Scenario 24. `memberLimit` and `isExpanded` are read from the
+/// backend, never hard-coded here: a group's expanded (Premium) tier
+/// follows its OWNER's subscription, not the viewer's — see
+/// TrainerGroupsService's doc comment.
 class TrainerGroup {
   const TrainerGroup({
     required this.id,
@@ -53,6 +57,7 @@ class TrainerGroup {
     required this.name,
     this.description,
     required this.memberLimit,
+    required this.isExpanded,
     required this.isOwnGroup,
     required this.createdAt,
     required this.members,
@@ -63,6 +68,7 @@ class TrainerGroup {
   final String name;
   final String? description;
   final int memberLimit;
+  final bool isExpanded;
   final bool isOwnGroup;
   final DateTime createdAt;
   final List<TrainerGroupMember> members;
@@ -74,6 +80,7 @@ class TrainerGroup {
       name: json['name'] as String,
       description: json['description'] as String?,
       memberLimit: json['memberLimit'] as int,
+      isExpanded: json['isExpanded'] as bool? ?? false,
       isOwnGroup: json['isOwnGroup'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
       members: (json['members'] as List<dynamic>)
@@ -167,6 +174,35 @@ class TrainerGroupSharedPlan {
       workoutPlanId: plan['id'] as String,
       workoutPlanName: plan['name'] as String,
       workoutPlanDescription: plan['description'] as String?,
+    );
+  }
+}
+
+/// A Premium-tier broadcast message (Build Session 9 Part 20) — only
+/// postable by the group owner or a moderator, and only once the group
+/// owner holds the expanded tier. See TrainerGroup.isExpanded.
+class TrainerGroupAnnouncement {
+  const TrainerGroupAnnouncement({
+    required this.id,
+    required this.groupId,
+    required this.authorId,
+    required this.body,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String groupId;
+  final String authorId;
+  final String body;
+  final DateTime createdAt;
+
+  factory TrainerGroupAnnouncement.fromJson(Map<String, dynamic> json) {
+    return TrainerGroupAnnouncement(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      authorId: json['authorId'] as String,
+      body: json['body'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
 }

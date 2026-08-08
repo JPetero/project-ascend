@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TrainerGroupInvitationStatus, TrainerGroupMemberRole } from '@prisma/client';
+import { CapabilityService } from '../../common/entitlements/capability.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TrainerGroupsService } from './trainer-groups.service';
 
@@ -33,6 +34,7 @@ function invitation(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe('TrainerGroupsService', () => {
   let service: TrainerGroupsService;
+  let capabilityService: { hasCapabilityForUser: jest.Mock };
   let prisma: {
     trainerGroup: {
       count: jest.Mock;
@@ -45,6 +47,7 @@ describe('TrainerGroupsService', () => {
       count: jest.Mock;
       findUnique: jest.Mock;
       create: jest.Mock;
+      update: jest.Mock;
       delete: jest.Mock;
     };
     trainerGroupInvitation: {
@@ -55,6 +58,7 @@ describe('TrainerGroupsService', () => {
     };
     trainerGroupMessage: { create: jest.Mock };
     trainerGroupSharedPlan: { findUnique: jest.Mock; delete: jest.Mock; upsert: jest.Mock };
+    trainerGroupAnnouncement: { create: jest.Mock; findMany: jest.Mock };
     workoutPlan: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -72,6 +76,7 @@ describe('TrainerGroupsService', () => {
         count: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
         delete: jest.fn(),
       },
       trainerGroupInvitation: {
@@ -82,12 +87,20 @@ describe('TrainerGroupsService', () => {
       },
       trainerGroupMessage: { create: jest.fn() },
       trainerGroupSharedPlan: { findUnique: jest.fn(), delete: jest.fn(), upsert: jest.fn() },
+      trainerGroupAnnouncement: { create: jest.fn(), findMany: jest.fn() },
       workoutPlan: { findUnique: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
+    // Defaults to the free tier — individual tests opt into Premium via
+    // mockResolvedValueOnce(true).
+    capabilityService = { hasCapabilityForUser: jest.fn().mockResolvedValue(false) };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [TrainerGroupsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        TrainerGroupsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: CapabilityService, useValue: capabilityService },
+      ],
     }).compile();
 
     service = moduleRef.get(TrainerGroupsService);
@@ -123,6 +136,21 @@ describe('TrainerGroupsService', () => {
         }),
       );
     });
+
+    it('allows a Premium owner to own more than the free-tier limit', async () => {
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+      prisma.trainerGroup.count.mockResolvedValue(1);
+      prisma.trainerGroup.create.mockResolvedValue(group());
+      prisma.trainerGroup.findUniqueOrThrow.mockResolvedValue({
+        ...group(),
+        createdAt: new Date(),
+        members: [],
+      });
+
+      await service.createGroup('owner-1', { name: 'Second' });
+
+      expect(prisma.trainerGroup.create).toHaveBeenCalled();
+    });
   });
 
   describe('invite', () => {
@@ -130,11 +158,23 @@ describe('TrainerGroupsService', () => {
       prisma.trainerGroup.findUnique.mockResolvedValue(group());
     });
 
-    it('rejects a non-owner trying to invite', async () => {
+    it('rejects a non-owner, non-moderator trying to invite', async () => {
       await expect(
         service.invite('someone-else', 'group-1', { inviteeUserId: 'invitee-1' }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.trainerGroupInvitation.upsert).not.toHaveBeenCalled();
+    });
+
+    it('allows a moderator to invite', async () => {
+      prisma.trainerGroupMember.findUnique
+        .mockResolvedValueOnce({ role: TrainerGroupMemberRole.MODERATOR }) // caller role lookup
+        .mockResolvedValueOnce(null); // invitee-already-a-member check
+      prisma.trainerGroupMember.count.mockResolvedValue(1);
+      prisma.trainerGroupInvitation.upsert.mockResolvedValue(invitation());
+
+      await service.invite('moderator-1', 'group-1', { inviteeUserId: 'invitee-1' });
+
+      expect(prisma.trainerGroupInvitation.upsert).toHaveBeenCalled();
     });
 
     it('rejects inviting yourself', async () => {
@@ -159,6 +199,17 @@ describe('TrainerGroupsService', () => {
         service.invite('owner-1', 'group-1', { inviteeUserId: 'invitee-1' }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.trainerGroupInvitation.upsert).not.toHaveBeenCalled();
+    });
+
+    it('allows inviting past the free-tier limit once the owner is Premium', async () => {
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+      prisma.trainerGroupMember.findUnique.mockResolvedValue(null);
+      prisma.trainerGroupMember.count.mockResolvedValue(5);
+      prisma.trainerGroupInvitation.upsert.mockResolvedValue(invitation());
+
+      await service.invite('owner-1', 'group-1', { inviteeUserId: 'invitee-1' });
+
+      expect(prisma.trainerGroupInvitation.upsert).toHaveBeenCalled();
     });
 
     it('upserts a PENDING invitation when everything checks out', async () => {
@@ -208,6 +259,7 @@ describe('TrainerGroupsService', () => {
 
     it('rejects accepting once the group is at its member limit', async () => {
       prisma.trainerGroupInvitation.findUnique.mockResolvedValue(invitation());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
       prisma.trainerGroupMember.count.mockResolvedValue(5);
 
       await expect(
@@ -218,6 +270,7 @@ describe('TrainerGroupsService', () => {
 
     it('accepting creates the membership and marks the invitation ACCEPTED in one transaction', async () => {
       prisma.trainerGroupInvitation.findUnique.mockResolvedValue(invitation());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
       prisma.trainerGroupMember.count.mockResolvedValue(1);
 
       const result = await service.respondToInvitation('invitee-1', 'invite-1', true);
@@ -267,6 +320,128 @@ describe('TrainerGroupsService', () => {
       expect(prisma.trainerGroupMember.delete).toHaveBeenCalledWith({
         where: { id: 'membership-1' },
       });
+    });
+
+    it('allows a moderator to remove a regular member', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique
+        .mockResolvedValueOnce({ role: TrainerGroupMemberRole.MODERATOR }) // caller role
+        .mockResolvedValueOnce({ role: TrainerGroupMemberRole.MEMBER }) // target role
+        .mockResolvedValueOnce({ id: 'membership-1' }); // target membership row to delete
+
+      await service.removeMember('moderator-1', 'group-1', 'member-b');
+
+      expect(prisma.trainerGroupMember.delete).toHaveBeenCalledWith({
+        where: { id: 'membership-1' },
+      });
+    });
+
+    it('rejects a moderator trying to remove another moderator', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique
+        .mockResolvedValueOnce({ role: TrainerGroupMemberRole.MODERATOR }) // caller role
+        .mockResolvedValueOnce({ role: TrainerGroupMemberRole.MODERATOR }); // target role
+
+      await expect(
+        service.removeMember('moderator-1', 'group-1', 'moderator-2'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.trainerGroupMember.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setMemberRole', () => {
+    it('rejects a non-owner', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+
+      await expect(
+        service.setMemberRole('someone-else', 'group-1', 'member-a', { role: 'MODERATOR' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects changing the owner’s own role', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+
+      await expect(
+        service.setMemberRole('owner-1', 'group-1', 'owner-1', { role: 'MEMBER' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects on the free tier', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+
+      await expect(
+        service.setMemberRole('owner-1', 'group-1', 'member-a', { role: 'MODERATOR' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.trainerGroupMember.update).not.toHaveBeenCalled();
+    });
+
+    it('promotes a member to MODERATOR once the owner is Premium', async () => {
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        id: 'membership-1',
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+      prisma.trainerGroupMember.update.mockResolvedValue({
+        userId: 'member-a',
+        role: TrainerGroupMemberRole.MODERATOR,
+      });
+
+      const result = await service.setMemberRole('owner-1', 'group-1', 'member-a', {
+        role: 'MODERATOR',
+      });
+
+      expect(result).toEqual({ userId: 'member-a', role: TrainerGroupMemberRole.MODERATOR });
+      expect(prisma.trainerGroupMember.update).toHaveBeenCalledWith({
+        where: { id: 'membership-1' },
+        data: { role: TrainerGroupMemberRole.MODERATOR },
+      });
+    });
+  });
+
+  describe('postAnnouncement', () => {
+    it('rejects a regular member', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+
+      await expect(
+        service.postAnnouncement('member-a', 'group-1', { body: 'Leg day tomorrow!' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects on the free tier even for the owner', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.OWNER,
+      });
+
+      await expect(
+        service.postAnnouncement('owner-1', 'group-1', { body: 'Leg day tomorrow!' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.trainerGroupAnnouncement.create).not.toHaveBeenCalled();
+    });
+
+    it('lets the owner post once Premium', async () => {
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.OWNER,
+      });
+      prisma.trainerGroupAnnouncement.create.mockResolvedValue({
+        id: 'ann-1',
+        groupId: 'group-1',
+        authorId: 'owner-1',
+        body: 'Leg day tomorrow!',
+        createdAt: new Date(),
+      });
+
+      const result = await service.postAnnouncement('owner-1', 'group-1', {
+        body: 'Leg day tomorrow!',
+      });
+
+      expect(result.id).toBe('ann-1');
     });
   });
 

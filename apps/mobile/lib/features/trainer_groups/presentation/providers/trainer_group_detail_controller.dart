@@ -9,24 +9,30 @@ class TrainerGroupDetailState {
     this.group,
     this.messages = const [],
     this.sharedPlans = const [],
+    this.announcements = const [],
     this.isLoading = true,
     this.isSendingMessage = false,
+    this.isPostingAnnouncement = false,
     this.error,
   });
 
   final TrainerGroup? group;
   final List<TrainerGroupMessage> messages;
   final List<TrainerGroupSharedPlan> sharedPlans;
+  final List<TrainerGroupAnnouncement> announcements;
   final bool isLoading;
   final bool isSendingMessage;
+  final bool isPostingAnnouncement;
   final String? error;
 
   TrainerGroupDetailState copyWith({
     TrainerGroup? group,
     List<TrainerGroupMessage>? messages,
     List<TrainerGroupSharedPlan>? sharedPlans,
+    List<TrainerGroupAnnouncement>? announcements,
     bool? isLoading,
     bool? isSendingMessage,
+    bool? isPostingAnnouncement,
     String? error,
     bool clearError = false,
   }) {
@@ -34,8 +40,11 @@ class TrainerGroupDetailState {
       group: group ?? this.group,
       messages: messages ?? this.messages,
       sharedPlans: sharedPlans ?? this.sharedPlans,
+      announcements: announcements ?? this.announcements,
       isLoading: isLoading ?? this.isLoading,
       isSendingMessage: isSendingMessage ?? this.isSendingMessage,
+      isPostingAnnouncement:
+          isPostingAnnouncement ?? this.isPostingAnnouncement,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -62,6 +71,7 @@ class TrainerGroupDetailController
         _repository.getGroup(groupId),
         _repository.listMessages(groupId),
         _repository.listSharedPlans(groupId),
+        _repository.listAnnouncements(groupId),
       ]);
       state = TrainerGroupDetailState(
         group: results[0] as TrainerGroup,
@@ -69,6 +79,7 @@ class TrainerGroupDetailController
         // as oldest-first.
         messages: (results[1] as List<TrainerGroupMessage>).reversed.toList(),
         sharedPlans: results[2] as List<TrainerGroupSharedPlan>,
+        announcements: results[3] as List<TrainerGroupAnnouncement>,
         isLoading: false,
       );
     } catch (error) {
@@ -141,6 +152,41 @@ class TrainerGroupDetailController
       return true;
     } catch (error) {
       state = state.copyWith(sharedPlans: previous, error: error.toString());
+      return false;
+    }
+  }
+
+  /// Owner-only, and only on an expanded (Premium) group — see
+  /// TrainerGroupsService.setMemberRole.
+  Future<bool> setMemberRole(String userId, TrainerGroupMemberRole role) async {
+    try {
+      await _repository.setMemberRole(groupId, userId, role);
+      await load();
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> postAnnouncement(String body) async {
+    if (body.trim().isEmpty) return false;
+    state = state.copyWith(isPostingAnnouncement: true, clearError: true);
+    try {
+      final announcement = await _repository.postAnnouncement(
+        groupId,
+        body.trim(),
+      );
+      state = state.copyWith(
+        announcements: [announcement, ...state.announcements],
+        isPostingAnnouncement: false,
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(
+        isPostingAnnouncement: false,
+        error: error.toString(),
+      );
       return false;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/features/trainer_groups/domain/trainer_group.dart';
 import 'package:mobile/features/trainer_groups/presentation/providers/trainer_group_detail_controller.dart';
 
 import '../../helpers/fake_trainer_groups_repository.dart';
@@ -68,4 +69,86 @@ void main() {
       expect(controller.state.sharedPlans, isEmpty);
     },
   );
+
+  test('setMemberRole promotes a member and reloads the group', () async {
+    repository.groups[0] = sampleGroup(
+      id: 'group-1',
+      ownerId: 'owner-1',
+      isOwnGroup: true,
+      isExpanded: true,
+      members: [
+        TrainerGroupMember(
+          userId: 'owner-1',
+          role: TrainerGroupMemberRole.owner,
+          joinedAt: DateTime.utc(2026, 8, 6),
+        ),
+        TrainerGroupMember(
+          userId: 'member-a',
+          role: TrainerGroupMemberRole.member,
+          joinedAt: DateTime.utc(2026, 8, 6),
+        ),
+      ],
+    );
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+
+    final ok = await controller.setMemberRole(
+      'member-a',
+      TrainerGroupMemberRole.moderator,
+    );
+
+    expect(ok, isTrue);
+    expect(repository.roleChanges, hasLength(1));
+    expect(
+      controller.state.group?.members
+          .firstWhere((m) => m.userId == 'member-a')
+          .role,
+      TrainerGroupMemberRole.moderator,
+    );
+  });
+
+  test(
+    'setMemberRole surfaces an error and does not reload on failure',
+    () async {
+      repository.failSetMemberRole = true;
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final ok = await controller.setMemberRole(
+        'member-a',
+        TrainerGroupMemberRole.moderator,
+      );
+
+      expect(ok, isFalse);
+      expect(controller.state.error, isNotNull);
+    },
+  );
+
+  test(
+    'postAnnouncement rejects an empty body without calling the repository',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final posted = await controller.postAnnouncement('   ');
+
+      expect(posted, isFalse);
+      expect(controller.state.announcements, isEmpty);
+    },
+  );
+
+  test('postAnnouncement prepends the new announcement on success', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+
+    final posted = await controller.postAnnouncement('Leg day tomorrow!');
+
+    expect(posted, isTrue);
+    expect(controller.state.announcements, hasLength(1));
+    expect(controller.state.announcements.single.body, 'Leg day tomorrow!');
+  });
 }

@@ -6,6 +6,7 @@ TrainerGroup sampleGroup({
   String ownerId = 'owner-1',
   String name = 'Morning Crew',
   int memberLimit = 5,
+  bool isExpanded = false,
   bool isOwnGroup = false,
   List<TrainerGroupMember>? members,
 }) {
@@ -14,6 +15,7 @@ TrainerGroup sampleGroup({
     ownerId: ownerId,
     name: name,
     memberLimit: memberLimit,
+    isExpanded: isExpanded,
     isOwnGroup: isOwnGroup,
     createdAt: DateTime.utc(2026, 8, 6),
     members:
@@ -41,7 +43,12 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
   final List<TrainerGroupInvitation> invitations;
   final Map<String, List<TrainerGroupMessage>> messagesByGroup = {};
   final Map<String, List<TrainerGroupSharedPlan>> sharedPlansByGroup = {};
+  final Map<String, List<TrainerGroupAnnouncement>> announcementsByGroup = {};
   final List<({String groupId, String inviteeUserId})> invitesSent = [];
+  final List<({String groupId, String userId, TrainerGroupMemberRole role})>
+  roleChanges = [];
+  bool failSetMemberRole = false;
+  bool failPostAnnouncement = false;
 
   @override
   Future<TrainerGroup> createGroup({
@@ -108,10 +115,73 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
       name: group.name,
       description: group.description,
       memberLimit: group.memberLimit,
+      isExpanded: group.isExpanded,
       isOwnGroup: group.isOwnGroup,
       createdAt: group.createdAt,
       members: group.members.where((m) => m.userId != userId).toList(),
     );
+  }
+
+  @override
+  Future<TrainerGroupMemberRole> setMemberRole(
+    String groupId,
+    String userId,
+    TrainerGroupMemberRole role,
+  ) async {
+    if (failSetMemberRole) throw Exception('failed to set role');
+    roleChanges.add((groupId: groupId, userId: userId, role: role));
+    final index = groups.indexWhere((g) => g.id == groupId);
+    if (index != -1) {
+      final group = groups[index];
+      groups[index] = TrainerGroup(
+        id: group.id,
+        ownerId: group.ownerId,
+        name: group.name,
+        description: group.description,
+        memberLimit: group.memberLimit,
+        isExpanded: group.isExpanded,
+        isOwnGroup: group.isOwnGroup,
+        createdAt: group.createdAt,
+        members: [
+          for (final member in group.members)
+            if (member.userId == userId)
+              TrainerGroupMember(
+                userId: member.userId,
+                role: role,
+                joinedAt: member.joinedAt,
+                displayName: member.displayName,
+                avatarUrl: member.avatarUrl,
+              )
+            else
+              member,
+        ],
+      );
+    }
+    return role;
+  }
+
+  @override
+  Future<TrainerGroupAnnouncement> postAnnouncement(
+    String groupId,
+    String body,
+  ) async {
+    if (failPostAnnouncement) throw Exception('failed to post');
+    final announcement = TrainerGroupAnnouncement(
+      id: 'announcement-${(announcementsByGroup[groupId]?.length ?? 0)}',
+      groupId: groupId,
+      authorId: 'me',
+      body: body,
+      createdAt: DateTime.now(),
+    );
+    announcementsByGroup.putIfAbsent(groupId, () => []).insert(0, announcement);
+    return announcement;
+  }
+
+  @override
+  Future<List<TrainerGroupAnnouncement>> listAnnouncements(
+    String groupId,
+  ) async {
+    return List.unmodifiable(announcementsByGroup[groupId] ?? []);
   }
 
   @override
