@@ -10,6 +10,7 @@ import 'package:mobile/features/auth/data/auth_identity_repository.dart';
 import 'package:mobile/features/auth/data/auth_repository.dart';
 import 'package:mobile/features/auth/domain/auth_identity.dart';
 import 'package:mobile/features/auth/domain/auth_user.dart';
+import 'package:mobile/features/auth/domain/device_session.dart';
 import 'package:mobile/features/profile/data/preferences_repository.dart';
 import 'package:mobile/features/profile/data/profile_repository.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
@@ -38,6 +39,18 @@ class FakeAuthRepository extends AuthRepository {
   bool signOutEverywhereCalled = false;
   String? lastDeleteAccountPassword;
   bool throwOnNextCall = false;
+  List<DeviceSession> sessions = [
+    DeviceSession(
+      id: 'family-current',
+      deviceName: 'Test Device',
+      platform: 'ios',
+      createdAt: DateTime(2026, 1, 1),
+      lastUsedAt: DateTime(2026, 1, 2),
+      current: true,
+    ),
+  ];
+  bool revokeOtherSessionsCalled = false;
+  String? lastRevokedSessionId;
 
   @override
   Future<AuthUser> register({
@@ -147,6 +160,40 @@ class FakeAuthRepository extends AuthRepository {
     }
     lastDeleteAccountPassword = password;
     await _tokenStorage.clear();
+  }
+
+  @override
+  Future<List<DeviceSession>> getSessions() async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Could not load your devices.',
+        code: 'UNKNOWN',
+      );
+    }
+    return sessions;
+  }
+
+  @override
+  Future<void> revokeSession(String familyId) async {
+    if (throwOnNextCall) {
+      throw const AppException(message: 'Session not found.', code: 'UNKNOWN');
+    }
+    lastRevokedSessionId = familyId;
+    sessions = sessions.where((s) => s.id != familyId).toList();
+  }
+
+  @override
+  Future<int> revokeOtherSessions() async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Something went wrong.',
+        code: 'UNKNOWN',
+      );
+    }
+    revokeOtherSessionsCalled = true;
+    final revokedCount = sessions.where((s) => !s.current).length;
+    sessions = sessions.where((s) => s.current).toList();
+    return revokedCount;
   }
 }
 

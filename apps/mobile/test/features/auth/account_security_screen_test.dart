@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/features/auth/domain/device_session.dart';
 import 'package:mobile/features/auth/presentation/providers/auth_controller.dart';
 import 'package:mobile/features/auth/presentation/screens/account_security_screen.dart';
 import 'package:mobile/features/auth/presentation/screens/change_password_screen.dart';
@@ -115,6 +116,192 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fakeRepo.signOutEverywhereCalled, isTrue);
+      expect(
+        container.read(authControllerProvider).status,
+        AuthStatus.unauthenticated,
+      );
+    },
+  );
+
+  testWidgets('lists every device and marks the current one', (tester) async {
+    final container = await createTestContainer(signedIn: true);
+    addTearDown(container.dispose);
+    final fakeRepo =
+        container.read(authRepositoryProvider) as FakeAuthRepository;
+    fakeRepo.sessions = [
+      DeviceSession(
+        id: 'family-current',
+        deviceName: 'iPhone 15',
+        platform: 'ios',
+        createdAt: DateTime(2026, 1, 1),
+        lastUsedAt: DateTime(2026, 1, 2),
+        current: true,
+      ),
+      DeviceSession(
+        id: 'family-other',
+        deviceName: 'Pixel 9',
+        platform: 'android',
+        createdAt: DateTime(2026, 1, 1),
+        lastUsedAt: DateTime(2026, 1, 2),
+        current: false,
+      ),
+    ];
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: AccountSecurityScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Your devices'), findsOneWidget);
+    expect(find.text('iPhone 15'), findsOneWidget);
+    expect(find.text('Pixel 9'), findsOneWidget);
+    expect(find.text('This device'), findsOneWidget);
+    expect(find.text('Sign out others'), findsOneWidget);
+  });
+
+  testWidgets(
+    'signing out another device requires confirmation, then removes it from the list',
+    (tester) async {
+      final container = await createTestContainer(signedIn: true);
+      addTearDown(container.dispose);
+      final fakeRepo =
+          container.read(authRepositoryProvider) as FakeAuthRepository;
+      fakeRepo.sessions = [
+        DeviceSession(
+          id: 'family-current',
+          deviceName: 'iPhone 15',
+          platform: 'ios',
+          createdAt: DateTime(2026, 1, 1),
+          lastUsedAt: DateTime(2026, 1, 2),
+          current: true,
+        ),
+        DeviceSession(
+          id: 'family-other',
+          deviceName: 'Pixel 9',
+          platform: 'android',
+          createdAt: DateTime(2026, 1, 1),
+          lastUsedAt: DateTime(2026, 1, 2),
+          current: false,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AccountSecurityScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollUntilFound(tester, find.text('Pixel 9'));
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.logout).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign out of Pixel 9?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(fakeRepo.lastRevokedSessionId, 'family-other');
+      expect(find.text('Pixel 9'), findsNothing);
+      // Signing out another device never touches this session.
+      expect(
+        container.read(authControllerProvider).status,
+        AuthStatus.authenticated,
+      );
+    },
+  );
+
+  testWidgets(
+    'sign out others revokes every non-current device and shows a confirmation',
+    (tester) async {
+      final container = await createTestContainer(signedIn: true);
+      addTearDown(container.dispose);
+      final fakeRepo =
+          container.read(authRepositoryProvider) as FakeAuthRepository;
+      fakeRepo.sessions = [
+        DeviceSession(
+          id: 'family-current',
+          deviceName: 'iPhone 15',
+          platform: 'ios',
+          createdAt: DateTime(2026, 1, 1),
+          lastUsedAt: DateTime(2026, 1, 2),
+          current: true,
+        ),
+        DeviceSession(
+          id: 'family-other',
+          deviceName: 'Pixel 9',
+          platform: 'android',
+          createdAt: DateTime(2026, 1, 1),
+          lastUsedAt: DateTime(2026, 1, 2),
+          current: false,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AccountSecurityScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollUntilFound(tester, find.text('Sign out others'));
+
+      await tester.tap(find.text('Sign out others'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Sign out others').last);
+      await tester.pumpAndSettle();
+
+      expect(fakeRepo.revokeOtherSessionsCalled, isTrue);
+      expect(find.text('Pixel 9'), findsNothing);
+      expect(find.textContaining('Signed out 1 other device'), findsOneWidget);
+      // The "Sign out others" action disappears once there's nothing left to revoke.
+      expect(find.text('Sign out others'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'signing out this device from the devices list warns first, then signs out locally',
+    (tester) async {
+      final container = await createTestContainer(signedIn: true);
+      addTearDown(container.dispose);
+      final fakeRepo =
+          container.read(authRepositoryProvider) as FakeAuthRepository;
+      fakeRepo.sessions = [
+        DeviceSession(
+          id: 'family-current',
+          deviceName: 'iPhone 15',
+          platform: 'ios',
+          createdAt: DateTime(2026, 1, 1),
+          lastUsedAt: DateTime(2026, 1, 2),
+          current: true,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: AccountSecurityScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollUntilFound(tester, find.text('iPhone 15'));
+
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.logout).last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign out of this device?'), findsOneWidget);
+      expect(
+        find.textContaining("device you're using right now"),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.widgetWithText(TextButton, 'Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(fakeRepo.loggedOutCalled, isTrue);
       expect(
         container.read(authControllerProvider).status,
         AuthStatus.unauthenticated,

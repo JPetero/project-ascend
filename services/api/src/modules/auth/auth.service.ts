@@ -1,5 +1,10 @@
 import * as crypto from 'crypto';
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthProvider, RefreshToken, User } from '@prisma/client';
@@ -103,7 +108,7 @@ export class AuthService {
     // email later via resendVerification().
     await this.issueAndSendVerificationEmail(user.id, user.email).catch(() => undefined);
 
-    const tokens = await this.issueTokenPair(user.id, user.email);
+    const tokens = await this.issueTokenPair(user.id, user.email, dto.deviceName, dto.platform);
     return {
       user: {
         id: user.id,
@@ -135,7 +140,7 @@ export class AuthService {
       entityId: user.id,
     });
 
-    const tokens = await this.issueTokenPair(user.id, user.email, dto.deviceName);
+    const tokens = await this.issueTokenPair(user.id, user.email, dto.deviceName, dto.platform);
     return {
       user: {
         id: user.id,
@@ -205,6 +210,10 @@ export class AuthService {
             tokenHash: newTokenHash,
             expiresAt,
             deviceName: stored.deviceName,
+            platform: stored.platform,
+            // Carried forward unchanged — this rotated row is the same
+            // logical session as `stored`, not a new one.
+            sessionCreatedAt: stored.sessionCreatedAt,
           },
         });
 
@@ -219,7 +228,7 @@ export class AuthService {
     }
 
     const accessToken = await this.jwtService.signAsync(
-      { sub: user.id, email: user.email } satisfies JwtPayload,
+      { sub: user.id, email: user.email, familyId: stored.familyId } satisfies JwtPayload,
       { secret: this.jwtConfig.accessSecret, expiresIn: this.jwtConfig.accessTtl },
     );
 
@@ -259,6 +268,88 @@ export class AuthService {
       entityType: 'User',
       entityId: userId,
     });
+  }
+
+  /**
+   * "Your devices" (Build Session 10 Part 11). Every active, unexpired
+   * RefreshToken family is exactly one signed-in device/session, so this
+   * is a flat read — no separate "session" table needed. `currentFamilyId`
+   * comes from the caller's own access token (JwtPayload.familyId) and is
+   * only ever used to mark `current: true`; it never filters the list.
+   */
+  async listSessions(userId: string, currentFamilyId: string | undefined) {
+    const tokens = await this.prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { sessionCreatedAt: 'desc' },
+    });
+
+    return tokens.map((token) => ({
+      id: token.familyId,
+      deviceName: token.deviceName,
+      platform: token.platform,
+      createdAt: token.sessionCreatedAt,
+      lastUsedAt: token.createdAt,
+      current: currentFamilyId !== undefined && token.familyId === currentFamilyId,
+    }));
+  }
+
+  /**
+   * Signs out one specific device by family id. Deliberately allows
+   * revoking the *current* session too — that's just "sign out this
+   * device", the same outcome as logout() — the safeguard against doing
+   * that by accident lives in the Flutter UI as a confirmation dialog,
+   * not as a server-side block.
+   */
+  async revokeSession(userId: string, familyId: string): Promise<void> {
+    const result = await this.prisma.refreshToken.updateMany({
+      where: { userId, familyId, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Session not found.');
+    }
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.session_revoked',
+      entityType: 'RefreshToken',
+      entityId: familyId,
+    });
+  }
+
+  /**
+   * "Sign out all other devices" — every active session except the
+   * caller's own. Requires a known `currentFamilyId` so it can never
+   * accidentally sweep up the caller's own session; an access token
+   * issued before familyId existed (pre-Part-11) can't use this endpoint
+   * until it refreshes into one that carries it.
+   */
+  async revokeOtherSessions(userId: string, currentFamilyId: string | undefined): Promise<number> {
+    if (!currentFamilyId) {
+      throw new UnauthorizedException(
+        'Sign in again to manage your other sessions from this device.',
+      );
+    }
+
+    const result = await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        familyId: { not: currentFamilyId },
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.other_sessions_revoked',
+      entityType: 'User',
+      entityId: userId,
+      metadata: { revokedCount: result.count },
+    });
+
+    return result.count;
   }
 
   async me(userId: string): Promise<AuthenticatedUser> {
@@ -490,7 +581,7 @@ export class AuthService {
     dto: GoogleSignInDto,
   ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
     const identity = await this.googleTokenVerifier.verify(dto.idToken);
-    return this.resolveSocialSignIn('GOOGLE', identity);
+    return this.resolveSocialSignIn('GOOGLE', identity, dto.deviceName, dto.platform);
   }
 
   /**
@@ -502,7 +593,12 @@ export class AuthService {
     dto: AppleSignInDto,
   ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
     const identity = await this.appleTokenVerifier.verify(dto.idToken);
-    return this.resolveSocialSignIn('APPLE', { ...identity, firstName: dto.firstName });
+    return this.resolveSocialSignIn(
+      'APPLE',
+      { ...identity, firstName: dto.firstName },
+      dto.deviceName,
+      dto.platform,
+    );
   }
 
   /**
@@ -519,6 +615,8 @@ export class AuthService {
   private async resolveSocialSignIn(
     provider: Extract<AuthProvider, 'GOOGLE' | 'APPLE'>,
     identity: VerifiedSocialIdentity,
+    deviceName?: string,
+    platform?: string,
   ): Promise<{ user: AuthenticatedUser; tokens: TokenPair }> {
     const existingIdentity = await this.authIdentitiesService.findByProviderSubject(
       provider,
@@ -582,7 +680,7 @@ export class AuthService {
       metadata: { provider },
     });
 
-    const tokens = await this.issueTokenPair(user.id, user.email);
+    const tokens = await this.issueTokenPair(user.id, user.email, deviceName, platform);
     return {
       user: {
         id: user.id,
@@ -651,12 +749,9 @@ export class AuthService {
     userId: string,
     email: string,
     deviceName?: string,
+    platform?: string,
   ): Promise<TokenPair> {
-    const payload: JwtPayload = { sub: userId, email };
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.jwtConfig.accessSecret,
-      expiresIn: this.jwtConfig.accessTtl,
-    });
+    const familyId = crypto.randomUUID();
 
     const secret = crypto.randomBytes(REFRESH_SECRET_BYTES).toString('hex');
     const tokenHash = await argon2.hash(secret);
@@ -665,11 +760,18 @@ export class AuthService {
     const refreshRecord = await this.prisma.refreshToken.create({
       data: {
         userId,
-        familyId: crypto.randomUUID(),
+        familyId,
         tokenHash,
         expiresAt,
         deviceName,
+        platform,
       },
+    });
+
+    const payload: JwtPayload = { sub: userId, email, familyId };
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.jwtConfig.accessSecret,
+      expiresIn: this.jwtConfig.accessTtl,
     });
 
     return {

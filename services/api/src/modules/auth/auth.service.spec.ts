@@ -23,7 +23,12 @@ describe('AuthService', () => {
   let tx: { refreshToken: { updateMany: jest.Mock; create: jest.Mock } };
   let prisma: {
     user: { create: jest.Mock; update: jest.Mock };
-    refreshToken: { findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock };
+    refreshToken: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      updateMany: jest.Mock;
+      findMany: jest.Mock;
+    };
     passwordResetToken: {
       findUnique: jest.Mock;
       create: jest.Mock;
@@ -45,7 +50,12 @@ describe('AuthService', () => {
     };
     prisma = {
       user: { create: jest.fn(), update: jest.fn() },
-      refreshToken: { findUnique: jest.fn(), create: jest.fn(), updateMany: jest.fn() },
+      refreshToken: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn(),
+        findMany: jest.fn(),
+      },
       passwordResetToken: {
         findUnique: jest.fn(),
         create: jest.fn(),
@@ -701,6 +711,128 @@ describe('AuthService', () => {
       expect(auditService.record).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1', action: 'auth.logout_all' }),
       );
+    });
+  });
+
+  describe('listSessions', () => {
+    it('maps active tokens to session summaries and marks the caller current by familyId', async () => {
+      const sessionCreatedAt = new Date('2026-08-01T00:00:00Z');
+      const lastRotatedAt = new Date('2026-08-05T00:00:00Z');
+      prisma.refreshToken.findMany.mockResolvedValue([
+        {
+          familyId: 'family-current',
+          deviceName: 'iPhone',
+          platform: 'ios',
+          sessionCreatedAt,
+          createdAt: lastRotatedAt,
+        },
+        {
+          familyId: 'family-other',
+          deviceName: 'Pixel',
+          platform: 'android',
+          sessionCreatedAt,
+          createdAt: lastRotatedAt,
+        },
+      ]);
+
+      const sessions = await authService.listSessions('user-1', 'family-current');
+
+      expect(prisma.refreshToken.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null, expiresAt: { gt: expect.any(Date) } },
+        orderBy: { sessionCreatedAt: 'desc' },
+      });
+      expect(sessions).toEqual([
+        {
+          id: 'family-current',
+          deviceName: 'iPhone',
+          platform: 'ios',
+          createdAt: sessionCreatedAt,
+          lastUsedAt: lastRotatedAt,
+          current: true,
+        },
+        {
+          id: 'family-other',
+          deviceName: 'Pixel',
+          platform: 'android',
+          createdAt: sessionCreatedAt,
+          lastUsedAt: lastRotatedAt,
+          current: false,
+        },
+      ]);
+    });
+
+    it('marks nothing current when the caller has no familyId (pre-Part-11 access token)', async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([
+        {
+          familyId: 'family-a',
+          deviceName: null,
+          platform: null,
+          sessionCreatedAt: new Date(),
+          createdAt: new Date(),
+        },
+      ]);
+
+      const sessions = await authService.listSessions('user-1', undefined);
+
+      expect(sessions[0].current).toBe(false);
+    });
+  });
+
+  describe('revokeSession', () => {
+    it('revokes the matching family and records an audit event', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+      await authService.revokeSession('user-1', 'family-other');
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          familyId: 'family-other',
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', action: 'auth.session_revoked' }),
+      );
+    });
+
+    it('throws NotFoundException when no active session matches', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(authService.revokeSession('user-1', 'no-such-family')).rejects.toThrow(
+        'Session not found.',
+      );
+    });
+  });
+
+  describe('revokeOtherSessions', () => {
+    it('revokes every session except the caller current family and returns the count', async () => {
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+      const revokedCount = await authService.revokeOtherSessions('user-1', 'family-current');
+
+      expect(revokedCount).toBe(2);
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+          familyId: { not: 'family-current' },
+        },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', action: 'auth.other_sessions_revoked' }),
+      );
+    });
+
+    it('rejects when the caller familyId is unknown, without touching the database', async () => {
+      await expect(authService.revokeOtherSessions('user-1', undefined)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
     });
   });
 });

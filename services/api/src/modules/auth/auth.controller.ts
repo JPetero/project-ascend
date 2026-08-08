@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, HttpCode, HttpStatus, Post, Get } from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Post, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
@@ -67,6 +67,33 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.me(user.id);
+  }
+
+  @ApiBearerAuth()
+  @Get('sessions')
+  sessions(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.listSessions(user.id, user.familyId);
+  }
+
+  // Must be registered before the `:familyId` route below, or Nest would
+  // match the literal path segment "others" as a familyId instead.
+  @ApiBearerAuth()
+  @Delete('sessions/others')
+  @HttpCode(HttpStatus.OK)
+  async revokeOtherSessions(@CurrentUser() user: AuthenticatedUser) {
+    const revokedCount = await this.authService.revokeOtherSessions(user.id, user.familyId);
+    return { revokedCount };
+  }
+
+  @ApiBearerAuth()
+  @Delete('sessions/:familyId')
+  @HttpCode(HttpStatus.OK)
+  async revokeSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('familyId') familyId: string,
+  ) {
+    await this.authService.revokeSession(user.id, familyId);
+    return { revoked: true };
   }
 
   @Public()
