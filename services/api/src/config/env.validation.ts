@@ -118,11 +118,17 @@ class EnvironmentVariables {
   @IsOptional()
   APPLE_CLIENT_ID?: string;
 
-  // Live AI provider (Build Session 9 Part 15/16) — optional. Undefined
-  // means AssistantService honestly rejects with "not configured" and
-  // the mobile app's aiProviderProvider falls back to the free,
-  // deterministic local companion — see AssistantService and
-  // LiveAiProvider's doc comments.
+  // Live AI provider (Build Session 9 Part 15/16; Openai/Gemini added
+  // Build Session 10 Part 14) — all optional. AI_PROVIDER selects which
+  // adapter AssistantModule's factory uses (default 'anthropic');
+  // whichever one is selected still honestly rejects with "not
+  // configured" if its own key below is unset, and the mobile app's
+  // aiProviderProvider falls back to the free, deterministic local
+  // companion — see AssistantService and LiveAiProvider's doc comments.
+  @IsIn(['anthropic', 'openai', 'gemini'])
+  @IsOptional()
+  AI_PROVIDER = 'anthropic';
+
   @IsString()
   @IsOptional()
   ANTHROPIC_API_KEY?: string;
@@ -130,6 +136,22 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ANTHROPIC_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_MODEL?: string;
+
+  @IsString()
+  @IsOptional()
+  GEMINI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  GEMINI_MODEL?: string;
 
   // Store purchase verification (Build Session 9 Part 17/18) — both
   // optional. Undefined means that platform's purchase verifier
