@@ -130,6 +130,23 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   ANTHROPIC_MODEL?: string;
+
+  // Store purchase verification (Build Session 9 Part 17/18) — both
+  // optional. Undefined means that platform's purchase verifier
+  // honestly rejects with "not configured" rather than pretending a
+  // purchase was verified. See ApplePurchaseVerifier /
+  // GooglePurchaseVerifier.
+  @IsString()
+  @IsOptional()
+  APPLE_IAP_SHARED_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON?: string;
+
+  @IsString()
+  @IsOptional()
+  GOOGLE_PLAY_PACKAGE_NAME?: string;
 }
 
 /**

@@ -51,12 +51,30 @@ export interface AiConfig {
   anthropicModel: string;
 }
 
+export interface IapConfig {
+  // App Store Connect shared secret, used to call Apple's verifyReceipt
+  // endpoint for auto-renewable subscriptions. Undefined means Apple
+  // purchase verification is not configured this environment — see
+  // ApplePurchaseVerifier's doc comment.
+  appleSharedSecret?: string;
+  // A Google Cloud service-account key (the raw JSON key file content),
+  // used to call the Google Play Developer API to verify a purchase
+  // token. Undefined means Google purchase verification is not
+  // configured this environment — see GooglePurchaseVerifier's doc
+  // comment.
+  googleServiceAccountJson?: string;
+  // The Android application id (e.g. com.projectascend.app) the Google
+  // Play Developer API call is scoped to.
+  googlePackageName?: string;
+}
+
 export default (): {
   app: AppConfig;
   media: MediaConfig;
   email: EmailConfig;
   socialAuth: SocialAuthConfig;
   ai: AiConfig;
+  iap: IapConfig;
 } => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -96,5 +114,10 @@ export default (): {
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
+  },
+  iap: {
+    appleSharedSecret: process.env.APPLE_IAP_SHARED_SECRET,
+    googleServiceAccountJson: process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON,
+    googlePackageName: process.env.GOOGLE_PLAY_PACKAGE_NAME,
   },
 });

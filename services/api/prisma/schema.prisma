@@ -172,6 +172,7 @@ model User {
   notificationPreference           NotificationPreference?
   notificationEvents               NotificationEvent[]
   galleryAlbums                    GalleryAlbum[]
+  purchases                        Purchase[]
 
   @@index([status])
   @@map("users")
@@ -1655,14 +1656,15 @@ model ChallengeParticipant {
   @@map("challenge_participants")
 }
 
-// Subscription/entitlement foundation — Founder Scenario 27. No billing
-// integration exists this session (see packages/docs/product/
-// parking-lot.md); this model exists so CapabilityService.getPlanTier
-// reads a real per-user row instead of a hardcoded literal, and so a
-// future payment-provider webhook has a single place to write to. No
-// row at all means FREE (CapabilityService's default), matching every
-// other "absence of a row = the private/free default" pattern already
-// established in this schema (RankingOptIn, etc).
+// Subscription/entitlement foundation — Founder Scenario 27. This model
+// exists so CapabilityService.getPlanTier reads a real per-user row
+// instead of a hardcoded literal. As of Build Session 9 Part 17/18, a
+// verified store Purchase (see below) is the one thing that writes a
+// PREMIUM row here — PurchasesService.verifyAndRecord upserts this row
+// after a real Apple/Google receipt check succeeds. No row at all means
+// FREE (CapabilityService's default), matching every other "absence of
+// a row = the private/free default" pattern already established in this
+// schema (RankingOptIn, etc).
 enum SubscriptionTier {
   FREE
   PREMIUM
@@ -1678,6 +1680,43 @@ model UserSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_subscriptions")
+}
+
+// Store purchase records — Build Session 9 Part 17/18. One row per
+// purchase attempt the client reports; verification against the real
+// Apple/Google server is what flips `status` to VERIFIED and (via
+// PurchasesService) upserts the buyer's UserSubscription to PREMIUM.
+// `platformTransactionId` is unique so the same Apple transaction id or
+// Google purchase token can never be redeemed into more than one
+// Purchase row, even across different accounts or repeated client
+// retries.
+enum PurchasePlatform {
+  IOS
+  ANDROID
+}
+
+enum PurchaseStatus {
+  PENDING
+  VERIFIED
+  INVALID
+}
+
+model Purchase {
+  id                    String           @id @default(uuid())
+  userId                String
+  platform              PurchasePlatform
+  productId             String
+  // Apple's original transaction id, or Google's purchase token — the
+  // one value each store treats as the durable identity of a purchase.
+  platformTransactionId String           @unique
+  status                PurchaseStatus   @default(PENDING)
+  verifiedAt            DateTime?
+  createdAt             DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("purchases")
 }
 
 // Affordability programs — Founder Scenario 27's Student/Accessibility/

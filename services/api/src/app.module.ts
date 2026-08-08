@@ -41,6 +41,7 @@ import { PersonalRecordsModule } from './modules/personal-records/personal-recor
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { PromoteModule } from './modules/promote/promote.module';
+import { PurchasesModule } from './modules/purchases/purchases.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { SportsModule } from './modules/sports/sports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -115,6 +116,7 @@ import { PrismaModule } from './prisma/prisma.module';
     NotificationsModule,
     DataExportModule,
     AssistantModule,
+    PurchasesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

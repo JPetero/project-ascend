@@ -40,6 +40,7 @@ import 'package:mobile/features/profile/domain/profile_model.dart';
 import 'package:mobile/features/profile/presentation/providers/preferences_controller.dart';
 import 'package:mobile/features/profile/presentation/providers/profile_controller.dart';
 import 'package:mobile/features/promote/presentation/providers/promote_controller.dart';
+import 'package:mobile/features/purchases/presentation/providers/purchase_controller.dart';
 import 'package:mobile/features/trainer_groups/presentation/providers/trainer_groups_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
@@ -73,6 +74,8 @@ import 'fake_text_to_speech_service.dart';
 import 'fake_nutrition_library_repository.dart';
 import 'fake_nutrition_repositories.dart';
 import 'fake_promote_repository.dart';
+import 'fake_purchase_service.dart';
+import 'fake_purchases_repository.dart';
 import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
 import 'fake_subscription_status_repository.dart';
@@ -130,6 +133,8 @@ Future<ProviderContainer> createTestContainer({
   FakeLocalNotificationSchedulingService? localNotificationSchedulingService,
   FakeSpeechToTextService? speechToTextService,
   FakeTextToSpeechService? textToSpeechService,
+  FakePurchaseService? purchaseService,
+  FakePurchasesRepository? purchasesRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -291,6 +296,12 @@ Future<ProviderContainer> createTestContainer({
       ),
       textToSpeechServiceProvider.overrideWithValue(
         textToSpeechService ?? FakeTextToSpeechService(),
+      ),
+      purchaseServiceProvider.overrideWithValue(
+        purchaseService ?? FakePurchaseService(),
+      ),
+      purchasesRepositoryProvider.overrideWithValue(
+        purchasesRepository ?? FakePurchasesRepository(),
       ),
     ],
   );
