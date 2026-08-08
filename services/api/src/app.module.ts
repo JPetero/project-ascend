@@ -48,6 +48,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { SupportModule } from './modules/support/support.module';
 import { TrainerGroupsModule } from './modules/trainer-groups/trainer-groups.module';
 import { UsersModule } from './modules/users/users.module';
+import { VisionModule } from './modules/vision/vision.module';
 import { WaterModule } from './modules/water/water.module';
 import { WorkoutHistoryModule } from './modules/workout-history/workout-history.module';
 import { WorkoutPlansModule } from './modules/workout-plans/workout-plans.module';
@@ -117,6 +118,7 @@ import { PrismaModule } from './prisma/prisma.module';
     DataExportModule,
     AssistantModule,
     PurchasesModule,
+    VisionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
