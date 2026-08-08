@@ -78,6 +78,7 @@ import 'fake_purchase_service.dart';
 import 'fake_purchases_repository.dart';
 import 'fake_rankings_repository.dart';
 import 'fake_repositories.dart';
+import 'fake_social_auth_providers.dart';
 import 'fake_subscription_status_repository.dart';
 import 'fake_subscriptions_repository.dart';
 import 'fake_support_repository.dart';
@@ -135,6 +136,8 @@ Future<ProviderContainer> createTestContainer({
   FakeTextToSpeechService? textToSpeechService,
   FakePurchaseService? purchaseService,
   FakePurchasesRepository? purchasesRepository,
+  FakeGoogleAuthProvider? googleAuthProvider,
+  FakeAppleAuthProvider? appleAuthProvider,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -156,6 +159,12 @@ Future<ProviderContainer> createTestContainer({
       secureTokenStorageProvider.overrideWithValue(tokenStorage),
       authRepositoryProvider.overrideWithValue(
         FakeAuthRepository(tokenStorage: tokenStorage),
+      ),
+      googleAuthProviderProvider.overrideWithValue(
+        googleAuthProvider ?? FakeGoogleAuthProvider(),
+      ),
+      appleAuthProviderProvider.overrideWithValue(
+        appleAuthProvider ?? FakeAppleAuthProvider(),
       ),
       profileRepositoryProvider.overrideWithValue(
         FakeProfileRepository(

@@ -79,6 +79,46 @@ class FakeAuthRepository extends AuthRepository {
     return AuthUser(id: 'user-1', email: email);
   }
 
+  bool signInWithGoogleCalled = false;
+  bool signInWithAppleCalled = false;
+  String? lastSocialIdToken;
+  String? lastSocialFirstName;
+
+  @override
+  Future<AuthUser> signInWithGoogle(String idToken) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Google sign-in failed. Please try again.',
+        code: 'UNKNOWN',
+      );
+    }
+    signInWithGoogleCalled = true;
+    lastSocialIdToken = idToken;
+    await _tokenStorage.saveTokens(
+      accessToken: 'fake-access',
+      refreshToken: 'fake-refresh-id.secret',
+    );
+    return const AuthUser(id: 'user-1', email: 'social@example.com');
+  }
+
+  @override
+  Future<AuthUser> signInWithApple(String idToken, {String? firstName}) async {
+    if (throwOnNextCall) {
+      throw const AppException(
+        message: 'Apple sign-in failed. Please try again.',
+        code: 'UNKNOWN',
+      );
+    }
+    signInWithAppleCalled = true;
+    lastSocialIdToken = idToken;
+    lastSocialFirstName = firstName;
+    await _tokenStorage.saveTokens(
+      accessToken: 'fake-access',
+      refreshToken: 'fake-refresh-id.secret',
+    );
+    return const AuthUser(id: 'user-1', email: 'social@example.com');
+  }
+
   @override
   Future<AuthUser> me() async =>
       const AuthUser(id: 'user-1', email: 'ada@example.com');

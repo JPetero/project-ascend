@@ -5,6 +5,8 @@ import '../../../../core/providers/core_providers.dart';
 import '../../../../core/storage/app_database.dart';
 import '../../../../core/storage/secure_token_storage.dart';
 import '../../data/auth_repository.dart';
+import '../../data/social_auth/apple_auth_provider.dart';
+import '../../data/social_auth/google_auth_provider.dart';
 import '../../domain/auth_user.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -34,9 +36,13 @@ class AuthController extends StateNotifier<AuthState> {
     required AuthRepository repository,
     required SecureTokenStorage tokenStorage,
     required AppDatabase database,
+    required GoogleAuthProvider googleAuthProvider,
+    required AppleAuthProvider appleAuthProvider,
   }) : _repository = repository,
        _tokenStorage = tokenStorage,
        _database = database,
+       _googleAuthProvider = googleAuthProvider,
+       _appleAuthProvider = appleAuthProvider,
        super(const AuthState()) {
     _bootstrap();
   }
@@ -44,6 +50,10 @@ class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   final SecureTokenStorage _tokenStorage;
   final AppDatabase _database;
+  final GoogleAuthProvider _googleAuthProvider;
+  final AppleAuthProvider _appleAuthProvider;
+
+  bool get canSignInWithApple => _appleAuthProvider.isAvailable;
 
   static const _maxBootstrapAttempts = 3;
 
@@ -107,6 +117,39 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isSubmitting: true);
     try {
       final user = await _repository.login(email: email, password: password);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+    } finally {
+      state = state.copyWith(isSubmitting: false);
+    }
+  }
+
+  /// Signs in (or registers, on first use) with Google (Build Session 10
+  /// Part 9). A null return from the provider means the user cancelled
+  /// the native picker — not an error, so `isSubmitting` just resets
+  /// without touching `status`.
+  Future<void> signInWithGoogle() async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      final identity = await _googleAuthProvider.signIn();
+      if (identity == null) return;
+      final user = await _repository.signInWithGoogle(identity.idToken);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+    } finally {
+      state = state.copyWith(isSubmitting: false);
+    }
+  }
+
+  /// Signs in (or registers, on first use) with Apple (Build Session 10
+  /// Part 10). See [signInWithGoogle] for the cancellation contract.
+  Future<void> signInWithApple() async {
+    state = state.copyWith(isSubmitting: true);
+    try {
+      final identity = await _appleAuthProvider.signIn();
+      if (identity == null) return;
+      final user = await _repository.signInWithApple(
+        identity.idToken,
+        firstName: identity.firstName,
+      );
       state = AuthState(status: AuthStatus.authenticated, user: user);
     } finally {
       state = state.copyWith(isSubmitting: false);
@@ -211,12 +254,22 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   );
 });
 
+final googleAuthProviderProvider = Provider<GoogleAuthProvider>((ref) {
+  return GoogleSignInAuthProvider();
+});
+
+final appleAuthProviderProvider = Provider<AppleAuthProvider>((ref) {
+  return SignInWithAppleAuthProvider();
+});
+
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
   (ref) {
     final controller = AuthController(
       repository: ref.watch(authRepositoryProvider),
       tokenStorage: ref.watch(secureTokenStorageProvider),
       database: ref.watch(appDatabaseProvider),
+      googleAuthProvider: ref.watch(googleAuthProviderProvider),
+      appleAuthProvider: ref.watch(appleAuthProviderProvider),
     );
 
     ref.listen<int>(sessionExpiredNotifierProvider, (previous, next) {

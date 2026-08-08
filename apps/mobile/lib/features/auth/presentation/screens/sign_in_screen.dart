@@ -6,6 +6,7 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../providers/auth_controller.dart';
+import '../widgets/social_sign_in_buttons.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -112,6 +113,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   label: 'Sign In',
                   isLoading: isSubmitting,
                   onPressed: _submit,
+                ),
+                const SizedBox(height: AscendSpacing.lg),
+                SocialSignInButtons(
+                  onError: (message) => setState(() => _errorMessage = message),
                 ),
               ],
             ),

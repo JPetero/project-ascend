@@ -13,4 +13,18 @@ abstract final class AppConfig {
 
   static const bool isDevelopment =
       bool.fromEnvironment('dart.vm.product') == false;
+
+  // Real Google sign-in (Build Session 10 Part 9) needs a real Google
+  // Cloud OAuth client, which this repository does not (and cannot)
+  // provision — override with `--dart-define=GOOGLE_CLIENT_ID=...` (and
+  // optionally GOOGLE_SERVER_CLIENT_ID, if the backend ever needs a
+  // server auth code) once one exists. Left blank, GoogleAuthProvider
+  // fails honestly with a real "not configured" error instead of
+  // pretending to work.
+  static const String googleClientId = String.fromEnvironment(
+    'GOOGLE_CLIENT_ID',
+  );
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+  );
 }
