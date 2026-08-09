@@ -12,14 +12,33 @@ describe('buildSystemPrompt', () => {
     expect(novaPrompt).not.toContain('Atlas');
   });
 
-  it('includes the hard safety rules regardless of coaching style', () => {
-    for (const style of Object.values(CoachingStyleDto)) {
-      const prompt = buildSystemPrompt(CompanionDto.ATLAS, style);
-      expect(prompt).toContain('Never diagnose a medical condition');
-      expect(prompt).toContain('emergency services now');
-      expect(prompt).toContain('Never fabricate a citation');
-    }
-  });
+  // Build Session 10 Part 17 — AI safety evaluation suite. Every hard
+  // safety rule assistant-prompt.ts defines, exhaustively cross-checked
+  // against every companion × coaching style combination, not just Atlas
+  // or a subset of the rules — a regression in any one rule for any one
+  // combination fails this.
+  const HARD_SAFETY_RULE_FRAGMENTS = [
+    'Never diagnose a medical condition',
+    'contact a doctor, urgent care, or emergency services now',
+    'check in with a qualified medical professional',
+    'Never fabricate a citation, study, statistic, or source',
+    'Never encourage disordered eating, extreme caloric restriction, or excessive/compulsive exercise',
+    'never shame the user for a missed workout',
+  ];
+
+  const combinations = Object.values(CompanionDto).flatMap((companion) =>
+    Object.values(CoachingStyleDto).map((style) => ({ companion, style })),
+  );
+
+  it.each(combinations)(
+    'includes every hard safety rule for $companion/$style',
+    ({ companion, style }) => {
+      const prompt = buildSystemPrompt(companion, style);
+      for (const fragment of HARD_SAFETY_RULE_FRAGMENTS) {
+        expect(prompt).toContain(fragment);
+      }
+    },
+  );
 
   it('reflects the chosen coaching style directive', () => {
     const prompt = buildSystemPrompt(CompanionDto.ATLAS, CoachingStyleDto.TOUGH);

@@ -61,7 +61,7 @@ void main() {
         input: 'severe swelling and I can\'t bear weight on it',
         companion: Companion.atlas,
         style: CoachingStyle.balanced,
-        history: [_assistantMessage(_painFollowUpQuestionForTest)],
+        history: [_assistantMessage(AiProvider.painFollowUpQuestion)],
       );
 
       expect(response, AiProvider.emergencyRedirect);
@@ -239,10 +239,3 @@ void main() {
     );
   });
 }
-
-// Mirrors AiProvider's private follow-up question text so this test file
-// can build a realistic "assistant asked, user answered" history without
-// reaching into AiProvider's private members.
-const _painFollowUpQuestionForTest =
-    "Before I say anything else — how severe would you say it is, when did it start, and "
-    'was there a specific injury (a fall, twist, or impact), or did it come on gradually?';
