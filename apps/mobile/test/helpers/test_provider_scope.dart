@@ -14,6 +14,7 @@ import 'package:mobile/features/community/presentation/providers/community_feed_
 import 'package:mobile/features/companion/data/ai_provider.dart';
 import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
+import 'package:mobile/features/companion/presentation/providers/companion_memory_controller.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_voice_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
 import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
@@ -56,6 +57,7 @@ import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
 import 'fake_challenges_repository.dart';
 import 'fake_community_repository.dart';
+import 'fake_companion_memory_repository.dart';
 import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
 import 'fake_joint_workout_sessions_repository.dart';
@@ -118,6 +120,7 @@ Future<ProviderContainer> createTestContainer({
   FakeSubscriptionStatusRepository? subscriptionStatusRepository,
   FakeSubscriptionsRepository? subscriptionsRepository,
   AiProvider? aiProvider,
+  FakeCompanionMemoryRepository? companionMemoryRepository,
   FakeSupportRepository? supportRepository,
   FakePromoteRepository? promoteRepository,
   FakeMediaRepository? mediaRepository,
@@ -255,6 +258,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       aiProviderProvider.overrideWithValue(
         aiProvider ?? const LocalDeterministicAiProvider(),
+      ),
+      companionMemoryRepositoryProvider.overrideWithValue(
+        companionMemoryRepository ?? FakeCompanionMemoryRepository(),
       ),
       supportRepositoryProvider.overrideWithValue(
         supportRepository ?? FakeSupportRepository(),

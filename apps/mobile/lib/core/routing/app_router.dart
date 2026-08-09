@@ -24,6 +24,7 @@ import '../../features/challenges/presentation/screens/challenge_detail_screen.d
 import '../../features/challenges/presentation/screens/challenges_screen.dart';
 import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
+import '../../features/companion/presentation/screens/companion_memory_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/joint_workouts/presentation/screens/joint_workout_session_detail_screen.dart';
@@ -239,6 +240,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.dataExport,
         builder: (context, state) => const DataExportScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.companionMemory,
+        builder: (context, state) => const CompanionMemoryScreen(),
       ),
       GoRoute(
         path: RoutePaths.gallery,

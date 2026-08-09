@@ -31,7 +31,7 @@ export class OpenAiReplyProvider implements AiReplyProvider {
     return Boolean(this.apiKey);
   }
 
-  async generateReply(dto: AssistantReplyDto): Promise<string> {
+  async generateReply(dto: AssistantReplyDto, memoryNotes?: string[]): Promise<string> {
     if (!this.apiKey) {
       throw new ServiceUnavailableException(
         'Live AI is not configured. Set OPENAI_API_KEY to enable it.',
@@ -43,7 +43,7 @@ export class OpenAiReplyProvider implements AiReplyProvider {
       model: this.model,
       max_completion_tokens: MAX_REPLY_TOKENS,
       messages: [
-        { role: 'system', content: buildSystemPrompt(dto.companion, dto.style) },
+        { role: 'system', content: buildSystemPrompt(dto.companion, dto.style, memoryNotes) },
         ...buildMessages(dto.history, dto.input),
       ],
     });

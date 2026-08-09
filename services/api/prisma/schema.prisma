@@ -207,6 +207,7 @@ model User {
   adminPermissionGrants            AdminPermissionGrant[]
   visionAnalysisSessions           VisionAnalysisSession[]
   pushDeviceTokens                 PushDeviceToken[]
+  companionMemory                  CompanionMemory?
 
   @@index([status])
   @@map("users")
@@ -2882,6 +2883,27 @@ model PushDeviceToken {
 
   @@index([userId])
   @@map("push_device_tokens")
+}
+
+// Build Session 10 Part 15 — real, durable Atlas/Nova memory, tied to
+// the `Preference.aiMemoryEnabled` toggle that already existed but was
+// never read anywhere (see roadmap.md's "AI gateway" section). `notes`
+// is a small, capped list of the user's own substantive statements
+// (goals, injuries, equipment, preferences), stored verbatim — never an
+// LLM-generated summary — so nothing here is ever a fabricated or
+// misremembered fact, matching the "never invent" rule used elsewhere
+// in the assistant/research pipeline. AssistantService caps and prunes
+// this list; the schema itself places no limit.
+model CompanionMemory {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  notes     String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("companion_memories")
 }
 
 // Build Session 10 Part 6 — private, user-owned results from a live

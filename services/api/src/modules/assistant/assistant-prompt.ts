@@ -27,9 +27,22 @@ const _styleDirectives: Record<CoachingStyleDto, string> = {
  * exists in case that gate is ever bypassed or this endpoint is called
  * directly.
  */
-export function buildSystemPrompt(companion: CompanionDto, style: CoachingStyleDto): string {
+/**
+ * `memoryNotes` (Build Session 10 Part 15) is a small, capped list of
+ * the user's own past statements — see `CompanionMemory`'s doc comment
+ * in schema.prisma: stored verbatim, never an LLM-generated summary, so
+ * appending it here never risks putting an invented "fact" in front of
+ * the model as if it were real context. Omitted (undefined/empty) when
+ * the user has `aiMemoryEnabled` off or no memory exists yet — the
+ * prompt shape is identical to before Part 15 in that case.
+ */
+export function buildSystemPrompt(
+  companion: CompanionDto,
+  style: CoachingStyleDto,
+  memoryNotes?: string[],
+): string {
   const name = _companionNames[companion];
-  return [
+  const lines = [
     `You are ${name}, a fitness, nutrition, and wellness companion inside the Ascend app.`,
     `Coaching style for this conversation: ${_styleDirectives[style]}`,
     'Stay strictly within fitness, nutrition, and general wellness coaching. Keep replies short — a few sentences, chat-bubble length, not an essay.',
@@ -40,7 +53,14 @@ export function buildSystemPrompt(companion: CompanionDto, style: CoachingStyleD
     '- Never fabricate a citation, study, statistic, or source. If you are not confident of a fact, say so honestly instead of inventing one.',
     '- Never encourage disordered eating, extreme caloric restriction, or excessive/compulsive exercise.',
     '- Be encouraging and non-judgmental — never shame the user for a missed workout, a food choice, or their body.',
-  ].join('\n');
+  ];
+  if (memoryNotes && memoryNotes.length > 0) {
+    lines.push(
+      'What you remember about this person from past conversations (their own words — treat as real context, not a fact to restate verbatim unprompted):',
+      ...memoryNotes.map((note) => `- ${note}`),
+    );
+  }
+  return lines.join('\n');
 }
 
 export interface AnthropicMessage {

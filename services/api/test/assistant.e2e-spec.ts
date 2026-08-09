@@ -76,3 +76,80 @@ describe('Assistant live reply — not configured (e2e)', () => {
       .expect(400);
   });
 });
+
+/**
+ * Build Session 10 Part 15 — real Atlas/Nova memory. This only covers
+ * the memory endpoints themselves (empty by default, real clear);
+ * "a reply gets remembered" can't be exercised over real HTTP in this
+ * environment since AssistantService only calls
+ * CompanionMemoryService.remember() after a successful reply, and no
+ * live ANTHROPIC_API_KEY exists here — see
+ * companion-memory.service.spec.ts and assistant.service.spec.ts for
+ * that behavior against a mocked provider.
+ */
+describe('Assistant memory (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let token: string;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter());
+    app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+    await app.init();
+
+    prisma = app.get(PrismaService);
+    await resetDatabase(prisma);
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Mia',
+        email: 'assistant-memory-e2e@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    token = res.body.data.tokens.accessToken as string;
+  });
+
+  afterAll(async () => {
+    await resetDatabase(prisma);
+    await app.close();
+  });
+
+  it('reports no remembered notes for a fresh account', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.data.notes).toEqual([]);
+  });
+
+  it('rejects an unauthenticated request to read memory', async () => {
+    await request(app.getHttpServer()).get('/assistant/memory').expect(401);
+  });
+
+  it('clearing memory is real and idempotent, even with nothing to clear', async () => {
+    await request(app.getHttpServer())
+      .delete('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .delete('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+  });
+
+  it('rejects an unauthenticated request to clear memory', async () => {
+    await request(app.getHttpServer()).delete('/assistant/memory').expect(401);
+  });
+});

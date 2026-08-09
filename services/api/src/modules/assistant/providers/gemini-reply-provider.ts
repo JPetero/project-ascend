@@ -36,7 +36,7 @@ export class GeminiReplyProvider implements AiReplyProvider {
     return Boolean(this.apiKey);
   }
 
-  async generateReply(dto: AssistantReplyDto): Promise<string> {
+  async generateReply(dto: AssistantReplyDto, memoryNotes?: string[]): Promise<string> {
     if (!this.apiKey) {
       throw new ServiceUnavailableException(
         'Live AI is not configured. Set GEMINI_API_KEY to enable it.',
@@ -46,7 +46,7 @@ export class GeminiReplyProvider implements AiReplyProvider {
 
     const model = this.client.getGenerativeModel({
       model: this.model,
-      systemInstruction: buildSystemPrompt(dto.companion, dto.style),
+      systemInstruction: buildSystemPrompt(dto.companion, dto.style, memoryNotes),
       generationConfig: { maxOutputTokens: MAX_REPLY_TOKENS },
     });
 
