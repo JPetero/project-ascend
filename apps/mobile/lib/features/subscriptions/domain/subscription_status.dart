@@ -60,9 +60,20 @@ class EligibilityStatus {
 }
 
 class SubscriptionStatus {
-  const SubscriptionStatus({required this.tier, this.eligibility});
+  const SubscriptionStatus({
+    required this.tier,
+    this.expiresAt,
+    this.willRenew,
+    this.eligibility,
+  });
 
   final PlanTier tier;
+  // The store's own stated current-period expiration/auto-renew intent
+  // (Build Session 10 Part 26) — null for a FREE user, or for a
+  // PREMIUM row predating this field. Never automatically downgrades
+  // the tier once passed; see the backend's UserSubscription comment.
+  final DateTime? expiresAt;
+  final bool? willRenew;
   final EligibilityStatus? eligibility;
 
   factory SubscriptionStatus.fromJson(Map<String, dynamic> json) {
@@ -70,6 +81,10 @@ class SubscriptionStatus {
       tier: (json['tier'] as String) == 'PREMIUM'
           ? PlanTier.premium
           : PlanTier.free,
+      expiresAt: json['expiresAt'] == null
+          ? null
+          : DateTime.parse(json['expiresAt'] as String),
+      willRenew: json['willRenew'] as bool?,
       eligibility: json['eligibility'] == null
           ? null
           : EligibilityStatus.fromJson(

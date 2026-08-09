@@ -67,11 +67,51 @@ describe('Subscriptions and affordability foundation (e2e)', () => {
     expect(php.eligibleAmount).toBeLessThan(php.standardAmount);
   });
 
-  it('defaults to FREE with no eligibility application', async () => {
+  it('defaults to FREE with no eligibility application, and no expiresAt/willRenew', async () => {
     const res = await request(app.getHttpServer()).get('/subscriptions/me').set(auth()).expect(200);
 
-    expect(res.body.data).toEqual({ tier: 'FREE', eligibility: null });
+    expect(res.body.data).toEqual({
+      tier: 'FREE',
+      expiresAt: null,
+      willRenew: null,
+      eligibility: null,
+    });
   });
+
+  it(
+    "surfaces the store's stated expiration and auto-renew intent for a real " +
+      'PREMIUM subscription (Build Session 10 Part 26)',
+    async () => {
+      const premium = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Pia',
+          email: 'subscriptions-premium@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const premiumToken = premium.body.data.tokens.accessToken as string;
+      const premiumUserId = premium.body.data.user.id as string;
+      const expiresAt = new Date('2026-09-09T00:00:00.000Z');
+
+      await prisma.userSubscription.upsert({
+        where: { userId: premiumUserId },
+        update: { tier: 'PREMIUM', expiresAt, willRenew: true },
+        create: { userId: premiumUserId, tier: 'PREMIUM', expiresAt, willRenew: true },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/subscriptions/me')
+        .set({ Authorization: `Bearer ${premiumToken}` })
+        .expect(200);
+
+      expect(res.body.data.tier).toBe('PREMIUM');
+      expect(new Date(res.body.data.expiresAt as string)).toEqual(expiresAt);
+      expect(res.body.data.willRenew).toBe(true);
+    },
+  );
 
   it('records an affordability application and reflects it on /me', async () => {
     const applied = await request(app.getHttpServer())

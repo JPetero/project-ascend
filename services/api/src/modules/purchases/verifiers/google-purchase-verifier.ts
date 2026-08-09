@@ -4,10 +4,18 @@ import { GoogleAuth } from 'google-auth-library';
 import { IapConfig } from '../../../config/configuration';
 import { PurchaseVerificationResult, PurchaseVerifier } from './purchase-verifier.interface';
 
-interface GooglePurchaseResponse {
-  // 0 = purchased, 1 = canceled, 2 = pending.
-  purchaseState?: number;
+// Every Ascend product id is an auto-renewable subscription (see
+// StoreProduct.premiumStandard/premiumEligible in the mobile app), so
+// this reads the `purchases.subscriptions` resource — not
+// `purchases.products`, which is for one-time managed products and
+// carries no expiry/renewal fields at all.
+interface GoogleSubscriptionPurchaseResponse {
   orderId?: string;
+  expiryTimeMillis?: string;
+  autoRenewing?: boolean;
+  // 0 = payment pending, 1 = payment received, 2 = free trial,
+  // 3 = pending deferred upgrade/downgrade.
+  paymentState?: number;
 }
 
 /**
@@ -50,23 +58,29 @@ export class GooglePurchaseVerifier implements PurchaseVerifier {
 
     const url =
       `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
-      `${this.packageName}/purchases/products/${productId}/tokens/${purchaseToken}`;
+      `${this.packageName}/purchases/subscriptions/${productId}/tokens/${purchaseToken}`;
 
-    let response: { data: GooglePurchaseResponse };
+    let response: { data: GoogleSubscriptionPurchaseResponse };
     try {
       const client = await this.auth.getClient();
-      response = await client.request<GooglePurchaseResponse>({ url });
+      response = await client.request<GoogleSubscriptionPurchaseResponse>({ url });
     } catch {
       throw new UnauthorizedException('Google Play rejected this purchase token.');
     }
 
-    if (response.data.purchaseState !== 0) {
+    if (response.data.paymentState === 0) {
       throw new UnauthorizedException('This purchase is not in a valid purchased state.');
     }
     if (!response.data.orderId) {
       throw new UnauthorizedException('Google Play did not return an order id for this purchase.');
     }
 
-    return { transactionId: response.data.orderId };
+    return {
+      transactionId: response.data.orderId,
+      expiresAt: response.data.expiryTimeMillis
+        ? new Date(Number(response.data.expiryTimeMillis))
+        : undefined,
+      willRenew: response.data.autoRenewing,
+    };
   }
 }

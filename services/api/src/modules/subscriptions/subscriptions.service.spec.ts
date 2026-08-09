@@ -8,12 +8,14 @@ describe('SubscriptionsService', () => {
   let service: SubscriptionsService;
   let prisma: {
     affordabilityEligibility: { findUnique: jest.Mock; upsert: jest.Mock };
+    userSubscription: { findUnique: jest.Mock };
   };
   let capabilityService: { getPlanTier: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       affordabilityEligibility: { findUnique: jest.fn(), upsert: jest.fn() },
+      userSubscription: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     capabilityService = { getPlanTier: jest.fn().mockResolvedValue(PlanTier.FREE) };
 
@@ -45,7 +47,12 @@ describe('SubscriptionsService', () => {
 
       const status = await service.getMyStatus('user-1');
 
-      expect(status).toEqual({ tier: PlanTier.FREE, eligibility: null });
+      expect(status).toEqual({
+        tier: PlanTier.FREE,
+        expiresAt: null,
+        willRenew: null,
+        eligibility: null,
+      });
     });
 
     it('includes the eligibility program and status once applied', async () => {
@@ -59,6 +66,26 @@ describe('SubscriptionsService', () => {
 
       expect(status.eligibility).toEqual({ program: 'STUDENT', status: 'PENDING' });
     });
+
+    it(
+      "surfaces the store's stated expiration and auto-renew intent for a real " +
+        'PREMIUM subscription (Build Session 10 Part 26)',
+      async () => {
+        capabilityService.getPlanTier.mockResolvedValue(PlanTier.PREMIUM);
+        const expiresAt = new Date('2026-09-09T00:00:00.000Z');
+        prisma.userSubscription.findUnique.mockResolvedValue({
+          userId: 'user-1',
+          tier: 'PREMIUM',
+          expiresAt,
+          willRenew: true,
+        });
+
+        const status = await service.getMyStatus('user-1');
+
+        expect(status.expiresAt).toEqual(expiresAt);
+        expect(status.willRenew).toBe(true);
+      },
+    );
   });
 
   describe('applyForEligibility', () => {

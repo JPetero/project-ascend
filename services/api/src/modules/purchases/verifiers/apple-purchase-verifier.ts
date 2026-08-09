@@ -16,12 +16,23 @@ interface AppleReceiptTransaction {
   transaction_id: string;
   original_transaction_id: string;
   purchase_date_ms: string;
+  // Only present for auto-renewable subscription transactions (absent
+  // for one-time products) — the current period's expiration.
+  expires_date_ms?: string;
+}
+
+// One entry per auto-renewable subscription on the receipt — carries
+// the current auto-renew intent, separate from the transaction history.
+interface ApplePendingRenewalInfo {
+  original_transaction_id: string;
+  auto_renew_status: string; // '1' = will renew, '0' = won't.
 }
 
 interface AppleVerifyReceiptResponse {
   status: number;
   receipt?: { in_app?: AppleReceiptTransaction[] };
   latest_receipt_info?: AppleReceiptTransaction[];
+  pending_renewal_info?: ApplePendingRenewalInfo[];
 }
 
 /**
@@ -72,7 +83,15 @@ export class ApplePurchaseVerifier implements PurchaseVerifier {
       );
     }
 
-    return { transactionId: latest.original_transaction_id };
+    const renewalInfo = result.pending_renewal_info?.find(
+      (info) => info.original_transaction_id === latest.original_transaction_id,
+    );
+
+    return {
+      transactionId: latest.original_transaction_id,
+      expiresAt: latest.expires_date_ms ? new Date(Number(latest.expires_date_ms)) : undefined,
+      willRenew: renewalInfo ? renewalInfo.auto_renew_status === '1' : undefined,
+    };
   }
 
   private async callVerifyReceipt(

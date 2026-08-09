@@ -1745,6 +1745,15 @@ model UserSubscription {
   id        String           @id @default(uuid())
   userId    String           @unique
   tier      SubscriptionTier @default(FREE)
+  // The store's own stated current-period expiration and auto-renew
+  // intent (Build Session 10 Part 26) — parsed straight out of the
+  // Apple/Google verification response PurchasesService already
+  // receives on every purchase, previously discarded. Nullable because
+  // older rows (and any future non-store grant) may not have it. No
+  // cron/webhook re-verifies or auto-downgrades on expiry yet — this
+  // only surfaces what the store told the client at verification time.
+  expiresAt DateTime?
+  willRenew Boolean?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 

@@ -10,7 +10,11 @@ import { GooglePurchaseVerifier } from './verifiers/google-purchase-verifier';
  * hands back a platform receipt/token, and this module is the only
  * thing that ever writes a PREMIUM `UserSubscription` row — always
  * gated on a real Apple/Google server check, never on the client's say-
- * so (Build Session 9 Part 17/18).
+ * so (Build Session 9 Part 17/18). Also persists the store's stated
+ * expiration/auto-renew intent (Build Session 10 Part 26) so
+ * SubscriptionsService can surface real renewal information instead of
+ * a static PREMIUM badge — see UserSubscription.expiresAt's schema
+ * comment for what this does and doesn't cover.
  */
 @Injectable()
 export class PurchasesService {
@@ -49,10 +53,15 @@ export class PurchasesService {
 
     await this.prisma.userSubscription.upsert({
       where: { userId },
-      update: { tier: 'PREMIUM' },
-      create: { userId, tier: 'PREMIUM' },
+      update: { tier: 'PREMIUM', expiresAt: result.expiresAt, willRenew: result.willRenew },
+      create: {
+        userId,
+        tier: 'PREMIUM',
+        expiresAt: result.expiresAt,
+        willRenew: result.willRenew,
+      },
     });
 
-    return { tier: 'PREMIUM' as const };
+    return { tier: 'PREMIUM' as const, expiresAt: result.expiresAt ?? null };
   }
 }

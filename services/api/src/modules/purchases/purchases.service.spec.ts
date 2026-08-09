@@ -52,7 +52,12 @@ describe('PurchasesService', () => {
 
   it('upserts a VERIFIED purchase row and promotes the buyer to PREMIUM after a real verification succeeds', async () => {
     prisma.purchase.findUnique.mockResolvedValue(null);
-    appleVerifier.verify.mockResolvedValue({ transactionId: 'apple-txn-1' });
+    const expiresAt = new Date('2026-09-09T00:00:00.000Z');
+    appleVerifier.verify.mockResolvedValue({
+      transactionId: 'apple-txn-1',
+      expiresAt,
+      willRenew: true,
+    });
 
     const result = await service.verifyAndRecord('user-1', {
       platform: PurchasePlatformDto.IOS,
@@ -75,11 +80,11 @@ describe('PurchasesService', () => {
     expect(prisma.userSubscription.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
-        update: { tier: 'PREMIUM' },
-        create: { userId: 'user-1', tier: 'PREMIUM' },
+        update: { tier: 'PREMIUM', expiresAt, willRenew: true },
+        create: { userId: 'user-1', tier: 'PREMIUM', expiresAt, willRenew: true },
       }),
     );
-    expect(result).toEqual({ tier: 'PREMIUM' });
+    expect(result).toEqual({ tier: 'PREMIUM', expiresAt });
   });
 
   it('refuses to redeem a transaction id that already belongs to a different account', async () => {
@@ -107,6 +112,6 @@ describe('PurchasesService', () => {
         productId: 'premium.monthly',
         receipt: 'base64-receipt',
       }),
-    ).resolves.toEqual({ tier: 'PREMIUM' });
+    ).resolves.toEqual({ tier: 'PREMIUM', expiresAt: null });
   });
 });
