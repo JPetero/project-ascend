@@ -114,9 +114,7 @@ describe('Achievement progress across domains (e2e)', () => {
       .query({ search: 'Cooked White Rice' })
       .set(auth())
       .expect(200);
-    const rice = foods.body.data.data.find(
-      (f: { name: string }) => f.name === 'Cooked White Rice',
-    );
+    const rice = foods.body.data.data.find((f: { name: string }) => f.name === 'Cooked White Rice');
     await request(app.getHttpServer())
       .post('/nutrition-log')
       .set(auth())
@@ -128,9 +126,9 @@ describe('Achievement progress across domains (e2e)', () => {
       .set(auth())
       .expect(200);
     const byKey = (key: string) =>
-      (achievements.body.data as Array<{ key: string; progress: number; earnedAt: string | null }>).find(
-        (a) => a.key === key,
-      )!;
+      (
+        achievements.body.data as Array<{ key: string; progress: number; earnedAt: string | null }>
+      ).find((a) => a.key === key)!;
 
     // First-tier achievements in every domain are earned...
     expect(byKey('first_workout').earnedAt).not.toBeNull();

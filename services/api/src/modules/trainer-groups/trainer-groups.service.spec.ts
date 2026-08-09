@@ -473,8 +473,7 @@ describe('TrainerGroupsService', () => {
     });
 
     it(
-      'returns every other member for the owner once Premium, excluding the ' +
-        'caller themselves',
+      'returns every other member for the owner once Premium, excluding the ' + 'caller themselves',
       async () => {
         capabilityService.hasCapabilityForUser.mockResolvedValue(true);
         prisma.trainerGroup.findUnique.mockResolvedValue(group());

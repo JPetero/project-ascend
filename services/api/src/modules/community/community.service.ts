@@ -309,9 +309,21 @@ export class CommunityService {
 
     const postIds = posts.map((p) => p.id);
     const [likeCounts, commentCounts, saveCounts] = await Promise.all([
-      this.prisma.communityLike.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
-      this.prisma.communityComment.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
-      this.prisma.communitySave.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
+      this.prisma.communityLike.groupBy({
+        by: ['postId'],
+        where: { postId: { in: postIds } },
+        _count: true,
+      }),
+      this.prisma.communityComment.groupBy({
+        by: ['postId'],
+        where: { postId: { in: postIds } },
+        _count: true,
+      }),
+      this.prisma.communitySave.groupBy({
+        by: ['postId'],
+        where: { postId: { in: postIds } },
+        _count: true,
+      }),
     ]);
     const likeCountByPost = new Map(likeCounts.map((c) => [c.postId, c._count]));
     const commentCountByPost = new Map(commentCounts.map((c) => [c.postId, c._count]));

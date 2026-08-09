@@ -23,10 +23,10 @@ actually in scope for the current session.
   capture and upload pipeline — IMAGE/VIDEO posts still require an
   externally-hosted URL, not a device-native picker/recorder feeding a
   server upload.
-  A dedicated full-screen vertical-swipe Reel viewer is also still open
-  — Reels currently play inline in the feed only, never in their own
-  swipeable viewer (Build Session 9 Part 20/21's UX audit flagged this
-  as the next well-scoped Community polish item, not yet built).
+  A dedicated full-screen vertical-swipe Reel viewer shipped in Build
+  Session 10 Part 22 (`ReelsViewerScreen`, driven by the same
+  `reelsOnly` feed as every other Community surface) — Reels no longer
+  play inline in the feed only.
 - **Leaderboards** — superseded by Build Session 7 Part 6: the Rankings
   tab now has a real opt-in-only FRIENDS/REGION/GLOBAL leaderboard plus
   time-boxed, join-by-choice Challenges — see `build-session-7.md` Part
@@ -252,9 +252,10 @@ architecture-only below).
   from the feed implemented in Build Session 8 Part 4** — posts now
   attach a real uploaded `MediaAsset` (Media Platform, Part 2) instead
   of requiring an externally-hosted URL, and a VIDEO/"Reel" post plays
-  through a real video player in the feed. Still pending: native
-  external sharing (Build Session 8 Part 5) and a dedicated full-screen
-  vertical swipe Reel viewer (today Reels play inline in the feed).
+  through a real video player in the feed. **Native external sharing
+  shipped in Build Session 8 Part 5, and a dedicated full-screen
+  vertical-swipe Reel viewer shipped in Build Session 10 Part 22** —
+  neither is pending any longer.
 - **Ascend Promote (23)** — **MVP implemented in Part 11** (Premium
   creators submit a campaign promoting one of their own Community
   posts; every campaign starts PENDING_REVIEW and only an admin can
@@ -278,11 +279,13 @@ architecture-only below).
   but not manage roles), and Premium owners/moderators can post
   broadcast announcements to the group. A group's expanded-ness always
   follows its *owner's* subscription tier, never the acting member's —
-  see `TrainerGroupsService`'s doc comment. Still architecture-only:
-  scheduled sessions (would need to integrate with the existing Joint
-  Workout Sessions system rather than duplicate it) and assignments —
-  both deliberately deferred as separate, meaningfully-sized features
-  rather than shipped as shallow stubs.
+  see `TrainerGroupsService`'s doc comment. **Scheduled group sessions
+  shipped in Build Session 10 Part 24**: an expanded-tier owner or
+  moderator can schedule a session for every group member at once,
+  reusing the existing Joint Workout Sessions system rather than
+  duplicating it. Still architecture-only: assignments (deliberately
+  deferred as a separate, meaningfully-sized feature rather than
+  shipped as a shallow stub).
 - **Sports scoring (25)** — manual match creation/confirmation/dispute
   flow; camera-assisted suggestion depends on the Premium Vision Shell.
 - **Expanded cardio and Nutrition Library (26)** — new free activity

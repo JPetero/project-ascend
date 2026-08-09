@@ -106,19 +106,11 @@ describe('Blocking cascade across friends, community, and messages (e2e)', () =>
       .expect(201);
 
     // B blocks A mid-conversation.
-    await request(app.getHttpServer())
-      .post(`/community/block/${userIdA}`)
-      .set(authB())
-      .expect(204);
+    await request(app.getHttpServer()).post(`/community/block/${userIdA}`).set(authB()).expect(204);
 
     // Friendship is severed on both sides.
-    const friendsOfA = await request(app.getHttpServer())
-      .get('/friends')
-      .set(authA())
-      .expect(200);
-    expect(
-      friendsOfA.body.data.some((f: { userId: string }) => f.userId === userIdB),
-    ).toBe(false);
+    const friendsOfA = await request(app.getHttpServer()).get('/friends').set(authA()).expect(200);
+    expect(friendsOfA.body.data.some((f: { userId: string }) => f.userId === userIdB)).toBe(false);
 
     // A can no longer see B's profile.
     await request(app.getHttpServer())

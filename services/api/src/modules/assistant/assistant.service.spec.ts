@@ -18,11 +18,13 @@ function buildService(options?: {
   };
   const prisma = {
     preference: {
-      findUnique: jest.fn().mockResolvedValue(
-        options?.aiMemoryEnabled === null
-          ? null
-          : { aiMemoryEnabled: options?.aiMemoryEnabled ?? true },
-      ),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options?.aiMemoryEnabled === null
+            ? null
+            : { aiMemoryEnabled: options?.aiMemoryEnabled ?? true },
+        ),
     },
   } as unknown as PrismaService;
   const getNotes = jest.fn().mockResolvedValue(options?.memoryNotes ?? []);

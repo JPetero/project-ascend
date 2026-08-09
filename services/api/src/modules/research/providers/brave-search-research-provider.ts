@@ -50,7 +50,12 @@ const MODERATE_QUALITY_HOSTS = [
 // Established health publishers with editorial/medical review, but not
 // peer-reviewed, government, or academic — the weakest tier this
 // provider will still cite, never anything below it.
-const LOW_QUALITY_HOSTS = ['healthline.com', 'webmd.com', 'verywellfit.com', 'medicalnewstoday.com'];
+const LOW_QUALITY_HOSTS = [
+  'healthline.com',
+  'webmd.com',
+  'verywellfit.com',
+  'medicalnewstoday.com',
+];
 
 function hostMatches(hostname: string, domains: string[]): boolean {
   return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));

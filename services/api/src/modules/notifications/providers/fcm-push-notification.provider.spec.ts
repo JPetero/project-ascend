@@ -18,7 +18,7 @@ describe('FcmPushNotificationProvider', () => {
     const result = await provider.send('user-1', { title: 'Title', body: 'Body' });
 
     expect(result).toEqual({ delivered: false, failureReason: 'No push provider configured.' });
-    expect((prisma.pushDeviceToken.findMany as jest.Mock)).not.toHaveBeenCalled();
+    expect(prisma.pushDeviceToken.findMany as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('honestly reports not-configured when only one of the two required values is set', async () => {
@@ -26,7 +26,10 @@ describe('FcmPushNotificationProvider', () => {
       pushDeviceToken: { findMany: jest.fn(), deleteMany: jest.fn() },
     } as unknown as PrismaService;
     const provider = new FcmPushNotificationProvider(
-      buildConfigService({ fcmServiceAccountJson: '{"client_email":"x"}', fcmProjectId: undefined }),
+      buildConfigService({
+        fcmServiceAccountJson: '{"client_email":"x"}',
+        fcmProjectId: undefined,
+      }),
       prisma,
     );
 

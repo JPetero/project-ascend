@@ -165,7 +165,7 @@ describe('NotificationsService', () => {
       });
     });
 
-    it('scopes unregister to the caller so one user cannot remove another\'s token', async () => {
+    it("scopes unregister to the caller so one user cannot remove another's token", async () => {
       await service.unregisterDeviceToken('user-1', 'fcm-token-1');
 
       expect(prisma.pushDeviceToken.deleteMany).toHaveBeenCalledWith({

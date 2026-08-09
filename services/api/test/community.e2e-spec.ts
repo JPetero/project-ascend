@@ -315,9 +315,9 @@ describe('Community profiles/posts/Reels (e2e)', () => {
       .set(authA())
       .expect(200);
 
-    expect(
-      videoOnly.body.data.data.some((p: { id: string }) => p.id === reel.body.data.id),
-    ).toBe(true);
+    expect(videoOnly.body.data.data.some((p: { id: string }) => p.id === reel.body.data.id)).toBe(
+      true,
+    );
     expect(
       videoOnly.body.data.data.some((p: { id: string }) => p.id === textPost.body.data.id),
     ).toBe(false);

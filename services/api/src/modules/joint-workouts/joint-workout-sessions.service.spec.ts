@@ -163,9 +163,9 @@ describe('JointWorkoutSessionsService', () => {
         new ForbiddenException('nope'),
       );
 
-      await expect(
-        service.create('host-1', { trainerGroupId: 'group-1' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.create('host-1', { trainerGroupId: 'group-1' })).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
       expect(prisma.jointWorkoutSession.create).not.toHaveBeenCalled();
     });
   });

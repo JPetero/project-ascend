@@ -182,9 +182,9 @@ describe('Trainer groups — expanded tier (e2e)', () => {
           .expect(201);
 
         expect(created.body.data.hostId).toBe(ownerId);
-        const participantIds = (
-          created.body.data.participants as { userId: string }[]
-        ).map((p) => p.userId);
+        const participantIds = (created.body.data.participants as { userId: string }[]).map(
+          (p) => p.userId,
+        );
         expect(participantIds).toContain(ownerId);
         expect(participantIds).toContain(memberId);
 
