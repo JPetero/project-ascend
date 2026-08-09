@@ -5,6 +5,8 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/media/domain/media_type.dart';
 import '../../../../core/media/presentation/providers/media_upload_controller.dart';
 import '../../../../core/media/presentation/widgets/media_attachment_picker.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/gallery_media.dart';
 import '../providers/gallery_album_detail_controller.dart';
 import '../providers/gallery_controller.dart';
@@ -34,12 +36,29 @@ class GalleryAlbumDetailScreen extends ConsumerWidget {
     final controller = ref.read(
       galleryAlbumDetailControllerProvider(albumId).notifier,
     );
+    final albumName =
+        ref.read(galleryAlbumDetailControllerProvider(albumId)).album?.name ??
+        'Gallery';
     return showAscendBottomSheet<void>(
       context: context,
       title: 'Photo options',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          ListTile(
+            leading: const Icon(Icons.ios_share_outlined),
+            title: const Text('Share'),
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => ShareContentScreen(
+                    content: _galleryMediaShareContent(item, albumName),
+                  ),
+                ),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: const Text('Set as profile avatar'),
@@ -251,4 +270,33 @@ class _AddMediaSheet extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Build Session 10 Parts 20-21 — `ShareContentType.progressMedia` was
+/// declared since Build Session 9 Part 3 but never used anywhere; the
+/// gallery had no share action at all. Weight is treated as sensitive
+/// (defaults hidden), same as personal_records_screen.dart's PR value.
+ShareContent _galleryMediaShareContent(GalleryMedia item, String albumName) {
+  final date = item.capturedAt ?? item.createdAt;
+  final dateLabel =
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+  return ShareContent(
+    type: ShareContentType.progressMedia,
+    title: albumName,
+    subtitle: item.note?.trim().isNotEmpty == true ? item.note! : dateLabel,
+    statLines: [
+      if (item.poseTag != null)
+        ShareStatLine(
+          label: 'Angle',
+          value: galleryPoseTagLabel(item.poseTag!),
+        ),
+      if (item.weightNote != null)
+        ShareStatLine(
+          label: 'Weight',
+          value: item.weightNote!,
+          sensitive: true,
+        ),
+    ],
+  );
 }

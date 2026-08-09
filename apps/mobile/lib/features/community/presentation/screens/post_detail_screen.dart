@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/community_post.dart';
 import '../providers/post_detail_controller.dart';
 import '../widgets/community_post_card.dart';
@@ -76,6 +77,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                           ),
                           onLike: controller.toggleLike,
                           onSave: controller.toggleSave,
+                          onShare: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => ShareContentScreen(
+                                content: communityPostShareContent(state.post!),
+                              ),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: AscendSpacing.lg),
                         Text(

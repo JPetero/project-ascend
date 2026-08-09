@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/community/presentation/screens/community_feed_screen.dart';
+import 'package:mobile/features/sharing/presentation/screens/share_content_screen.dart';
 
 import '../../helpers/fake_community_repository.dart';
 import '../../helpers/pump_helpers.dart';
@@ -143,4 +144,37 @@ void main() {
 
     expect(find.text('Report submitted.'), findsOneWidget);
   });
+
+  testWidgets(
+    'sharing a post from the menu opens the share screen (Build Session 10 '
+    'Parts 20-21 — onShare was declared since Build Session 9 Part 3 but '
+    'never actually wired up)',
+    (tester) async {
+      final repository = FakeCommunityRepository(
+        posts: [samplePost(id: 'post-1', caption: 'New deadlift PR')],
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        communityRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: CommunityFeedScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      expect(find.text('Share'), findsOneWidget);
+
+      await tester.tap(find.text('Share'));
+      await pumpForAsyncSettle(tester);
+
+      expect(find.byType(ShareContentScreen), findsOneWidget);
+    },
+  );
 }

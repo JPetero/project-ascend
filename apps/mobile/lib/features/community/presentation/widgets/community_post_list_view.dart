@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/community_post.dart';
 import '../providers/community_feed_controller.dart';
 import 'community_post_card.dart';
@@ -115,6 +116,13 @@ class _CommunityPostListViewState extends State<CommunityPostListView> {
             onReport: widget.onReport != null && !post.isOwnPost
                 ? (reason) => widget.onReport!(post, reason)
                 : null,
+            onShare: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => ShareContentScreen(
+                  content: communityPostShareContent(post),
+                ),
+              ),
+            ),
           );
         },
       ),

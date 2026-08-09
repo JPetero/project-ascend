@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/media/media_url.dart';
 import '../../../../core/media/presentation/widgets/ascend_video_player.dart';
+import '../../../sharing/domain/share_content.dart';
 import '../../domain/community_post.dart';
 
 /// One feed/profile post card — shared by the feed and profile screens
@@ -93,13 +94,15 @@ class CommunityPostCard extends StatelessWidget {
                   tooltip: 'Delete post',
                   onPressed: onDelete,
                 )
-              else if (onReport != null)
+              else if (onShare != null || onReport != null)
                 PopupMenuButton<_PostMenuAction>(
                   icon: const Icon(Icons.more_vert, size: 20),
                   onSelected: (action) {
                     switch (action) {
                       case _PostMenuAction.report:
-                        _showReportDialog(context, onReport!);
+                        if (onReport != null) {
+                          _showReportDialog(context, onReport!);
+                        }
                       case _PostMenuAction.share:
                         onShare?.call();
                     }
@@ -110,10 +113,11 @@ class CommunityPostCard extends StatelessWidget {
                         value: _PostMenuAction.share,
                         child: Text('Share'),
                       ),
-                    const PopupMenuItem(
-                      value: _PostMenuAction.report,
-                      child: Text('Report'),
-                    ),
+                    if (onReport != null)
+                      const PopupMenuItem(
+                        value: _PostMenuAction.report,
+                        child: Text('Report'),
+                      ),
                   ],
                 ),
             ],
@@ -294,4 +298,28 @@ class _ActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shared by both [CommunityPostListView] and PostDetailScreen so the
+/// branded share card looks identical wherever a post is shared from
+/// (Build Session 10 Parts 20-21 — this content type existed since
+/// Build Session 9 Part 3 but nothing ever built it).
+ShareContent communityPostShareContent(CommunityPost post) {
+  final caption = post.caption?.trim();
+  final subtitle = (caption != null && caption.isNotEmpty)
+      ? caption
+      : switch (post.mediaType) {
+          CommunityPostMediaType.video => 'Shared a Reel on Ascend',
+          CommunityPostMediaType.image => 'Shared a photo on Ascend',
+          CommunityPostMediaType.text => 'Shared a post on Ascend',
+        };
+  return ShareContent(
+    type: ShareContentType.communityPost,
+    title: post.author?.displayName ?? 'Ascend member',
+    subtitle: subtitle,
+    statLines: [
+      ShareStatLine(label: 'Likes', value: '${post.likeCount}'),
+      ShareStatLine(label: 'Comments', value: '${post.commentCount}'),
+    ],
+  );
 }
