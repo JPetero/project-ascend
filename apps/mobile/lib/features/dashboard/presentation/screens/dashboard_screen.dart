@@ -1164,7 +1164,7 @@ class _SettingsCard extends ConsumerWidget {
             subtitle: const Text(
               'Let Ascend remember context between conversations.',
             ),
-            value: preferences?.aiMemoryEnabled ?? true,
+            value: preferences?.aiMemoryEnabled ?? false,
             onChanged: (value) => ref
                 .read(preferencesControllerProvider.notifier)
                 .update({'aiMemoryEnabled': value}),

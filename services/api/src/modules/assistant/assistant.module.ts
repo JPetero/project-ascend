@@ -5,6 +5,7 @@ import { AssistantController } from './assistant.controller';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantService } from './assistant.service';
 import { CompanionMemoryService } from './companion-memory.service';
+import { MemoryExtractionService } from './memory-extraction.service';
 import { AnthropicReplyProvider } from './providers/anthropic-reply-provider';
 import { AI_REPLY_PROVIDER } from './providers/ai-reply-provider.interface';
 import { GeminiReplyProvider } from './providers/gemini-reply-provider';
@@ -37,6 +38,7 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
     AssistantService,
     AssistantSafetyService,
     CompanionMemoryService,
+    MemoryExtractionService,
     AnthropicReplyProvider,
     OpenAiReplyProvider,
     GeminiReplyProvider,

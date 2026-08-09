@@ -81,7 +81,9 @@ class PreferencesModel {
       themeMode: themeModeFromJson(json['themeMode'] as String? ?? 'SYSTEM'),
       reducedMotion: json['reducedMotion'] as bool? ?? false,
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
-      aiMemoryEnabled: json['aiMemoryEnabled'] as bool? ?? true,
+      // Opt-in by default (Build Session 11 Part 4) — matches the
+      // backend's Preference.aiMemoryEnabled schema default.
+      aiMemoryEnabled: json['aiMemoryEnabled'] as bool? ?? false,
     );
   }
 

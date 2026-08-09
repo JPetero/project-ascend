@@ -2,13 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../domain/companion_memory_note.dart';
 import '../providers/companion_memory_controller.dart';
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+String _formatDate(DateTime date) {
+  return '${_months[date.month - 1]} ${date.day}, ${date.year}';
+}
 
 /// What Atlas/Nova remembers about the user across conversations (Build
 /// Session 10 Part 15), reachable from the "AI memory" toggle in
-/// dashboard_screen.dart. Every note shown here is the user's own past
-/// words, stored verbatim server-side — never an invented summary — so
-/// this screen never risks showing a fabricated "memory."
+/// dashboard_screen.dart. Build Session 11 Part 4: each remembered fact
+/// is now a structured, categorized entry (never raw free-form text —
+/// see `MemoryExtractionService`'s doc comment server-side) with its own
+/// creation date and a per-entry delete, not just clear-everything.
 class CompanionMemoryScreen extends ConsumerWidget {
   const CompanionMemoryScreen({super.key});
 
@@ -38,6 +59,21 @@ class CompanionMemoryScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _deleteNote(
+    BuildContext context,
+    WidgetRef ref,
+    CompanionMemoryNote note,
+  ) async {
+    await ref
+        .read(companionMemoryControllerProvider.notifier)
+        .deleteNote(note.id);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Forgotten.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(companionMemoryControllerProvider);
@@ -52,8 +88,9 @@ class CompanionMemoryScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(AscendSpacing.md),
             children: [
               Text(
-                "What Atlas and Nova remember from past conversations — in your own words, "
-                'never invented.',
+                'What Atlas and Nova remember from past conversations — a short list of '
+                'preferences, never a full transcript, and never anything sensitive '
+                'like symptoms or emotional disclosures.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: AscendSpacing.md),
@@ -64,21 +101,28 @@ class CompanionMemoryScreen extends ConsumerWidget {
                   icon: Icons.psychology_outlined,
                   title: 'Nothing remembered yet',
                   message:
-                      'As you chat with Atlas or Nova, anything worth remembering shows up here.',
+                      'As you chat with Atlas or Nova, preferences worth remembering show up here.',
                 )
               else ...[
                 for (final note in state.notes)
                   Card(
                     margin: const EdgeInsets.only(bottom: AscendSpacing.sm),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AscendSpacing.md),
-                      child: Text(note),
+                    child: ListTile(
+                      title: Text(note.value),
+                      subtitle: Text(
+                        '${note.category.label} · Remembered ${_formatDate(note.createdAt)}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Forget this',
+                        onPressed: () => _deleteNote(context, ref, note),
+                      ),
                     ),
                   ),
                 const SizedBox(height: AscendSpacing.md),
                 OutlinedButton(
                   onPressed: () => _confirmClear(context, ref),
-                  child: const Text('Clear memory'),
+                  child: const Text('Clear all memory'),
                 ),
               ],
             ],

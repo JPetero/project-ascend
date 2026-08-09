@@ -203,6 +203,7 @@ describe('Assistant memory (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let token: string;
+  let userId: string;
 
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -231,6 +232,7 @@ describe('Assistant memory (e2e)', () => {
       })
       .expect(201);
     token = res.body.data.tokens.accessToken as string;
+    userId = res.body.data.user.id as string;
   });
 
   afterAll(async () => {
@@ -263,5 +265,71 @@ describe('Assistant memory (e2e)', () => {
 
   it('rejects an unauthenticated request to clear memory', async () => {
     await request(app.getHttpServer()).delete('/assistant/memory').expect(401);
+  });
+
+  // Build Session 11 Part 4 — memory is now structured (category/value/
+  // createdAt per fact, one row per fact) instead of a raw string list.
+  it('lists a structured note with its category and creation date, and deleting it removes only that one', async () => {
+    const created = await prisma.companionMemoryNote.create({
+      data: { userId: userId, category: 'GOAL', value: 'Goal: build strength.' },
+    });
+    const other = await prisma.companionMemoryNote.create({
+      data: { userId: userId, category: 'EQUIPMENT', value: 'Has access to: dumbbells.' },
+    });
+
+    const listed = await request(app.getHttpServer())
+      .get('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(listed.body.data.notes).toHaveLength(2);
+    const first = listed.body.data.notes.find((n: { id: string }) => n.id === created.id);
+    expect(first).toMatchObject({ category: 'GOAL', value: 'Goal: build strength.' });
+    expect(first.createdAt).toBeDefined();
+
+    await request(app.getHttpServer())
+      .delete(`/assistant/memory/${created.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+
+    const afterDelete = await request(app.getHttpServer())
+      .get('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(afterDelete.body.data.notes.map((n: { id: string }) => n.id)).toEqual([other.id]);
+  });
+
+  it('404s deleting a memory note that does not exist or belongs to someone else', async () => {
+    const stranger = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Stranger',
+        email: 'assistant-memory-stranger@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    const strangersNote = await prisma.companionMemoryNote.create({
+      data: {
+        userId: stranger.body.data.user.id,
+        category: 'GOAL',
+        value: "Stranger's private goal.",
+      },
+    });
+
+    await request(app.getHttpServer())
+      .delete(`/assistant/memory/${strangersNote.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete('/assistant/memory/00000000-0000-0000-0000-000000000000')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+  });
+
+  it('rejects an unauthenticated request to delete a single memory note', async () => {
+    await request(app.getHttpServer())
+      .delete('/assistant/memory/00000000-0000-0000-0000-000000000000')
+      .expect(401);
   });
 });
