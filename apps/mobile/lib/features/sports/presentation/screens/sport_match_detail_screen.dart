@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/sport_match.dart';
 import '../providers/sport_match_detail_controller.dart';
 
@@ -26,7 +28,39 @@ class SportMatchDetailScreen extends ConsumerWidget {
     final match = state.match;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Badminton match')),
+      appBar: AppBar(
+        title: const Text('Badminton match'),
+        actions: [
+          if (match != null &&
+              match.status == SportMatchStatus.confirmed &&
+              match.scoreProposals.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.ios_share_outlined),
+              tooltip: 'Share match result',
+              onPressed: () {
+                final score = match.scoreProposals.first;
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => ShareContentScreen(
+                      content: ShareContent(
+                        type: ShareContentType.sportsMatchResult,
+                        title: 'Match confirmed!',
+                        subtitle: 'Badminton',
+                        statLines: [
+                          ShareStatLine(
+                            label: 'Final score',
+                            value:
+                                '${score.proposerScore} - ${score.opponentScore}',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       body: SafeArea(
         child: state.isLoading && match == null
             ? const AscendLoadingIndicator()

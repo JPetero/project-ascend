@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/achievement.dart';
 import '../providers/achievement_controller.dart';
 import '../widgets/achievement_icon.dart';
@@ -136,8 +138,30 @@ class _AchievementCard extends StatelessWidget {
               ],
             ),
           ),
-          if (earned)
+          if (earned) ...[
             const Icon(Icons.check_circle, color: AscendColors.successEmerald),
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
+              tooltip: 'Share this achievement',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (context) => ShareContentScreen(
+                    content: ShareContent(
+                      type: ShareContentType.achievement,
+                      title: achievement.title,
+                      subtitle: achievement.description,
+                      statLines: [
+                        ShareStatLine(
+                          label: 'Category',
+                          value: achievementCategoryLabel(achievement.category),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

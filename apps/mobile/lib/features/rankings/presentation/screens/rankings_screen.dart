@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
 import '../../domain/ranking.dart';
 import '../providers/rankings_controller.dart';
 
@@ -283,6 +285,29 @@ class _LeaderboardView extends StatelessWidget {
                     '${entry.points} pts',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
+                  if (entry.isViewer)
+                    IconButton(
+                      icon: const Icon(Icons.ios_share_outlined, size: 18),
+                      tooltip: 'Share your rank',
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (context) => ShareContentScreen(
+                            content: ShareContent(
+                              type: ShareContentType.rankingMilestone,
+                              title: '#${entry.rank}',
+                              subtitle:
+                                  '${_scopeLabel(state.selectedScope)} leaderboard',
+                              statLines: [
+                                ShareStatLine(
+                                  label: 'Points',
+                                  value: '${entry.points}',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -290,3 +315,9 @@ class _LeaderboardView extends StatelessWidget {
     );
   }
 }
+
+String _scopeLabel(RankingScope scope) => switch (scope) {
+  RankingScope.friends => 'Friends',
+  RankingScope.region => 'Regional',
+  RankingScope.global => 'Global',
+};

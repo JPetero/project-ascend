@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../sharing/domain/share_content.dart';
+import '../../../sharing/presentation/screens/share_content_screen.dart';
+import '../../domain/challenge.dart';
 import '../providers/challenge_detail_controller.dart';
 
 class ChallengeDetailScreen extends ConsumerWidget {
@@ -45,6 +48,40 @@ class ChallengeDetailScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(challenge.title),
         actions: [
+          if (detail.isParticipant)
+            IconButton(
+              icon: const Icon(Icons.ios_share_outlined),
+              tooltip: 'Share your progress',
+              onPressed: () {
+                ChallengeParticipantProgress? mine;
+                for (final participant in detail.participants ?? const []) {
+                  if (participant.userId == viewerId) {
+                    mine = participant;
+                    break;
+                  }
+                }
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => ShareContentScreen(
+                      content: ShareContent(
+                        type: ShareContentType.challengeResult,
+                        title: challenge.title,
+                        subtitle: challenge.hasEnded
+                            ? 'Challenge complete'
+                            : 'Challenge in progress',
+                        statLines: [
+                          ShareStatLine(
+                            label: 'Active days',
+                            value:
+                                '${mine?.activeDays ?? 0}/${mine?.totalDays ?? 0}',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           if (isCreator)
             IconButton(
               icon: const Icon(Icons.delete_outline),
