@@ -2,6 +2,8 @@ import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../../common/entitlements/ai-entitlement.service';
 import { AiFeature } from '../../common/entitlements/ai-entitlement.types';
+import { AiReplyProviderRouter } from './ai-reply-provider-router';
+import { AiUsagePolicy, FAIR_USE_LIMIT_MESSAGE } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantSafetyDecisionType } from './assistant-safety.types';
 import { CompanionMemoryNoteView, CompanionMemoryService } from './companion-memory.service';
@@ -59,6 +61,7 @@ export class AssistantService {
     private readonly safety: AssistantSafetyService,
     private readonly entitlement: AiEntitlementService,
     private readonly extraction: MemoryExtractionService,
+    private readonly usagePolicy: AiUsagePolicy,
   ) {}
 
   get isConfigured(): boolean {
@@ -84,6 +87,16 @@ export class AssistantService {
       throw new ForbiddenException(access.reason ?? 'This requires Ascend Premium.');
     }
 
+    // Fair-use ceiling (Build Session 12 Part 6) — separate from the
+    // tier check above, which only answers "is this feature in this
+    // plan at all." Only ever engages for abnormal volume; see
+    // AiUsagePolicy's doc comment for why this is never a user-facing
+    // credit system.
+    const usage = await this.usagePolicy.checkWithinLimit(userId, AiFeature.ADVANCED_CONVERSATION);
+    if (!usage.allowed) {
+      throw new ForbiddenException(FAIR_USE_LIMIT_MESSAGE);
+    }
+
     const memoryEnabled = await this.isMemoryEnabled(userId);
     const notes = memoryEnabled ? await this.memory.getNotes(userId) : [];
 
@@ -97,6 +110,28 @@ export class AssistantService {
       safetyContext,
     );
     const reply = this.safety.normalizeOutput(rawReply);
+
+    // Build Session 12 Part 6 — every provider attempt this call made
+    // (see AiReplyProviderRouter.lastAttempts's doc comment for why this
+    // is a side-channel rather than a widened AiReplyProvider contract).
+    // Only entitled, Premium accounts ever reach this line (the
+    // ForbiddenException above already returned for anyone else), so the
+    // tier is recorded as PREMIUM rather than re-querying it.
+    if (this.provider instanceof AiReplyProviderRouter) {
+      for (const attempt of this.provider.lastAttempts) {
+        void this.usagePolicy.record({
+          userId,
+          provider: attempt.provider,
+          model: attempt.model,
+          feature: AiFeature.ADVANCED_CONVERSATION,
+          tier: 'PREMIUM',
+          success: attempt.success,
+          latencyMs: attempt.latencyMs,
+          inputChars: dto.input.length,
+          outputChars: attempt.success ? reply.length : undefined,
+        });
+      }
+    }
 
     let pendingMemory: MemoryCandidate | undefined;
     if (memoryEnabled) {

@@ -1,6 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AiEntitlementService } from '../../common/entitlements/ai-entitlement.service';
 import { AiFeature } from '../../common/entitlements/ai-entitlement.types';
+import { AiProviderCircuitBreaker } from './ai-provider-circuit-breaker.service';
+import { AiReplyProviderRouter } from './ai-reply-provider-router';
+import { AiUsagePolicy } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantSafetyCategory, AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
@@ -8,6 +12,9 @@ import { CompanionMemoryService } from './companion-memory.service';
 import { MemoryExtractionService } from './memory-extraction.service';
 import { CompanionMemoryCategory } from './memory-extraction.types';
 import { AiReplyProvider } from './providers/ai-reply-provider.interface';
+import { AnthropicReplyProvider } from './providers/anthropic-reply-provider';
+import { GeminiReplyProvider } from './providers/gemini-reply-provider';
+import { OpenAiReplyProvider } from './providers/openai-reply-provider';
 import { CoachingStyleDto, CompanionDto } from './assistant.types';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -20,6 +27,7 @@ function buildService(options?: {
   normalizeOutput?: jest.Mock;
   checkAccess?: jest.Mock;
   extractCandidate?: jest.Mock;
+  checkWithinLimit?: jest.Mock;
 }) {
   const generateReply = jest.fn().mockResolvedValue('Nice work today!');
   const provider: AiReplyProvider = {
@@ -61,7 +69,24 @@ function buildService(options?: {
   const extractCandidate = options?.extractCandidate ?? jest.fn().mockReturnValue(null);
   const extraction = { extractCandidate } as unknown as MemoryExtractionService;
 
-  const service = new AssistantService(provider, prisma, memory, safety, entitlement, extraction);
+  const checkWithinLimit =
+    options?.checkWithinLimit ??
+    jest.fn().mockResolvedValue({
+      allowed: true,
+      window: { windowStart: new Date(), count: 0, limit: 200 },
+    });
+  const record = jest.fn().mockResolvedValue(undefined);
+  const usagePolicy = { checkWithinLimit, record } as unknown as AiUsagePolicy;
+
+  const service = new AssistantService(
+    provider,
+    prisma,
+    memory,
+    safety,
+    entitlement,
+    extraction,
+    usagePolicy,
+  );
   return {
     service,
     generateReply,
@@ -74,6 +99,8 @@ function buildService(options?: {
     normalizeOutput,
     checkAccess,
     extractCandidate,
+    checkWithinLimit,
+    record,
   };
 }
 
@@ -324,6 +351,254 @@ describe('AssistantService', () => {
       await service.reply(dto, 'user-1');
 
       expect(checkAccess).toHaveBeenCalledWith('user-1', AiFeature.ADVANCED_CONVERSATION);
+    });
+  });
+
+  describe('fair-use ceiling (Build Session 12 Part 6)', () => {
+    it('rejects with ForbiddenException and never calls the provider once the daily ceiling is reached', async () => {
+      const checkWithinLimit = jest.fn().mockResolvedValue({
+        allowed: false,
+        window: { windowStart: new Date(), count: 200, limit: 200 },
+      });
+      const { service, generateReply } = buildService({ checkWithinLimit });
+
+      await expect(service.reply(dto, 'user-1')).rejects.toBeInstanceOf(ForbiddenException);
+      expect(generateReply).not.toHaveBeenCalled();
+    });
+
+    it('never mentions upgrading in the fair-use rejection — this applies to Premium accounts already paying', async () => {
+      const checkWithinLimit = jest.fn().mockResolvedValue({
+        allowed: false,
+        window: { windowStart: new Date(), count: 200, limit: 200 },
+      });
+      const { service } = buildService({ checkWithinLimit });
+
+      await expect(service.reply(dto, 'user-1')).rejects.toMatchObject({
+        message: expect.not.stringMatching(/upgrade|subscribe/i),
+      });
+    });
+
+    it('checks the fair-use ceiling for this specific user and feature', async () => {
+      const { service, checkWithinLimit } = buildService();
+
+      await service.reply(dto, 'user-1');
+
+      expect(checkWithinLimit).toHaveBeenCalledWith('user-1', AiFeature.ADVANCED_CONVERSATION);
+    });
+  });
+
+  describe('provider resilience usage recording (Build Session 12 Part 6)', () => {
+    // Bypasses buildService's plain-object `provider` composition — a
+    // real class instance's methods live on its prototype, not as own
+    // properties, so `{ ...router }` (what buildService's `provider`
+    // override does) would silently drop `generateReply`. This test
+    // needs an actual `AiReplyProviderRouter` instance so the
+    // `instanceof` check in `AssistantService.reply` takes the real
+    // branch, so it constructs `AssistantService` directly instead.
+    function buildServiceWithRouter(router: AiReplyProviderRouter) {
+      const prisma = {
+        preference: { findUnique: jest.fn().mockResolvedValue({ aiMemoryEnabled: false }) },
+      } as unknown as PrismaService;
+      const memory = {
+        getNotes: jest.fn().mockResolvedValue([]),
+        remember: jest.fn().mockResolvedValue(undefined),
+        deleteNote: jest.fn().mockResolvedValue(undefined),
+        clear: jest.fn().mockResolvedValue(undefined),
+      } as unknown as CompanionMemoryService;
+      const safety = {
+        classify: jest.fn().mockReturnValue({
+          category: AssistantSafetyCategory.GENERAL,
+          decision: AssistantSafetyDecisionType.ALLOW_PROVIDER,
+        }),
+        normalizeOutput: jest.fn((reply: string) => reply),
+      } as unknown as AssistantSafetyService;
+      const entitlement = {
+        checkAccess: jest
+          .fn()
+          .mockResolvedValue({ allowed: true, feature: AiFeature.ADVANCED_CONVERSATION }),
+      } as unknown as AiEntitlementService;
+      const extraction = {
+        extractCandidate: jest.fn().mockReturnValue(null),
+      } as unknown as MemoryExtractionService;
+      const record = jest.fn().mockResolvedValue(undefined);
+      const usagePolicy = {
+        checkWithinLimit: jest.fn().mockResolvedValue({
+          allowed: true,
+          window: { windowStart: new Date(), count: 0, limit: 200 },
+        }),
+        record,
+      } as unknown as AiUsagePolicy;
+
+      const service = new AssistantService(
+        router,
+        prisma,
+        memory,
+        safety,
+        entitlement,
+        extraction,
+        usagePolicy,
+      );
+      return { service, record };
+    }
+
+    function buildRouter(overrides: {
+      anthropicGenerateReply?: jest.Mock;
+      openaiGenerateReply?: jest.Mock;
+    }) {
+      const anthropic = {
+        isConfigured: true,
+        generateReply: overrides.anthropicGenerateReply ?? jest.fn().mockResolvedValue('unused'),
+      };
+      const openai = {
+        isConfigured: true,
+        generateReply: overrides.openaiGenerateReply ?? jest.fn().mockResolvedValue('unused'),
+      };
+      const gemini = { isConfigured: true, generateReply: jest.fn().mockResolvedValue('unused') };
+      const configService = {
+        get: () => ({
+          provider: 'anthropic',
+          anthropicModel: 'claude-x',
+          openaiModel: 'gpt-x',
+          geminiModel: 'gemini-x',
+        }),
+      } as unknown as ConfigService;
+      return new AiReplyProviderRouter(
+        configService,
+        new AiProviderCircuitBreaker(),
+        anthropic as unknown as AnthropicReplyProvider,
+        openai as unknown as OpenAiReplyProvider,
+        gemini as unknown as GeminiReplyProvider,
+      );
+    }
+
+    it('records one AiUsageEvent per attempt the router made, via the lastAttempts side-channel', async () => {
+      const router = buildRouter({
+        anthropicGenerateReply: jest.fn().mockRejectedValue(new Error('anthropic down')),
+        openaiGenerateReply: jest.fn().mockResolvedValue('a live reply'),
+      });
+      const { service, record } = buildServiceWithRouter(router);
+
+      const result = await service.reply(dto, 'user-1');
+
+      expect(result.reply).toBe('a live reply');
+      expect(record).toHaveBeenCalledTimes(2);
+      expect(record).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          userId: 'user-1',
+          provider: 'anthropic',
+          feature: AiFeature.ADVANCED_CONVERSATION,
+          tier: 'PREMIUM',
+          success: false,
+        }),
+      );
+      expect(record).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          userId: 'user-1',
+          provider: 'openai',
+          success: true,
+          outputChars: 'a live reply'.length,
+        }),
+      );
+    });
+
+    it('does not attempt to record anything when the provider is not the resilience router', async () => {
+      const { service, record } = buildService();
+
+      await service.reply(dto, 'user-1');
+
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('context minimization (Build Session 12 Part 7)', () => {
+    it('reply() never queries any Prisma model besides Preference — a Proxy trap fires if a future change adds a forbidden DB read (DMs, gallery, support tickets, GPS routes, wearables, etc.)', async () => {
+      const touched: string[] = [];
+      const prisma = new Proxy(
+        {},
+        {
+          get(_target, prop: string) {
+            if (prop === 'preference') {
+              return { findUnique: jest.fn().mockResolvedValue({ aiMemoryEnabled: false }) };
+            }
+            touched.push(prop);
+            throw new Error(`AssistantService.reply() touched forbidden Prisma model "${prop}"`);
+          },
+        },
+      ) as unknown as PrismaService;
+
+      const generateReply = jest.fn().mockResolvedValue('a reply');
+      const provider: AiReplyProvider = { isConfigured: true, generateReply };
+      const memory = {
+        getNotes: jest.fn().mockResolvedValue([]),
+        remember: jest.fn().mockResolvedValue(undefined),
+      } as unknown as CompanionMemoryService;
+      const safety = {
+        classify: jest.fn().mockReturnValue({
+          category: AssistantSafetyCategory.GENERAL,
+          decision: AssistantSafetyDecisionType.ALLOW_PROVIDER,
+        }),
+        normalizeOutput: jest.fn((reply: string) => reply),
+      } as unknown as AssistantSafetyService;
+      const entitlement = {
+        checkAccess: jest
+          .fn()
+          .mockResolvedValue({ allowed: true, feature: AiFeature.ADVANCED_CONVERSATION }),
+      } as unknown as AiEntitlementService;
+      const extraction = {
+        extractCandidate: jest.fn().mockReturnValue(null),
+      } as unknown as MemoryExtractionService;
+      const usagePolicy = {
+        checkWithinLimit: jest.fn().mockResolvedValue({
+          allowed: true,
+          window: { windowStart: new Date(), count: 0, limit: 200 },
+        }),
+        record: jest.fn().mockResolvedValue(undefined),
+      } as unknown as AiUsagePolicy;
+
+      const service = new AssistantService(
+        provider,
+        prisma,
+        memory,
+        safety,
+        entitlement,
+        extraction,
+        usagePolicy,
+      );
+
+      await service.reply(dto, 'user-1');
+
+      expect(touched).toEqual([]);
+    });
+
+    it('only ever sends the companion, style, capped history, current input, structured memory notes, and an optional safety-context string to the provider — never a raw object from elsewhere', async () => {
+      const { service, generateReply } = buildService({
+        memoryNotes: [
+          {
+            id: 'note-1',
+            category: CompanionMemoryCategory.GOAL,
+            value: 'Goal: build strength.',
+            createdAt: new Date(),
+          },
+        ],
+      });
+
+      await service.reply(dto, 'user-1');
+
+      const [passedDto, passedNotes, passedSafetyContext] = generateReply.mock.calls[0];
+      expect(passedDto).toBe(dto);
+      expect(passedNotes).toEqual(['Goal: build strength.']);
+      expect(passedSafetyContext).toBeUndefined();
+      // dto only ever has the fields AssistantReplyDto declares — the
+      // global ValidationPipe's forbidNonWhitelisted already strips/
+      // rejects anything else before this method is ever reached (see
+      // the e2e test in assistant.e2e-spec.ts for that boundary).
+      expect(
+        Object.keys(passedDto).every((key) =>
+          ['companion', 'history', 'input', 'style'].includes(key),
+        ),
+      ).toBe(true);
     });
   });
 });

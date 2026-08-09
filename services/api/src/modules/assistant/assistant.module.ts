@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AiConfig } from '../../config/configuration';
+import { ConfigModule } from '@nestjs/config';
 import { AssistantController } from './assistant.controller';
+import { AiProviderCircuitBreaker } from './ai-provider-circuit-breaker.service';
+import { AiReplyProviderRouter } from './ai-reply-provider-router';
+import { AiUsagePolicy } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantService } from './assistant.service';
 import { CompanionMemoryService } from './companion-memory.service';
@@ -14,14 +16,16 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
 /**
  * Build Session 9 Part 15/16 built the first backend AI provider
  * (Anthropic); Build Session 10 Part 14 added Openai/Gemini as
- * alternatives. Selects the active `AiReplyProvider` from `ai.provider`
- * (`AI_PROVIDER` env, default `'anthropic'`) — the same config-driven-
- * factory pattern MediaStorageModule/NotificationsModule use. Every
- * adapter is still constructed (each is cheap — no network call happens
- * until `generateReply` runs), so switching providers is just an env
- * change, never a code change. Deliberately not exported for other
- * modules to inject: the mobile app is the only caller, via
- * `POST /assistant/reply`.
+ * alternatives. Build Session 12 Part 6 replaced the single-provider
+ * factory with `AiReplyProviderRouter` — `AI_REPLY_PROVIDER` now
+ * resolves to the router, which tries the configured preferred provider
+ * first and falls back sequentially to the others if it's unconfigured/
+ * unhealthy/erroring, instead of a single provider's failure always
+ * failing the whole request. Every adapter is still constructed (each is
+ * cheap — no network call happens until `generateReply` runs), so which
+ * one is "preferred" stays an env change, never a code change.
+ * Deliberately not exported for other modules to inject: the mobile app
+ * is the only caller, via `POST /assistant/reply`.
  *
  * Build Session 11 Parts 1-2 added `AssistantSafetyService` (pre/post-
  * provider content classification, registered here) and
@@ -39,27 +43,15 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
     AssistantSafetyService,
     CompanionMemoryService,
     MemoryExtractionService,
+    AiProviderCircuitBreaker,
+    AiUsagePolicy,
+    AiReplyProviderRouter,
     AnthropicReplyProvider,
     OpenAiReplyProvider,
     GeminiReplyProvider,
     {
       provide: AI_REPLY_PROVIDER,
-      useFactory: (
-        configService: ConfigService,
-        anthropic: AnthropicReplyProvider,
-        openai: OpenAiReplyProvider,
-        gemini: GeminiReplyProvider,
-      ) => {
-        switch (configService.get<AiConfig>('ai')!.provider) {
-          case 'openai':
-            return openai;
-          case 'gemini':
-            return gemini;
-          default:
-            return anthropic;
-        }
-      },
-      inject: [ConfigService, AnthropicReplyProvider, OpenAiReplyProvider, GeminiReplyProvider],
+      useExisting: AiReplyProviderRouter,
     },
   ],
 })

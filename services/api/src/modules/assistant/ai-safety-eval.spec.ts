@@ -1,5 +1,6 @@
 import { AiEntitlementService } from '../../common/entitlements/ai-entitlement.service';
 import { CapabilityService } from '../../common/entitlements/capability.service';
+import { AiUsagePolicy } from './ai-usage-policy.service';
 import {
   AssistantSafetyService,
   ABUSE_CRISIS_KEYWORDS,
@@ -65,8 +66,23 @@ function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
       .mockResolvedValue((options?.planTier ?? 'PREMIUM') === 'PREMIUM'),
   } as unknown as CapabilityService;
   const entitlement = new AiEntitlementService(capabilityService);
+  const usagePolicy = {
+    checkWithinLimit: jest.fn().mockResolvedValue({
+      allowed: true,
+      window: { windowStart: new Date(), count: 0, limit: 200 },
+    }),
+    record: jest.fn().mockResolvedValue(undefined),
+  } as unknown as AiUsagePolicy;
 
-  const service = new AssistantService(provider, prisma, memory, safety, entitlement, extraction);
+  const service = new AssistantService(
+    provider,
+    prisma,
+    memory,
+    safety,
+    entitlement,
+    extraction,
+    usagePolicy,
+  );
   return { service, generateReply };
 }
 
