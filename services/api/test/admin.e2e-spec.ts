@@ -215,6 +215,20 @@ describe('Admin foundation (e2e)', () => {
       expect(detail.body.data.status).toBe('RESOLVED');
       expect(detail.body.data.replies).toHaveLength(1);
       expect(detail.body.data.replies[0].isStaff).toBe(true);
+
+      // Build Session 12 Part 2 — a status-changing reply notifies the
+      // ticket owner, with no reply/subject content in the copy.
+      const events = await request(app.getHttpServer())
+        .get('/notifications/events')
+        .set(authA())
+        .expect(200);
+      const ticketEvent = events.body.data.find(
+        (e: { type: string; data: string | null }) =>
+          e.type === 'SUPPORT_STATUS_CHANGED' && e.data === ticketId,
+      );
+      expect(ticketEvent).toBeDefined();
+      expect(ticketEvent.body).not.toContain('refunded');
+      expect(ticketEvent.body).not.toContain('Charged twice');
     });
 
     it('404s a made-up ticket id', async () => {

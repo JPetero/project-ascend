@@ -32,6 +32,20 @@ IconData _iconFor(NotificationEventType type) {
       return Icons.group_work_outlined;
     case NotificationEventType.sportsMatch:
       return Icons.sports_tennis_outlined;
+    case NotificationEventType.supportReply:
+    case NotificationEventType.supportStatusChanged:
+      return Icons.support_agent_outlined;
+    case NotificationEventType.moderationDecision:
+    case NotificationEventType.moderationAppealUpdate:
+      return Icons.shield_outlined;
+    case NotificationEventType.promoteReview:
+      return Icons.campaign_outlined;
+    case NotificationEventType.trainerVerificationUpdate:
+      return Icons.verified_outlined;
+    case NotificationEventType.eligibilityVerificationUpdate:
+      return Icons.workspace_premium_outlined;
+    case NotificationEventType.unknown:
+      return Icons.notifications_outlined;
   }
 }
 

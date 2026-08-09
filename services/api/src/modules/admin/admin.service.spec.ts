@@ -1,12 +1,14 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AuditService } from '../../common/audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminService } from './admin.service';
 
 describe('AdminService', () => {
   let service: AdminService;
   let auditService: { record: jest.Mock };
+  let notifications: { notify: jest.Mock };
   let prisma: {
     communityReport: {
       findMany: jest.Mock;
@@ -15,9 +17,19 @@ describe('AdminService', () => {
       update: jest.Mock;
     };
     communityPost: { update: jest.Mock };
-    affordabilityEligibility: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
-    supportTicket: { findMany: jest.Mock; count: jest.Mock; findUnique: jest.Mock };
-    supportTicketReply: { findMany: jest.Mock };
+    affordabilityEligibility: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    supportTicket: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    supportTicketReply: { findMany: jest.Mock; create: jest.Mock };
     promotedCampaign: {
       findMany: jest.Mock;
       count: jest.Mock;
@@ -42,9 +54,19 @@ describe('AdminService', () => {
         update: jest.fn(),
       },
       communityPost: { update: jest.fn() },
-      affordabilityEligibility: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
-      supportTicket: { findMany: jest.fn(), count: jest.fn(), findUnique: jest.fn() },
-      supportTicketReply: { findMany: jest.fn().mockResolvedValue([]) },
+      affordabilityEligibility: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      supportTicket: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      supportTicketReply: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
       promotedCampaign: {
         findMany: jest.fn(),
         count: jest.fn(),
@@ -60,12 +82,14 @@ describe('AdminService', () => {
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
     auditService = { record: jest.fn() };
+    notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AdminService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: auditService },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -90,6 +114,7 @@ describe('AdminService', () => {
     it('marks a post REMOVED when actioned with removeContent on a POST target', async () => {
       prisma.communityReport.findUnique.mockResolvedValue({
         id: 'report-1',
+        reporterId: 'reporter-1',
         targetType: 'POST',
         targetId: 'post-1',
         status: 'OPEN',
@@ -106,6 +131,7 @@ describe('AdminService', () => {
     it('does not touch content when removeContent is not set', async () => {
       prisma.communityReport.findUnique.mockResolvedValue({
         id: 'report-1',
+        reporterId: 'reporter-1',
         targetType: 'POST',
         targetId: 'post-1',
         status: 'OPEN',
@@ -114,6 +140,28 @@ describe('AdminService', () => {
       await service.actionReport('report-1', { status: 'REVIEWED' as never });
 
       expect(prisma.communityPost.update).not.toHaveBeenCalled();
+    });
+
+    it('notifies the reporter of the decision, never the specifics', async () => {
+      prisma.communityReport.findUnique.mockResolvedValue({
+        id: 'report-1',
+        reporterId: 'reporter-1',
+        targetType: 'POST',
+        targetId: 'post-1',
+        status: 'OPEN',
+      });
+
+      await service.actionReport('report-1', { status: 'REVIEWED' as never });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'reporter-1',
+        'MODERATION_DECISION',
+        expect.any(String),
+        expect.any(String),
+        'report-1',
+      );
+      const [, , , body] = notifications.notify.mock.calls[0];
+      expect(body).not.toMatch(/post|remove|target/i);
     });
   });
 
@@ -131,6 +179,20 @@ describe('AdminService', () => {
         service.decideEligibility('user-1', { status: 'APPROVED' as never }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('notifies the applicant of the decision', async () => {
+      prisma.affordabilityEligibility.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.affordabilityEligibility.update.mockResolvedValue({ userId: 'user-1' });
+
+      await service.decideEligibility('user-1', { status: 'APPROVED' as never });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'user-1',
+        'ELIGIBILITY_VERIFICATION_UPDATE',
+        expect.any(String),
+        expect.any(String),
+      );
+    });
   });
 
   describe('replyToTicket', () => {
@@ -140,6 +202,84 @@ describe('AdminService', () => {
       await expect(
         service.replyToTicket('admin-1', 'ticket-1', { body: 'reply' }),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('notifies a plain support reply when the status is unchanged', async () => {
+      prisma.supportTicket.findUnique.mockResolvedValue({
+        id: 'ticket-1',
+        userId: 'user-1',
+        category: 'GENERAL',
+        status: 'OPEN',
+      });
+
+      await service.replyToTicket('admin-1', 'ticket-1', { body: 'Thanks for reaching out.' });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'user-1',
+        'SUPPORT_REPLY',
+        expect.any(String),
+        expect.any(String),
+        'ticket-1',
+      );
+    });
+
+    it('notifies a status change instead of a plain reply when status actually changes', async () => {
+      prisma.supportTicket.findUnique.mockResolvedValue({
+        id: 'ticket-1',
+        userId: 'user-1',
+        category: 'GENERAL',
+        status: 'OPEN',
+      });
+
+      await service.replyToTicket('admin-1', 'ticket-1', {
+        body: 'Resolved.',
+        status: 'RESOLVED' as never,
+      });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'user-1',
+        'SUPPORT_STATUS_CHANGED',
+        expect.any(String),
+        expect.any(String),
+        'ticket-1',
+      );
+    });
+
+    it('notifies a moderation appeal update, not a plain support reply, for an appeal ticket', async () => {
+      prisma.supportTicket.findUnique.mockResolvedValue({
+        id: 'ticket-1',
+        userId: 'user-1',
+        category: 'MODERATION_APPEAL',
+        status: 'OPEN',
+      });
+
+      await service.replyToTicket('admin-1', 'ticket-1', { body: 'Reviewed your appeal.' });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'user-1',
+        'MODERATION_APPEAL_UPDATE',
+        expect.any(String),
+        expect.any(String),
+        'ticket-1',
+      );
+    });
+
+    it('never puts the reply body or ticket subject in the notification copy', async () => {
+      prisma.supportTicket.findUnique.mockResolvedValue({
+        id: 'ticket-1',
+        userId: 'user-1',
+        category: 'GENERAL',
+        subject: 'My billing issue',
+        status: 'OPEN',
+      });
+
+      await service.replyToTicket('admin-1', 'ticket-1', {
+        body: 'Here is a very specific private detail about your account.',
+      });
+
+      const [, , , body] = notifications.notify.mock.calls[0];
+      expect(body).not.toContain('very specific private detail');
+      expect(body).not.toContain('My billing issue');
     });
   });
 
@@ -172,6 +312,7 @@ describe('AdminService', () => {
     it('activates a PENDING_REVIEW campaign and records the reviewer', async () => {
       prisma.promotedCampaign.findUnique.mockResolvedValue({
         id: 'campaign-1',
+        creatorId: 'creator-1',
         status: 'PENDING_REVIEW',
       });
 
@@ -181,6 +322,13 @@ describe('AdminService', () => {
         where: { id: 'campaign-1' },
         data: expect.objectContaining({ status: 'ACTIVE', reviewedBy: 'admin-1' }),
       });
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'creator-1',
+        'PROMOTE_REVIEW',
+        expect.any(String),
+        expect.any(String),
+        'campaign-1',
+      );
     });
   });
 

@@ -32,5 +32,32 @@ String? deepLinkPathFor(NotificationEventType type, String? data) {
       return data == null ? null : RoutePaths.jointWorkoutDetailPath(data);
     case NotificationEventType.sportsMatch:
       return data == null ? null : RoutePaths.sportMatchDetailPath(data);
+    case NotificationEventType.supportReply:
+    case NotificationEventType.supportStatusChanged:
+      // [data] is the ticket id.
+      return data == null ? null : RoutePaths.supportTicketDetailPath(data);
+    case NotificationEventType.moderationAppealUpdate:
+      // A moderation appeal is filed as a Support ticket
+      // (SupportTicketCategory.MODERATION_APPEAL) — [data] is that
+      // ticket's id, not a separate appeal-detail route.
+      return data == null ? null : RoutePaths.supportTicketDetailPath(data);
+    case NotificationEventType.moderationDecision:
+      // No per-decision detail screen exists — Support is where the
+      // user can see their reports and file an appeal if they disagree.
+      return RoutePaths.support;
+    case NotificationEventType.promoteReview:
+      return data == null ? null : RoutePaths.promoteCampaignDetailPath(data);
+    case NotificationEventType.eligibilityVerificationUpdate:
+      // Eligibility application status is shown inline on the
+      // subscription screen — there's no separate eligibility route.
+      return RoutePaths.subscription;
+    case NotificationEventType.trainerVerificationUpdate:
+      // No trainer-verification UI exists yet (deferred — see
+      // build-session-12.md) — nothing to navigate to.
+      return null;
+    case NotificationEventType.unknown:
+      // Deliberately no navigation for a type this client build doesn't
+      // recognize — see NotificationEventType.unknown's doc comment.
+      return null;
   }
 }
