@@ -5,9 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { TrainerGroupInvitationStatus, TrainerGroupMemberRole } from '@prisma/client';
+import {
+  TrainerGroupInvitationStatus,
+  TrainerGroupMemberRole,
+  WorkoutAssignmentStatus,
+} from '@prisma/client';
 import { CapabilityService } from '../../common/entitlements/capability.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TrainerGroupsService } from './trainer-groups.service';
 
 function group(overrides: Partial<Record<string, unknown>> = {}) {
@@ -41,6 +46,7 @@ describe('TrainerGroupsService', () => {
       create: jest.Mock;
       findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
+      findMany: jest.Mock;
       delete: jest.Mock;
     };
     trainerGroupMember: {
@@ -60,9 +66,26 @@ describe('TrainerGroupsService', () => {
     trainerGroupMessage: { create: jest.Mock };
     trainerGroupSharedPlan: { findUnique: jest.Mock; delete: jest.Mock; upsert: jest.Mock };
     trainerGroupAnnouncement: { create: jest.Mock; findMany: jest.Mock };
-    workoutPlan: { findUnique: jest.Mock };
+    workoutPlan: { findUnique: jest.Mock; create: jest.Mock };
+    workoutPlanExercise: { createMany: jest.Mock };
+    workoutAssignment: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      delete: jest.Mock;
+      groupBy: jest.Mock;
+    };
+    trainerGroupScheduledSession: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
+  let notifications: { notify: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -71,6 +94,7 @@ describe('TrainerGroupsService', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
+        findMany: jest.fn(),
         delete: jest.fn(),
       },
       trainerGroupMember: {
@@ -90,18 +114,41 @@ describe('TrainerGroupsService', () => {
       trainerGroupMessage: { create: jest.fn() },
       trainerGroupSharedPlan: { findUnique: jest.fn(), delete: jest.fn(), upsert: jest.fn() },
       trainerGroupAnnouncement: { create: jest.fn(), findMany: jest.fn() },
-      workoutPlan: { findUnique: jest.fn() },
-      $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
+      workoutPlan: { findUnique: jest.fn(), create: jest.fn() },
+      workoutPlanExercise: { createMany: jest.fn() },
+      workoutAssignment: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        delete: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
+      trainerGroupScheduledSession: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn((arg: unknown) => {
+        if (typeof arg === 'function') {
+          return (arg as (tx: unknown) => unknown)(prisma);
+        }
+        return Promise.resolve(arg);
+      }),
     };
     // Defaults to the free tier — individual tests opt into Premium via
     // mockResolvedValueOnce(true).
     capabilityService = { hasCapabilityForUser: jest.fn().mockResolvedValue(false) };
+    notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         TrainerGroupsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CapabilityService, useValue: capabilityService },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -546,6 +593,341 @@ describe('TrainerGroupsService', () => {
       await expect(service.unsharePlan('bystander', 'group-1', 'shared-1')).rejects.toBeInstanceOf(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('createAssignments (Build Session 12 Part 9)', () => {
+    it('rejects assigning a plan the caller does not own', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.workoutPlan.findUnique.mockResolvedValue({ id: 'plan-1', userId: 'someone-else' });
+
+      await expect(
+        service.createAssignments('owner-1', 'group-1', {
+          workoutPlanId: 'plan-1',
+          assigneeUserIds: ['member-a'],
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects an assignee who is not a member of the group', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.workoutPlan.findUnique.mockResolvedValue({ id: 'plan-1', userId: 'owner-1' });
+      prisma.trainerGroupMember.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.createAssignments('owner-1', 'group-1', {
+          workoutPlanId: 'plan-1',
+          assigneeUserIds: ['not-a-member'],
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a plain member (neither owner nor moderator) assigning a workout', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+
+      await expect(
+        service.createAssignments('member-a', 'group-1', {
+          workoutPlanId: 'plan-1',
+          assigneeUserIds: ['member-b'],
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('creates one assignment per assignee and notifies each of them', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.workoutPlan.findUnique.mockResolvedValue({
+        id: 'plan-1',
+        userId: 'owner-1',
+        name: 'Push Day',
+      });
+      prisma.trainerGroupMember.findMany.mockResolvedValue([
+        { userId: 'member-a' },
+        { userId: 'member-b' },
+      ]);
+      prisma.workoutAssignment.create.mockImplementation(
+        (args: { data: Record<string, unknown> }) =>
+          Promise.resolve({
+            id: `assignment-${args.data.assigneeId as string}`,
+            status: WorkoutAssignmentStatus.PENDING,
+            assignedPlanId: null,
+            note: null,
+            dueAt: null,
+            createdAt: new Date(),
+            completedAt: null,
+            ...args.data,
+          }),
+      );
+
+      const result = await service.createAssignments('owner-1', 'group-1', {
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['member-a', 'member-b'],
+      });
+
+      expect(result).toHaveLength(2);
+      expect(notifications.notify).toHaveBeenCalledTimes(2);
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'member-a',
+        'WORKOUT_ASSIGNED',
+        expect.any(String),
+        expect.stringContaining('Push Day'),
+        'assignment-member-a',
+      );
+    });
+  });
+
+  describe('acceptAssignment', () => {
+    it('rejects an assignment that does not belong to the caller', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assigneeId: 'someone-else',
+        status: WorkoutAssignmentStatus.PENDING,
+      });
+
+      await expect(service.acceptAssignment('member-a', 'assignment-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('rejects re-accepting an assignment that already has a response', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.ACCEPTED,
+      });
+
+      await expect(service.acceptAssignment('member-a', 'assignment-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('clones the source plan’s exercises into a new plan owned by the assignee', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+        sourcePlan: {
+          name: 'Push Day',
+          description: 'Chest, shoulders, triceps',
+          exercises: [
+            {
+              exerciseId: 'exercise-1',
+              order: 1,
+              targetSets: 3,
+              targetReps: 10,
+              targetDurationSeconds: null,
+              targetWeightKg: null,
+              targetDistanceMeters: null,
+              restSeconds: 60,
+              notes: null,
+            },
+          ],
+        },
+      });
+      prisma.workoutPlan.create.mockResolvedValue({ id: 'cloned-plan-1' });
+      prisma.workoutAssignment.update.mockResolvedValue({});
+
+      const result = await service.acceptAssignment('member-a', 'assignment-1');
+
+      expect(prisma.workoutPlan.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ userId: 'member-a', name: 'Push Day' }),
+        }),
+      );
+      expect(prisma.workoutAssignment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: WorkoutAssignmentStatus.ACCEPTED,
+            assignedPlanId: 'cloned-plan-1',
+          }),
+        }),
+      );
+      expect(result).toEqual({ assignmentId: 'assignment-1', workoutPlanId: 'cloned-plan-1' });
+    });
+  });
+
+  describe('cancelAssignment', () => {
+    it('rejects a bystander who is neither the assigner nor the assignee', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+      });
+
+      await expect(service.cancelAssignment('bystander', 'assignment-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects removing a completed assignment', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.COMPLETED,
+      });
+
+      await expect(service.cancelAssignment('member-a', 'assignment-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('lets the assignee remove their own pending assignment', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+      });
+
+      await service.cancelAssignment('member-a', 'assignment-1');
+
+      expect(prisma.workoutAssignment.delete).toHaveBeenCalledWith({
+        where: { id: 'assignment-1' },
+      });
+    });
+  });
+
+  describe('completeAssignmentsForSession', () => {
+    it('is a no-op when the session has no workout plan', async () => {
+      await service.completeAssignmentsForSession('member-a', null);
+
+      expect(prisma.workoutAssignment.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('marks only the matching accepted assignment as completed', async () => {
+      await service.completeAssignmentsForSession('member-a', 'cloned-plan-1');
+
+      expect(prisma.workoutAssignment.updateMany).toHaveBeenCalledWith({
+        where: {
+          assigneeId: 'member-a',
+          assignedPlanId: 'cloned-plan-1',
+          status: WorkoutAssignmentStatus.ACCEPTED,
+        },
+        data: { status: WorkoutAssignmentStatus.COMPLETED, completedAt: expect.any(Date) },
+      });
+    });
+  });
+
+  describe('createScheduledSession (Build Session 12 Part 10)', () => {
+    it('rejects a non-expanded (free-tier) owner scheduling a session', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      capabilityService.hasCapabilityForUser.mockResolvedValue(false);
+
+      await expect(
+        service.createScheduledSession('owner-1', 'group-1', {
+          scheduledAt: new Date(Date.now() + 86_400_000).toISOString(),
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('rejects a scheduledAt that is not in the future', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+
+      await expect(
+        service.createScheduledSession('owner-1', 'group-1', {
+          scheduledAt: new Date(Date.now() - 86_400_000).toISOString(),
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('creates the session and notifies every other member', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      capabilityService.hasCapabilityForUser.mockResolvedValue(true);
+      const scheduledAt = new Date(Date.now() + 86_400_000);
+      prisma.trainerGroupScheduledSession.create.mockResolvedValue({
+        id: 'session-1',
+        groupId: 'group-1',
+        createdById: 'owner-1',
+        title: null,
+        scheduledAt,
+        durationMinutes: null,
+        location: null,
+        videoLink: null,
+        description: null,
+        canceledAt: null,
+        createdAt: new Date(),
+      });
+      prisma.trainerGroupMember.findMany.mockResolvedValue([
+        { userId: 'member-a' },
+        { userId: 'member-b' },
+      ]);
+
+      const result = await service.createScheduledSession('owner-1', 'group-1', {
+        scheduledAt: scheduledAt.toISOString(),
+      });
+
+      expect(result.id).toBe('session-1');
+      expect(notifications.notify).toHaveBeenCalledTimes(2);
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'member-a',
+        'GROUP_SESSION_SCHEDULED',
+        expect.any(String),
+        expect.any(String),
+        'session-1',
+      );
+    });
+  });
+
+  describe('cancelScheduledSession', () => {
+    it('rejects a bystander who neither created it nor owns the group', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        id: 'session-1',
+        groupId: 'group-1',
+        createdById: 'owner-1',
+        canceledAt: null,
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+
+      await expect(service.cancelScheduledSession('bystander', 'session-1')).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects canceling an already-canceled session', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        id: 'session-1',
+        groupId: 'group-1',
+        createdById: 'owner-1',
+        canceledAt: new Date(),
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+
+      await expect(service.cancelScheduledSession('owner-1', 'session-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+  });
+
+  describe('getTrainerDashboard', () => {
+    it('returns an empty dashboard for a caller who owns/moderates no groups', async () => {
+      prisma.trainerGroupMember.findMany.mockResolvedValue([]);
+
+      const result = await service.getTrainerDashboard('nobody');
+
+      expect(result).toEqual({ groups: [], upcomingSessions: [], recentAssignments: [] });
+    });
+
+    it('aggregates member counts and pending assignments per owned group', async () => {
+      prisma.trainerGroupMember.findMany.mockResolvedValue([{ groupId: 'group-1' }]);
+      prisma.trainerGroup.findMany.mockResolvedValue([
+        { id: 'group-1', name: 'Strong Squad', _count: { members: 3 } },
+      ]);
+      prisma.trainerGroupScheduledSession.findMany.mockResolvedValue([]);
+      prisma.workoutAssignment.findMany.mockResolvedValue([]);
+      prisma.workoutAssignment.groupBy.mockResolvedValue([
+        { groupId: 'group-1', _count: { _all: 2 } },
+      ]);
+
+      const result = await service.getTrainerDashboard('owner-1');
+
+      expect(result.groups).toEqual([
+        { id: 'group-1', name: 'Strong Squad', memberCount: 3, pendingAssignmentCount: 2 },
+      ]);
     });
   });
 });

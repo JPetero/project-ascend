@@ -10,6 +10,8 @@ class TrainerGroupDetailState {
     this.messages = const [],
     this.sharedPlans = const [],
     this.announcements = const [],
+    this.assignments = const [],
+    this.scheduledSessions = const [],
     this.isLoading = true,
     this.isSendingMessage = false,
     this.isPostingAnnouncement = false,
@@ -20,6 +22,8 @@ class TrainerGroupDetailState {
   final List<TrainerGroupMessage> messages;
   final List<TrainerGroupSharedPlan> sharedPlans;
   final List<TrainerGroupAnnouncement> announcements;
+  final List<WorkoutAssignment> assignments;
+  final List<TrainerGroupScheduledSession> scheduledSessions;
   final bool isLoading;
   final bool isSendingMessage;
   final bool isPostingAnnouncement;
@@ -30,6 +34,8 @@ class TrainerGroupDetailState {
     List<TrainerGroupMessage>? messages,
     List<TrainerGroupSharedPlan>? sharedPlans,
     List<TrainerGroupAnnouncement>? announcements,
+    List<WorkoutAssignment>? assignments,
+    List<TrainerGroupScheduledSession>? scheduledSessions,
     bool? isLoading,
     bool? isSendingMessage,
     bool? isPostingAnnouncement,
@@ -41,6 +47,8 @@ class TrainerGroupDetailState {
       messages: messages ?? this.messages,
       sharedPlans: sharedPlans ?? this.sharedPlans,
       announcements: announcements ?? this.announcements,
+      assignments: assignments ?? this.assignments,
+      scheduledSessions: scheduledSessions ?? this.scheduledSessions,
       isLoading: isLoading ?? this.isLoading,
       isSendingMessage: isSendingMessage ?? this.isSendingMessage,
       isPostingAnnouncement:
@@ -72,7 +80,13 @@ class TrainerGroupDetailController
         _repository.listMessages(groupId),
         _repository.listSharedPlans(groupId),
         _repository.listAnnouncements(groupId),
+        _repository.listScheduledSessions(groupId),
       ]);
+      // Owner/moderator-only on the backend — a plain member's 403 just
+      // means an empty list here rather than failing the whole load.
+      final assignments = await _repository
+          .listGroupAssignments(groupId)
+          .catchError((_) => const <WorkoutAssignment>[]);
       state = TrainerGroupDetailState(
         group: results[0] as TrainerGroup,
         // The API returns newest-first; the chat UI reads top-to-bottom
@@ -80,6 +94,8 @@ class TrainerGroupDetailController
         messages: (results[1] as List<TrainerGroupMessage>).reversed.toList(),
         sharedPlans: results[2] as List<TrainerGroupSharedPlan>,
         announcements: results[3] as List<TrainerGroupAnnouncement>,
+        scheduledSessions: results[4] as List<TrainerGroupScheduledSession>,
+        assignments: assignments,
         isLoading: false,
       );
     } catch (error) {
@@ -185,6 +201,89 @@ class TrainerGroupDetailController
     } catch (error) {
       state = state.copyWith(
         isPostingAnnouncement: false,
+        error: error.toString(),
+      );
+      return false;
+    }
+  }
+
+  /// Owner/moderator-only — see TrainerGroupsService.createAssignments.
+  Future<bool> createAssignments({
+    required String workoutPlanId,
+    required List<String> assigneeUserIds,
+    String? note,
+  }) async {
+    try {
+      final created = await _repository.createAssignments(
+        groupId,
+        workoutPlanId: workoutPlanId,
+        assigneeUserIds: assigneeUserIds,
+        note: note,
+      );
+      state = state.copyWith(assignments: [...created, ...state.assignments]);
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> cancelAssignment(String assignmentId) async {
+    final previous = state.assignments;
+    state = state.copyWith(
+      assignments: previous.where((a) => a.id != assignmentId).toList(),
+    );
+    try {
+      await _repository.cancelAssignment(assignmentId);
+      return true;
+    } catch (error) {
+      state = state.copyWith(assignments: previous, error: error.toString());
+      return false;
+    }
+  }
+
+  /// Owner/moderator + the group owner's expanded (Premium) tier — see
+  /// TrainerGroupsService.createScheduledSession.
+  Future<bool> createScheduledSession({
+    required DateTime scheduledAt,
+    String? title,
+    int? durationMinutes,
+    String? location,
+    String? videoLink,
+    String? description,
+  }) async {
+    try {
+      final created = await _repository.createScheduledSession(
+        groupId,
+        scheduledAt: scheduledAt,
+        title: title,
+        durationMinutes: durationMinutes,
+        location: location,
+        videoLink: videoLink,
+        description: description,
+      );
+      state = state.copyWith(
+        scheduledSessions: [...state.scheduledSessions, created]
+          ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt)),
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> cancelScheduledSession(String sessionId) async {
+    final previous = state.scheduledSessions;
+    state = state.copyWith(
+      scheduledSessions: previous.where((s) => s.id != sessionId).toList(),
+    );
+    try {
+      await _repository.cancelScheduledSession(sessionId);
+      return true;
+    } catch (error) {
+      state = state.copyWith(
+        scheduledSessions: previous,
         error: error.toString(),
       );
       return false;

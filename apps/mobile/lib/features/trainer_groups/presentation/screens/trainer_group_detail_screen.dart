@@ -155,6 +155,184 @@ class _TrainerGroupDetailScreenState
     );
   }
 
+  /// Owner/moderator-only (Build Session 12 Part 9) — picks one of the
+  /// caller's own workout plans and one or more group members to assign
+  /// it to. See TrainerGroupsService.createAssignments for the
+  /// membership validation and clone-on-accept flow.
+  Future<void> _assignWorkout() async {
+    final controller = ref.read(
+      trainerGroupDetailControllerProvider(widget.groupId).notifier,
+    );
+    final group = ref.read(
+      trainerGroupDetailControllerProvider(
+        widget.groupId,
+      ).select((s) => s.group),
+    );
+    if (group == null) return;
+    final plans = await ref.read(workoutPlanRepositoryProvider).list();
+    if (!mounted) return;
+    if (plans.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Create a workout plan first to assign one.'),
+        ),
+      );
+      return;
+    }
+    final planId = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Assign which plan?'),
+        children: [
+          for (final plan in plans)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, plan.id),
+              child: Text(plan.name),
+            ),
+        ],
+      ),
+    );
+    if (planId == null || !mounted) return;
+
+    final assignees = <String>{};
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: const Text('Assign to whom?'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final member in group.members)
+                  if (member.userId != group.ownerId)
+                    CheckboxListTile(
+                      value: assignees.contains(member.userId),
+                      title: Text(member.displayName ?? 'Ascend member'),
+                      onChanged: (checked) => setState(() {
+                        if (checked ?? false) {
+                          assignees.add(member.userId);
+                        } else {
+                          assignees.remove(member.userId);
+                        }
+                      }),
+                    ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: assignees.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, true),
+              child: const Text('Assign'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ok = await controller.createAssignments(
+      workoutPlanId: planId,
+      assigneeUserIds: assignees.toList(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Workout assigned.' : "Couldn't assign — try again.",
+        ),
+      ),
+    );
+  }
+
+  /// Owner/moderator + the group owner's expanded (Premium) tier (Build
+  /// Session 12 Part 10) — a genuine date/time booking, distinct from
+  /// the ad-hoc "start now" Joint Workout Session scheduled above. See
+  /// TrainerGroupScheduledSession's schema comment.
+  Future<void> _scheduleDatedSession() async {
+    final controller = ref.read(
+      trainerGroupDetailControllerProvider(widget.groupId).notifier,
+    );
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 18, minute: 0),
+    );
+    if (time == null || !mounted) return;
+    final scheduledAt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
+    final titleController = TextEditingController();
+    final videoLinkController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Session details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Title (optional)'),
+            ),
+            TextField(
+              controller: videoLinkController,
+              decoration: const InputDecoration(
+                labelText: 'Video link (optional)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Schedule'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final ok = await controller.createScheduledSession(
+      scheduledAt: scheduledAt,
+      title: titleController.text.trim().isEmpty
+          ? null
+          : titleController.text.trim(),
+      videoLink: videoLinkController.text.trim().isEmpty
+          ? null
+          : videoLinkController.text.trim(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok ? 'Session scheduled.' : "Couldn't schedule — try again.",
+        ),
+      ),
+    );
+  }
+
   /// Schedules a Joint Workout Session for every current group member —
   /// Build Session 10 Part 24, reusing the existing friend-only Joint
   /// Workout Sessions system (via `trainerGroupId`) rather than
@@ -247,28 +425,80 @@ class _TrainerGroupDetailScreenState
       );
     }
 
+    final canManage = isOwner || isModerator;
+    final tabs = <Tab>[
+      const Tab(text: 'Chat'),
+      const Tab(text: 'Members'),
+      const Tab(text: 'Shared plans'),
+      const Tab(text: 'Announcements'),
+      const Tab(text: 'Scheduled'),
+      if (canManage) const Tab(text: 'Assignments'),
+    ];
+    final tabViews = <Widget>[
+      _ChatTab(
+        state: state,
+        messageController: _messageController,
+        onSend: _sendMessage,
+        viewerId: viewerId,
+      ),
+      _MembersTab(
+        group: state.group!,
+        viewerId: viewerId,
+        isOwner: isOwner,
+        onRemove: controller.removeMember,
+        onSetRole: controller.setMemberRole,
+      ),
+      _SharedPlansTab(
+        sharedPlans: state.sharedPlans,
+        viewerId: viewerId,
+        isOwner: isOwner,
+        onShare: _sharePlan,
+        onUnshare: controller.unsharePlan,
+      ),
+      _AnnouncementsTab(
+        announcements: state.announcements,
+        isExpanded: state.group!.isExpanded,
+        canPost: canManage,
+        isPosting: state.isPostingAnnouncement,
+        onPost: _postAnnouncement,
+      ),
+      _ScheduledSessionsTab(
+        sessions: state.scheduledSessions,
+        canManage: canManage,
+        isExpanded: state.group!.isExpanded,
+        viewerId: viewerId,
+        onSchedule: _scheduleDatedSession,
+        onCancel: controller.cancelScheduledSession,
+      ),
+      if (canManage)
+        _AssignmentsTab(
+          assignments: state.assignments,
+          members: state.group!.members,
+          onAssign: _assignWorkout,
+          onCancel: controller.cancelAssignment,
+        ),
+    ];
+
     return DefaultTabController(
-      length: 4,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           title: Text(state.group!.name),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Chat'),
-              Tab(text: 'Members'),
-              Tab(text: 'Shared plans'),
-              Tab(text: 'Announcements'),
-            ],
-          ),
+          bottom: TabBar(isScrollable: true, tabs: tabs),
           actions: [
-            if (state.group!.isExpanded && (isOwner || isModerator))
+            if (canManage)
+              IconButton(
+                icon: const Icon(Icons.assignment_ind_outlined),
+                tooltip: 'Assign a workout',
+                onPressed: _assignWorkout,
+              ),
+            if (state.group!.isExpanded && canManage)
               IconButton(
                 icon: const Icon(Icons.event_available_outlined),
-                tooltip: 'Schedule a session',
+                tooltip: 'Start a group session now',
                 onPressed: _scheduleSession,
               ),
-            if (isOwner || isModerator)
+            if (canManage)
               IconButton(
                 icon: const Icon(Icons.person_add_alt_1),
                 tooltip: 'Invite member',
@@ -276,39 +506,7 @@ class _TrainerGroupDetailScreenState
               ),
           ],
         ),
-        body: SafeArea(
-          child: TabBarView(
-            children: [
-              _ChatTab(
-                state: state,
-                messageController: _messageController,
-                onSend: _sendMessage,
-                viewerId: viewerId,
-              ),
-              _MembersTab(
-                group: state.group!,
-                viewerId: viewerId,
-                isOwner: isOwner,
-                onRemove: controller.removeMember,
-                onSetRole: controller.setMemberRole,
-              ),
-              _SharedPlansTab(
-                sharedPlans: state.sharedPlans,
-                viewerId: viewerId,
-                isOwner: isOwner,
-                onShare: _sharePlan,
-                onUnshare: controller.unsharePlan,
-              ),
-              _AnnouncementsTab(
-                announcements: state.announcements,
-                isExpanded: state.group!.isExpanded,
-                canPost: isOwner || isModerator,
-                isPosting: state.isPostingAnnouncement,
-                onPost: _postAnnouncement,
-              ),
-            ],
-          ),
-        ),
+        body: SafeArea(child: TabBarView(children: tabViews)),
       ),
     );
   }
@@ -658,6 +856,195 @@ class _SharedPlansTab extends StatelessWidget {
           child: AscendSecondaryButton(
             label: 'Share a plan',
             onPressed: onShare,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Build Session 12 Part 10 — a genuine date/time booking, visible to
+/// every member; only the owner/moderator can add one, and only on an
+/// expanded (Premium) group.
+class _ScheduledSessionsTab extends StatelessWidget {
+  const _ScheduledSessionsTab({
+    required this.sessions,
+    required this.canManage,
+    required this.isExpanded,
+    required this.viewerId,
+    required this.onSchedule,
+    required this.onCancel,
+  });
+
+  final List<TrainerGroupScheduledSession> sessions;
+  final bool canManage;
+  final bool isExpanded;
+  final String? viewerId;
+  final Future<void> Function() onSchedule;
+  final Future<bool> Function(String sessionId) onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: sessions.isEmpty
+              ? const AscendEmptyState(
+                  icon: Icons.event_outlined,
+                  title: 'No sessions scheduled',
+                  message: 'The owner or a moderator can book one here.',
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(AscendSpacing.md),
+                  children: [
+                    for (final session in sessions)
+                      AscendCard(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    session.title ?? 'Group session',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                  Text(
+                                    session.scheduledAt.toLocal().toString(),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                  if (session.videoLink != null)
+                                    Text(
+                                      session.videoLink!,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (canManage || session.createdById == viewerId)
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Cancel',
+                                onPressed: () => onCancel(session.id),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        if (canManage && isExpanded)
+          Padding(
+            padding: const EdgeInsets.all(AscendSpacing.md),
+            child: AscendSecondaryButton(
+              label: 'Schedule a session',
+              onPressed: onSchedule,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Owner/moderator-only (Build Session 12 Part 9) — a trainer's view of
+/// every workout assigned to this group's members, whatever its status.
+class _AssignmentsTab extends StatelessWidget {
+  const _AssignmentsTab({
+    required this.assignments,
+    required this.members,
+    required this.onAssign,
+    required this.onCancel,
+  });
+
+  final List<WorkoutAssignment> assignments;
+  final List<TrainerGroupMember> members;
+  final Future<void> Function() onAssign;
+  final Future<bool> Function(String assignmentId) onCancel;
+
+  String _assigneeLabel(String assigneeId) {
+    for (final member in members) {
+      if (member.userId == assigneeId) {
+        return member.displayName ?? 'Ascend member';
+      }
+    }
+    return 'Ascend member';
+  }
+
+  String _statusLabel(WorkoutAssignmentStatus status) {
+    switch (status) {
+      case WorkoutAssignmentStatus.pending:
+        return 'Pending';
+      case WorkoutAssignmentStatus.accepted:
+        return 'In progress';
+      case WorkoutAssignmentStatus.completed:
+        return 'Completed';
+      case WorkoutAssignmentStatus.canceled:
+        return 'Canceled';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: assignments.isEmpty
+              ? const AscendEmptyState(
+                  icon: Icons.assignment_ind_outlined,
+                  title: 'No workouts assigned yet',
+                  message: 'Assign one of your workout plans to a member.',
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(AscendSpacing.md),
+                  children: [
+                    for (final assignment in assignments)
+                      AscendCard(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    assignment.sourcePlanName,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                  Text(
+                                    '${_assigneeLabel(assignment.assigneeId)} · '
+                                    '${_statusLabel(assignment.status)}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (assignment.status !=
+                                WorkoutAssignmentStatus.completed)
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                tooltip: 'Remove',
+                                onPressed: () => onCancel(assignment.id),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(AscendSpacing.md),
+          child: AscendSecondaryButton(
+            label: 'Assign a workout',
+            onPressed: onAssign,
           ),
         ),
       ],

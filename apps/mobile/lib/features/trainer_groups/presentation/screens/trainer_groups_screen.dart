@@ -20,7 +20,16 @@ class TrainerGroupsScreen extends ConsumerWidget {
     final controller = ref.read(trainerGroupsControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Trainer Groups')),
+      appBar: AppBar(
+        title: const Text('Trainer Groups'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.dashboard_outlined),
+            tooltip: 'Trainer dashboard',
+            onPressed: () => context.push(RoutePaths.trainerDashboard),
+          ),
+        ],
+      ),
       floatingActionButton: state.groups.any((g) => g.isOwnGroup)
           ? null
           : FloatingActionButton(

@@ -187,4 +187,122 @@ class TrainerGroupsRepository {
         )
         .toList();
   }
+
+  // --- Workout assignments (Build Session 12 Part 9) ----------------------
+
+  Future<List<WorkoutAssignment>> createAssignments(
+    String groupId, {
+    required String workoutPlanId,
+    required List<String> assigneeUserIds,
+    String? note,
+  }) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/$groupId/assignments',
+      (data) => data as List<dynamic>,
+      data: {
+        'workoutPlanId': workoutPlanId,
+        'assigneeUserIds': assigneeUserIds,
+        'note': ?note,
+      },
+    );
+    return envelope.data!
+        .map((a) => WorkoutAssignment.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<WorkoutAssignment>> listGroupAssignments(String groupId) async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/$groupId/assignments',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map((a) => WorkoutAssignment.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<WorkoutAssignment>> listMyAssignments() async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/assignments/mine',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map((a) => WorkoutAssignment.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Returns the id of the new workout plan cloned into the caller's own
+  /// plans — the caller starts a session against it exactly like any
+  /// other plan of theirs.
+  Future<String> acceptAssignment(String assignmentId) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/assignments/$assignmentId/accept',
+      (data) => data as Map<String, dynamic>,
+    );
+    return envelope.data!['workoutPlanId'] as String;
+  }
+
+  Future<void> cancelAssignment(String assignmentId) async {
+    await _apiClient.delete(
+      '/trainer-groups/assignments/$assignmentId',
+      (_) => null,
+    );
+  }
+
+  // --- Scheduled sessions (Build Session 12 Part 10) -----------------------
+
+  Future<TrainerGroupScheduledSession> createScheduledSession(
+    String groupId, {
+    required DateTime scheduledAt,
+    String? title,
+    int? durationMinutes,
+    String? location,
+    String? videoLink,
+    String? description,
+  }) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/$groupId/scheduled-sessions',
+      (data) => data as Map<String, dynamic>,
+      data: {
+        'scheduledAt': scheduledAt.toIso8601String(),
+        'title': ?title,
+        'durationMinutes': ?durationMinutes,
+        'location': ?location,
+        'videoLink': ?videoLink,
+        'description': ?description,
+      },
+    );
+    return TrainerGroupScheduledSession.fromJson(envelope.data!);
+  }
+
+  Future<List<TrainerGroupScheduledSession>> listScheduledSessions(
+    String groupId,
+  ) async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/$groupId/scheduled-sessions',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map(
+          (s) =>
+              TrainerGroupScheduledSession.fromJson(s as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> cancelScheduledSession(String sessionId) async {
+    await _apiClient.delete(
+      '/trainer-groups/scheduled-sessions/$sessionId',
+      (_) => null,
+    );
+  }
+
+  // --- Trainer dashboard (Build Session 12 Part 11) -------------------------
+
+  Future<TrainerDashboard> getTrainerDashboard() async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/dashboard',
+      (data) => data as Map<String, dynamic>,
+    );
+    return TrainerDashboard.fromJson(envelope.data!);
+  }
 }

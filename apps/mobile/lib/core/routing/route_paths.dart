@@ -59,6 +59,12 @@ abstract final class RoutePaths {
   static const trainerGroups = '/social/groups';
   static const trainerGroupCreate = '/social/groups/new';
   static const trainerGroupDetail = '/social/groups/:id';
+  // Trainer Dashboard (Build Session 12 Part 11) — read-only aggregate
+  // across every group the caller owns or moderates.
+  static const trainerDashboard = '/social/groups/dashboard';
+  // A member's own assigned-workout to-do list (Build Session 12 Part
+  // 9), reachable from dashboard_screen.dart.
+  static const myAssignments = '/assigned-workouts';
 
   // Challenges — Founder Scenario 21, reachable from the Rankings tab.
   // Opt-in Rankings itself lives at [leaderboards] with no separate push

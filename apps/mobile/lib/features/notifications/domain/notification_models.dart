@@ -70,6 +70,10 @@ enum NotificationEventType {
   promoteReview,
   trainerVerificationUpdate,
   eligibilityVerificationUpdate,
+  // Build Session 12 Part 9/10 — a trainer assigning a workout, or
+  // scheduling a session for the group.
+  workoutAssigned,
+  groupSessionScheduled,
 
   /// A server-sent type this build of the client doesn't recognize yet
   /// (Build Session 12 Part 1) — e.g. an older app version receiving a
@@ -132,6 +136,10 @@ NotificationEventType? tryParseNotificationEventType(String value) {
       return NotificationEventType.trainerVerificationUpdate;
     case 'ELIGIBILITY_VERIFICATION_UPDATE':
       return NotificationEventType.eligibilityVerificationUpdate;
+    case 'WORKOUT_ASSIGNED':
+      return NotificationEventType.workoutAssigned;
+    case 'GROUP_SESSION_SCHEDULED':
+      return NotificationEventType.groupSessionScheduled;
     default:
       return null;
   }

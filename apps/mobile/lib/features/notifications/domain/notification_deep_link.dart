@@ -55,6 +55,16 @@ String? deepLinkPathFor(NotificationEventType type, String? data) {
       // No trainer-verification UI exists yet (deferred — see
       // build-session-12.md) — nothing to navigate to.
       return null;
+    case NotificationEventType.workoutAssigned:
+      // [data] is the assignment id, but there's no per-assignment
+      // detail route — the to-do list is the most specific place there
+      // is to send the user.
+      return RoutePaths.myAssignments;
+    case NotificationEventType.groupSessionScheduled:
+      // [data] is the scheduled session id, not the group id, so it
+      // can't build a group-detail deep link — the groups list is the
+      // most specific place there is to send the user.
+      return RoutePaths.trainerGroups;
     case NotificationEventType.unknown:
       // Deliberately no navigation for a type this client build doesn't
       // recognize — see NotificationEventType.unknown's doc comment.
