@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
@@ -48,4 +49,16 @@ export class AssistantReplyDto {
   @ValidateNested({ each: true })
   @Type(() => AssistantHistoryMessageDto)
   history?: AssistantHistoryMessageDto[];
+
+  // Build Session 12 Part 8 — omitted on the first turn of a new
+  // conversation; the server creates one and returns its id. Sent back
+  // on every subsequent turn so replies append to the same conversation
+  // instead of each turn silently starting a new one. Never trusted
+  // blindly: CompanionConversationsService.appendTurn re-checks
+  // ownership (`userId` match) before appending, and falls back to
+  // creating a fresh conversation rather than erroring if this doesn't
+  // resolve to one this user owns.
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }

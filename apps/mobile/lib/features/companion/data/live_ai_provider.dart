@@ -49,6 +49,18 @@ class LiveAiProvider extends AiProvider {
   /// never mistaken for this turn's.
   PendingCompanionMemory? pendingMemoryCandidate;
 
+  /// Tracks the backend conversation this provider instance's turns
+  /// belong to (Build Session 12 Part 8) — sent back on every subsequent
+  /// call so a whole chat session appends to one saved conversation
+  /// instead of every turn silently starting a new one. Self-contained:
+  /// since [aiProviderProvider] keeps the same `LiveAiProvider` instance
+  /// alive for an entire chat session, no other class needs to read or
+  /// set this for that to work. Null again (a fresh conversation) once a
+  /// new `LiveAiProvider` is created (e.g. after an app restart), or
+  /// whenever the backend didn't return one (history disabled, or this
+  /// call fell back to the local provider).
+  String? conversationId;
+
   @override
   Future<String> generateReply({
     required String input,
@@ -68,6 +80,7 @@ class LiveAiProvider extends AiProvider {
           'history': history
               .map((m) => {'text': m.text, 'isFromUser': m.isFromUser})
               .toList(),
+          if (conversationId != null) 'conversationId': conversationId,
         },
       );
       final reply = envelope.data?['reply'] as String?;
@@ -78,6 +91,7 @@ class LiveAiProvider extends AiProvider {
           rawPendingMemory,
         );
       }
+      conversationId = envelope.data?['conversationId'] as String?;
       if (reply != null && reply.trim().isNotEmpty) return reply;
     } catch (_) {
       // Falls through to the fallback below — never surfaces a raw

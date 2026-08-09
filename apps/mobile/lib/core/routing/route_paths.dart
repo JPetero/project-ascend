@@ -29,6 +29,13 @@ abstract final class RoutePaths {
   // Companion memory — Build Session 10 Part 15, reachable from the
   // "AI memory" toggle in dashboard_screen.dart.
   static const companionMemory = '/assistant/memory';
+  // Conversation history — Build Session 12 Part 8, reachable from the
+  // "Conversation history" toggle in dashboard_screen.dart. Deliberately
+  // separate from companionMemory above.
+  static const companionConversations = '/assistant/conversations';
+  static const companionConversationDetail = '/assistant/conversations/:id';
+  static String companionConversationDetailPath(String id) =>
+      '/assistant/conversations/$id';
   static const leaderboards = '/leaderboards';
   static const vision = '/vision';
 

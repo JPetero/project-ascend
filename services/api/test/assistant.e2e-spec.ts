@@ -404,3 +404,250 @@ describe('Assistant memory (e2e)', () => {
       .expect(401);
   });
 });
+
+/**
+ * Build Session 12 Part 8 — "Conversation history" as a real, separate
+ * surface from "what Ascend remembers" above. Like the memory endpoints,
+ * "a reply appends to a conversation" can't be exercised over real HTTP
+ * here (no live provider) — see assistant.service.spec.ts's "conversation
+ * history" describe block for that behavior against a mocked provider.
+ * This covers the CRUD endpoints themselves against conversations seeded
+ * directly via Prisma, plus the explicit cross-feature isolation the
+ * directive requires: deleting a conversation must not touch memory
+ * notes/preferences, and clearing memory must not touch conversations.
+ */
+describe('Assistant conversation history (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let token: string;
+  let userId: string;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter());
+    app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+    await app.init();
+
+    prisma = app.get(PrismaService);
+    await resetDatabase(prisma);
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Rae',
+        email: 'assistant-conversations-e2e@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    token = res.body.data.tokens.accessToken as string;
+    userId = res.body.data.user.id as string;
+  });
+
+  afterAll(async () => {
+    await resetDatabase(prisma);
+    await app.close();
+  });
+
+  it('reports no conversations for a fresh account', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/assistant/conversations')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(res.body.data.conversations).toEqual([]);
+  });
+
+  it('rejects an unauthenticated request to list conversations', async () => {
+    await request(app.getHttpServer()).get('/assistant/conversations').expect(401);
+  });
+
+  it('lists, opens, renames, and deletes a seeded conversation', async () => {
+    const conversation = await prisma.companionConversation.create({
+      data: { userId, companion: 'ATLAS' },
+    });
+    await prisma.companionChatMessage.createMany({
+      data: [
+        { conversationId: conversation.id, isFromUser: true, text: 'Plan my week' },
+        { conversationId: conversation.id, isFromUser: false, text: 'Sure — how many days?' },
+      ],
+    });
+
+    const listed = await request(app.getHttpServer())
+      .get('/assistant/conversations')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(listed.body.data.conversations).toHaveLength(1);
+    expect(listed.body.data.conversations[0]).toMatchObject({
+      id: conversation.id,
+      companion: 'ATLAS',
+      title: null,
+      lastMessagePreview: 'Sure — how many days?',
+    });
+
+    const opened = await request(app.getHttpServer())
+      .get(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(opened.body.data.messages.map((m: { text: string }) => m.text)).toEqual([
+      'Plan my week',
+      'Sure — how many days?',
+    ]);
+
+    await request(app.getHttpServer())
+      .patch(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Weekly plan' })
+      .expect(204);
+    const renamed = await request(app.getHttpServer())
+      .get(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(renamed.body.data.title).toBe('Weekly plan');
+
+    await request(app.getHttpServer())
+      .delete(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .get(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+  });
+
+  it('404s opening, renaming, or deleting a conversation belonging to someone else', async () => {
+    const stranger = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Stranger',
+        email: 'assistant-conversations-stranger@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    const strangersConversation = await prisma.companionConversation.create({
+      data: { userId: stranger.body.data.user.id, companion: 'NOVA' },
+    });
+
+    await request(app.getHttpServer())
+      .get(`/assistant/conversations/${strangersConversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .patch(`/assistant/conversations/${strangersConversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: 'Hijacked' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete(`/assistant/conversations/${strangersConversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+  });
+
+  it("clearing all conversations removes every one of this user's conversations but never touches memory notes or preferences", async () => {
+    await prisma.companionConversation.create({ data: { userId, companion: 'ATLAS' } });
+    await prisma.companionConversation.create({ data: { userId, companion: 'NOVA' } });
+    const memoryNote = await prisma.companionMemoryNote.create({
+      data: { userId, category: 'GOAL', value: 'Goal: build strength.' },
+    });
+    await prisma.preference.upsert({
+      where: { userId },
+      create: { userId, aiMemoryEnabled: true },
+      update: { aiMemoryEnabled: true },
+    });
+
+    await request(app.getHttpServer())
+      .delete('/assistant/conversations')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+
+    const afterClear = await request(app.getHttpServer())
+      .get('/assistant/conversations')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(afterClear.body.data.conversations).toEqual([]);
+
+    // Clearing conversation history never touches memory or preferences.
+    const memoryAfterClear = await prisma.companionMemoryNote.findUnique({
+      where: { id: memoryNote.id },
+    });
+    expect(memoryAfterClear).not.toBeNull();
+    const preferenceAfterClear = await prisma.preference.findUnique({ where: { userId } });
+    expect(preferenceAfterClear?.aiMemoryEnabled).toBe(true);
+  });
+
+  it('deleting a single conversation never touches memory notes or preferences', async () => {
+    const conversation = await prisma.companionConversation.create({
+      data: { userId, companion: 'ATLAS' },
+    });
+    const memoryNote = await prisma.companionMemoryNote.create({
+      data: { userId, category: 'EQUIPMENT', value: 'Has access to: dumbbells.' },
+    });
+
+    await request(app.getHttpServer())
+      .delete(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+
+    const memoryAfterDelete = await prisma.companionMemoryNote.findUnique({
+      where: { id: memoryNote.id },
+    });
+    expect(memoryAfterDelete).not.toBeNull();
+  });
+
+  it('clearing memory never touches conversation history', async () => {
+    const conversation = await prisma.companionConversation.create({
+      data: { userId, companion: 'ATLAS' },
+    });
+    await prisma.companionChatMessage.create({
+      data: { conversationId: conversation.id, isFromUser: true, text: 'Still here?' },
+    });
+
+    await request(app.getHttpServer())
+      .delete('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+
+    const conversationAfterMemoryClear = await prisma.companionConversation.findUnique({
+      where: { id: conversation.id },
+    });
+    expect(conversationAfterMemoryClear).not.toBeNull();
+  });
+
+  it('rejects renaming a conversation with an empty title', async () => {
+    const conversation = await prisma.companionConversation.create({
+      data: { userId, companion: 'ATLAS' },
+    });
+    await request(app.getHttpServer())
+      .patch(`/assistant/conversations/${conversation.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ title: '' })
+      .expect(400);
+  });
+
+  it('rejects unauthenticated requests to open, rename, delete, or clear conversations', async () => {
+    const conversation = await prisma.companionConversation.create({
+      data: { userId, companion: 'ATLAS' },
+    });
+
+    await request(app.getHttpServer())
+      .get(`/assistant/conversations/${conversation.id}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch(`/assistant/conversations/${conversation.id}`)
+      .send({ title: 'x' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .delete(`/assistant/conversations/${conversation.id}`)
+      .expect(401);
+    await request(app.getHttpServer()).delete('/assistant/conversations').expect(401);
+  });
+});

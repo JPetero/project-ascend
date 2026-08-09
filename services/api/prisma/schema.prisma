@@ -209,6 +209,7 @@ model User {
   pushDeviceTokens                 PushDeviceToken[]
   companionMemoryNotes             CompanionMemoryNote[]
   aiUsageEvents                    AiUsageEvent[]
+  companionConversations           CompanionConversation[]
 
   @@index([status])
   @@map("users")
@@ -315,28 +316,39 @@ model Profile {
 }
 
 model Preference {
-  id                   String        @id @default(uuid())
-  userId               String        @unique
-  companion            Companion     @default(ATLAS)
-  companionMode        CompanionMode @default(STANDARD)
+  id                         String        @id @default(uuid())
+  userId                     String        @unique
+  companion                  Companion     @default(ATLAS)
+  companionMode              CompanionMode @default(STANDARD)
   // Independent of `companion` by design — see
   // packages/docs/product/atlas-nova-bible.md. Neither Atlas nor Nova is
   // "for" a given coaching style.
-  coachingStyle        CoachingStyle @default(BALANCED)
+  coachingStyle              CoachingStyle @default(BALANCED)
   // 1 (softest) - 5 (most intense) delivery of the selected coachingStyle.
   // Never changes what's safe to recommend, only how it's phrased.
-  toneIntensity        Int           @default(3)
-  themeMode            ThemeMode     @default(SYSTEM)
-  reducedMotion        Boolean       @default(false)
-  notificationsEnabled Boolean       @default(true)
+  toneIntensity              Int           @default(3)
+  themeMode                  ThemeMode     @default(SYSTEM)
+  reducedMotion              Boolean       @default(false)
+  notificationsEnabled       Boolean       @default(true)
   // Build Session 11 Part 4 — defaults OFF (was ON): durable
   // conversational memory is opt-in now that the extractor's category
   // allowlist exists, matching the directive's "default privacy-
   // conscious" guidance. A user who wants Atlas/Nova to remember
   // preferences across conversations turns this on explicitly.
-  aiMemoryEnabled      Boolean       @default(false)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  aiMemoryEnabled            Boolean       @default(false)
+  // Build Session 12 Part 8 — deliberately separate from
+  // `aiMemoryEnabled`: this controls whether the raw back-and-forth chat
+  // transcript is saved (so a conversation can be reopened later), not
+  // whether structured facts are extracted from it. Defaults ON — unlike
+  // memory, which builds a standing profile that follows the user
+  // between conversations, this only preserves scrollback continuity
+  // within what the user already said, matching ordinary chat-app
+  // expectations. Turning it off does not delete existing conversations;
+  // it only stops new ones from being saved (see
+  // CompanionConversationsService).
+  conversationHistoryEnabled Boolean       @default(true)
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2950,6 +2962,47 @@ model CompanionMemoryNote {
 
   @@index([userId, createdAt])
   @@map("companion_memory_notes")
+}
+
+// Build Session 12 Part 8 — the raw back-and-forth transcript, kept
+// deliberately separate from `CompanionMemoryNote` (structured,
+// extracted facts). Deleting a conversation never touches memory notes,
+// and clearing memory (`CompanionMemoryService.clear`) never touches
+// conversations — two independent tables, two independent controls, per
+// the privacy directive's explicit "clearing memory must not erase chat
+// history" / "deleting a conversation must not remove profile
+// preferences" requirements. Only ever written by
+// `CompanionConversationsService`, and only when the user has
+// `Preference.conversationHistoryEnabled` on.
+model CompanionConversation {
+  id        String    @id @default(uuid())
+  userId    String
+  companion Companion
+  // Null until the user explicitly renames it — the UI derives a
+  // display title from the first message client-side rather than this
+  // service inventing one.
+  title     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages CompanionChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("companion_conversations")
+}
+
+model CompanionChatMessage {
+  id             String   @id @default(uuid())
+  conversationId String
+  isFromUser     Boolean
+  text           String
+  createdAt      DateTime @default(now())
+
+  conversation CompanionConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("companion_chat_messages")
 }
 
 // Build Session 12 Part 6 — internal usage tracking for the AI provider

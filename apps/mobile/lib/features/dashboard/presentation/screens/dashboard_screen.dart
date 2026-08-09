@@ -1176,6 +1176,29 @@ class _SettingsCard extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(RoutePaths.companionMemory),
           ),
+          const Divider(),
+          // Build Session 12 Part 8 — deliberately a separate toggle from
+          // "AI memory" above: this controls whether the chat transcript
+          // itself is saved (so a conversation can be reopened later),
+          // not whether Atlas/Nova extracts standing facts from it.
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Conversation history'),
+            subtitle: const Text(
+              'Save your chat with Atlas and Nova so you can reopen it later.',
+            ),
+            value: preferences?.conversationHistoryEnabled ?? true,
+            onChanged: (value) => ref
+                .read(preferencesControllerProvider.notifier)
+                .update({'conversationHistoryEnabled': value}),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Manage conversation history'),
+            subtitle: const Text('View, rename, or delete past conversations.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(RoutePaths.companionConversations),
+          ),
         ],
       ),
     );
