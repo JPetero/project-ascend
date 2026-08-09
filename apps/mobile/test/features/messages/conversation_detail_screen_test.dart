@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/features/messages/domain/conversation.dart';
 import 'package:mobile/features/messages/presentation/screens/conversation_detail_screen.dart';
 
@@ -9,6 +10,36 @@ import '../../helpers/pump_helpers.dart';
 import '../../helpers/test_provider_scope.dart';
 
 void main() {
+  testWidgets(
+    'a stale or unauthorized conversation target shows a safe unavailable state',
+    (tester) async {
+      final repository = FakeMessagesRepository()
+        ..getMessagesError = const AppException(
+          message: 'Conversation not found.',
+        );
+      final container = await createTestContainer(
+        signedIn: true,
+        messagesRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: ConversationDetailScreen(conversationId: 'stale-conv'),
+          ),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Conversation not available'), findsOneWidget);
+      expect(find.text('Conversation not found.'), findsOneWidget);
+      // Never falls through to the brand-new-conversation empty state.
+      expect(find.text('Say hello'), findsNothing);
+    },
+  );
+
   testWidgets('shows existing messages and sends a new one', (tester) async {
     final repository = FakeMessagesRepository(
       conversations: [

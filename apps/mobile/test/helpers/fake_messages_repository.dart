@@ -1,3 +1,4 @@
+import 'package:mobile/core/errors/app_exception.dart';
 import 'package:mobile/features/messages/data/messages_repository.dart';
 import 'package:mobile/features/messages/domain/conversation.dart';
 import 'package:mobile/features/messages/domain/direct_message.dart';
@@ -51,6 +52,12 @@ class FakeMessagesRepository implements MessagesRepository {
   String? lastReportReason;
   int _messageCounter = 0;
 
+  /// Set to simulate a stale/unauthorized/deleted conversation target
+  /// (Build Session 11 Part 6) — [getMessages] throws this instead of
+  /// returning, matching the backend's 404 for a conversation the caller
+  /// isn't a participant of or that no longer exists.
+  AppException? getMessagesError;
+
   @override
   Future<int> unreadCount() async =>
       conversations.fold<int>(0, (sum, c) => sum + c.unreadCount);
@@ -77,6 +84,7 @@ class FakeMessagesRepository implements MessagesRepository {
     int page = 1,
     int limit = 30,
   }) async {
+    if (getMessagesError != null) throw getMessagesError!;
     final messages = messagesByConversation[conversationId] ?? [];
     // Fake mirrors the backend's newest-first ordering.
     return messages.reversed.toList();
