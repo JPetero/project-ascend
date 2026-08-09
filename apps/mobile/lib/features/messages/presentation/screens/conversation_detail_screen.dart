@@ -111,6 +111,20 @@ class _ConversationDetailScreenState
             Expanded(
               child: state.isLoading && state.messages.isEmpty
                   ? const AscendLoadingIndicator()
+                  // A stale, unauthorized, or deleted conversation target
+                  // (e.g. a push notification tapped after the thread was
+                  // removed) fails to load rather than returning an empty
+                  // history — distinct from a brand-new conversation with
+                  // no error and no messages yet, which still gets the
+                  // "Say hello" state below (Build Session 11 Part 6).
+                  : state.error != null && state.messages.isEmpty
+                  ? AscendEmptyState(
+                      icon: Icons.error_outline,
+                      title: 'Conversation not available',
+                      message:
+                          state.error ??
+                          'This conversation may have been removed.',
+                    )
                   : state.messages.isEmpty
                   ? const AscendEmptyState(
                       icon: Icons.chat_bubble_outline,
