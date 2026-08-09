@@ -10,6 +10,7 @@ import '../../../../core/routing/route_paths.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../domain/companion_dialogue.dart';
+import '../../domain/companion_memory_note.dart';
 import '../providers/companion_chat_controller.dart';
 import '../providers/companion_voice_controller.dart';
 import '../widgets/companion_avatar.dart';
@@ -206,6 +207,17 @@ class _AscendCommandCenterScreenState
                       },
                     ),
             ),
+            if (chatState.pendingMemory != null)
+              _PendingMemoryBanner(
+                companionName: companion == Companion.atlas ? 'Atlas' : 'Nova',
+                candidate: chatState.pendingMemory!,
+                onRemember: () => ref
+                    .read(companionChatControllerProvider.notifier)
+                    .confirmPendingMemory(),
+                onNotNow: () => ref
+                    .read(companionChatControllerProvider.notifier)
+                    .dismissPendingMemory(),
+              ),
             if (isListening || voiceState.isSpeaking)
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -316,6 +328,65 @@ class _EmptyChatState extends StatelessWidget {
                   label: Text(command),
                   onPressed: () => onQuickCommand(command),
                 ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Build Session 12 Part 4 — a non-blocking, explicit-consent prompt for
+/// a SENSITIVE-category fact (accessibility/dietary info) the assistant
+/// noticed but did not silently auto-save, even though memory is on.
+/// Never a dialog/modal — sits inline above the composer so ignoring it
+/// (sending another message) is a perfectly valid way to decline.
+class _PendingMemoryBanner extends StatelessWidget {
+  const _PendingMemoryBanner({
+    required this.companionName,
+    required this.candidate,
+    required this.onRemember,
+    required this.onNotNow,
+  });
+
+  final String companionName;
+  final PendingCompanionMemory candidate;
+  final VoidCallback onRemember;
+  final VoidCallback onNotNow;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AscendSpacing.md,
+        vertical: AscendSpacing.xs,
+      ),
+      padding: const EdgeInsets.all(AscendSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(AscendRadius.medium),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$companionName noticed something that could help personalize '
+            'Ascend. Remember: "${candidate.value}"?',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSecondaryContainer,
+            ),
+          ),
+          const SizedBox(height: AscendSpacing.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(onPressed: onNotNow, child: const Text('Not now')),
+              const SizedBox(width: AscendSpacing.xs),
+              FilledButton(
+                onPressed: onRemember,
+                child: const Text('Remember'),
+              ),
             ],
           ),
         ],

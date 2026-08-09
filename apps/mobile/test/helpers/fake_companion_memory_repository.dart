@@ -7,6 +7,7 @@ class FakeCompanionMemoryRepository implements CompanionMemoryRepository {
     : notes = notes ?? [];
 
   final List<CompanionMemoryNote> notes;
+  final List<PendingCompanionMemory> confirmedCandidates = [];
 
   @override
   Future<List<CompanionMemoryNote>> fetchNotes() async =>
@@ -19,6 +20,11 @@ class FakeCompanionMemoryRepository implements CompanionMemoryRepository {
 
   @override
   Future<void> clear() async => notes.clear();
+
+  @override
+  Future<void> confirmPendingMemory(PendingCompanionMemory candidate) async {
+    confirmedCandidates.add(candidate);
+  }
 }
 
 CompanionMemoryNote sampleMemoryNote({
