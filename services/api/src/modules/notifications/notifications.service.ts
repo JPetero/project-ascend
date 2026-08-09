@@ -142,6 +142,12 @@ export class NotificationsService {
         return preference.mealReminders;
       case NotificationType.ACHIEVEMENT_UNLOCKED:
         return preference.achievementNotifications;
+      // Support/moderation/promote/eligibility updates (Build Session 12
+      // Part 2) share the same catch-all bucket every other non-reminder
+      // category already uses (friend requests, DMs, group invites,
+      // etc.) — there's no dedicated preference column for them, and
+      // adding one is a bigger, separate product decision than this
+      // Part's scope.
       default:
         return preference.socialNotifications;
     }

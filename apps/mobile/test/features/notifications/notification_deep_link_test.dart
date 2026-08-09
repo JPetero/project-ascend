@@ -73,5 +73,105 @@ void main() {
         '/social/sports/match-1',
       );
     });
+
+    test('supportReply opens the specific support ticket', () {
+      expect(
+        deepLinkPathFor(NotificationEventType.supportReply, 'ticket-1'),
+        '/support/ticket-1',
+      );
+    });
+
+    test('supportStatusChanged opens the specific support ticket', () {
+      expect(
+        deepLinkPathFor(NotificationEventType.supportStatusChanged, 'ticket-1'),
+        '/support/ticket-1',
+      );
+    });
+
+    test(
+      'moderationAppealUpdate opens the support ticket the appeal was filed as',
+      () {
+        expect(
+          deepLinkPathFor(
+            NotificationEventType.moderationAppealUpdate,
+            'ticket-2',
+          ),
+          '/support/ticket-2',
+        );
+      },
+    );
+
+    test('moderationDecision always opens Support, even with no data', () {
+      expect(
+        deepLinkPathFor(NotificationEventType.moderationDecision, null),
+        '/support',
+      );
+    });
+
+    test('promoteReview opens the specific campaign', () {
+      expect(
+        deepLinkPathFor(NotificationEventType.promoteReview, 'campaign-1'),
+        '/social/promote/campaign-1',
+      );
+    });
+
+    test('eligibilityVerificationUpdate opens the subscription screen', () {
+      expect(
+        deepLinkPathFor(
+          NotificationEventType.eligibilityVerificationUpdate,
+          null,
+        ),
+        '/subscription',
+      );
+    });
+
+    test('trainerVerificationUpdate has no deep link yet', () {
+      expect(
+        deepLinkPathFor(
+          NotificationEventType.trainerVerificationUpdate,
+          'anything',
+        ),
+        isNull,
+      );
+    });
+
+    test('an unknown type never navigates, regardless of data', () {
+      expect(deepLinkPathFor(NotificationEventType.unknown, 'some-id'), isNull);
+    });
+  });
+
+  group('notificationEventTypeFromJson fails closed', () {
+    test(
+      'a type unrecognized by this client build parses to unknown, not directMessage',
+      () {
+        // Regression for the Build Session 12 Part 1 bug: an unknown
+        // server type used to silently fall back to directMessage, which
+        // meant a tapped push could open a stranger's conversation
+        // thread. SUPPORT_REPLY is used here as a stand-in for "a type
+        // added to the backend before this client build knows about
+        // it" — the assertion is about the parser's *fallback* behavior
+        // for any unrecognized string, not about SUPPORT_REPLY itself
+        // (which this build does recognize — see the dedicated test
+        // below).
+        final type = notificationEventTypeFromJson('FUTURE_TYPE_V99');
+
+        expect(type, NotificationEventType.unknown);
+        expect(type, isNot(NotificationEventType.directMessage));
+        // And critically: no navigation results from it, even with data
+        // that looks like a conversation id.
+        expect(deepLinkPathFor(type, 'looks-like-a-conversation-id'), isNull);
+      },
+    );
+
+    test('tryParseNotificationEventType returns null for an unknown value', () {
+      expect(tryParseNotificationEventType('SOMETHING_NEW'), isNull);
+    });
+
+    test('SUPPORT_REPLY parses to the real supportReply type', () {
+      expect(
+        notificationEventTypeFromJson('SUPPORT_REPLY'),
+        NotificationEventType.supportReply,
+      );
+    });
   });
 }

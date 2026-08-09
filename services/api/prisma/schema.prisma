@@ -2812,6 +2812,18 @@ enum NotificationType {
   CHALLENGE
   JOINT_WORKOUT
   SPORTS_MATCH
+  // Build Session 12 Part 2 — each has a real trigger (admin.service.ts)
+  // and a real mobile destination (the same Support ticket detail
+  // screen for the first three; the Promote campaign detail screen for
+  // the last). TRAINER_VERIFICATION_UPDATE is deliberately NOT added
+  // here — no trainer-verification backend exists yet to ever emit it;
+  // see build-session-12.md.
+  SUPPORT_REPLY
+  SUPPORT_STATUS_CHANGED
+  MODERATION_DECISION
+  MODERATION_APPEAL_UPDATE
+  PROMOTE_REVIEW
+  ELIGIBILITY_VERIFICATION_UPDATE
 }
 
 model NotificationPreference {

@@ -63,9 +63,38 @@ enum NotificationEventType {
   challenge,
   jointWorkout,
   sportsMatch,
+  supportReply,
+  supportStatusChanged,
+  moderationDecision,
+  moderationAppealUpdate,
+  promoteReview,
+  trainerVerificationUpdate,
+  eligibilityVerificationUpdate,
+
+  /// A server-sent type this build of the client doesn't recognize yet
+  /// (Build Session 12 Part 1) — e.g. an older app version receiving a
+  /// category added in a later release. Deliberately fails closed: an
+  /// unknown type must never be silently reinterpreted as an existing
+  /// category (it used to default to [directMessage], which meant an
+  /// unrecognized push could open a stranger's conversation thread).
+  /// Renders generically and never drives navigation — see
+  /// `deepLinkPathFor`.
+  unknown,
 }
 
+/// Parses a server `NotificationType` string, failing closed to
+/// [NotificationEventType.unknown] for anything this client build
+/// doesn't recognize — see [NotificationEventType.unknown]'s doc
+/// comment for why silently guessing an existing category is unsafe.
 NotificationEventType notificationEventTypeFromJson(String value) {
+  return tryParseNotificationEventType(value) ?? NotificationEventType.unknown;
+}
+
+/// Same parse as [notificationEventTypeFromJson], but returns `null`
+/// instead of [NotificationEventType.unknown] for an unrecognized value
+/// — for callers that want to distinguish "recognized as unknown" from
+/// "didn't even attempt to parse."
+NotificationEventType? tryParseNotificationEventType(String value) {
   switch (value) {
     case 'WORKOUT_REMINDER':
       return NotificationEventType.workoutReminder;
@@ -89,8 +118,22 @@ NotificationEventType notificationEventTypeFromJson(String value) {
       return NotificationEventType.jointWorkout;
     case 'SPORTS_MATCH':
       return NotificationEventType.sportsMatch;
+    case 'SUPPORT_REPLY':
+      return NotificationEventType.supportReply;
+    case 'SUPPORT_STATUS_CHANGED':
+      return NotificationEventType.supportStatusChanged;
+    case 'MODERATION_DECISION':
+      return NotificationEventType.moderationDecision;
+    case 'MODERATION_APPEAL_UPDATE':
+      return NotificationEventType.moderationAppealUpdate;
+    case 'PROMOTE_REVIEW':
+      return NotificationEventType.promoteReview;
+    case 'TRAINER_VERIFICATION_UPDATE':
+      return NotificationEventType.trainerVerificationUpdate;
+    case 'ELIGIBILITY_VERIFICATION_UPDATE':
+      return NotificationEventType.eligibilityVerificationUpdate;
     default:
-      return NotificationEventType.directMessage;
+      return null;
   }
 }
 

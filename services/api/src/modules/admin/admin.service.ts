@@ -3,12 +3,15 @@ import {
   AdminPermission,
   CommunityReportStatus,
   CommunityReportTargetType,
+  NotificationType,
   PromotedCampaignStatus,
+  SupportTicketCategory,
   SupportTicketStatus,
   UserRole,
 } from '@prisma/client';
 import { AuditService } from '../../common/audit/audit.service';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActionReportDto } from './dto/action-report.dto';
 import { DecideCampaignDto } from './dto/decide-campaign.dto';
@@ -37,6 +40,7 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // --- Community moderation --------------------------------------------
@@ -94,6 +98,19 @@ export class AdminService {
           ]
         : []),
     ]);
+
+    // Build Session 12 Part 2 — notify the reporter their report has an
+    // update, never the specifics of the decision (no target
+    // type/content/removal outcome in the copy) so the notification/lock
+    // screen never reveals moderation details.
+    await this.notifications.notify(
+      report.reporterId,
+      NotificationType.MODERATION_DECISION,
+      'Report update',
+      "There's an update about one of your Ascend reports.",
+      report.id,
+    );
+
     return updated;
   }
 
@@ -119,10 +136,19 @@ export class AdminService {
     const existing = await this.prisma.affordabilityEligibility.findUnique({ where: { userId } });
     if (!existing) throw new NotFoundException('No eligibility application for this user.');
 
-    return this.prisma.affordabilityEligibility.update({
+    const updated = await this.prisma.affordabilityEligibility.update({
       where: { userId },
       data: { status: dto.status, reviewedAt: new Date() },
     });
+
+    await this.notifications.notify(
+      userId,
+      NotificationType.ELIGIBILITY_VERIFICATION_UPDATE,
+      'Eligibility application update',
+      'Your Ascend affordability program application has an update.',
+    );
+
+    return updated;
   }
 
   // --- Support ticket queue ---------------------------------------------
@@ -166,6 +192,44 @@ export class AdminService {
         },
       }),
     ]);
+
+    // Build Session 12 Part 2 — a moderation appeal is filed as a Support
+    // ticket (SupportTicketCategory.MODERATION_APPEAL), so it goes
+    // through this same reply path; it gets its own notification
+    // category so the user can tell an appeal update apart from an
+    // ordinary support reply. A status change (e.g. resolved) is the
+    // more significant event when both happen in the same admin action,
+    // so it takes priority over the plain "you got a reply" copy. Never
+    // put the reply body or ticket subject in the notification — no
+    // ticket contents on the lock screen.
+    const isAppeal = ticket.category === SupportTicketCategory.MODERATION_APPEAL;
+    const statusChanged = dto.status !== undefined && dto.status !== ticket.status;
+    if (isAppeal) {
+      await this.notifications.notify(
+        ticket.userId,
+        NotificationType.MODERATION_APPEAL_UPDATE,
+        'Appeal update',
+        'Your Ascend moderation appeal has an update.',
+        id,
+      );
+    } else if (statusChanged) {
+      await this.notifications.notify(
+        ticket.userId,
+        NotificationType.SUPPORT_STATUS_CHANGED,
+        'Support ticket update',
+        'Your Ascend support ticket status changed.',
+        id,
+      );
+    } else {
+      await this.notifications.notify(
+        ticket.userId,
+        NotificationType.SUPPORT_REPLY,
+        'Support ticket update',
+        'Your Ascend support ticket has an update.',
+        id,
+      );
+    }
+
     return reply;
   }
 
@@ -197,10 +261,20 @@ export class AdminService {
       throw new BadRequestException('Only a PENDING_REVIEW campaign can be reviewed.');
     }
 
-    return this.prisma.promotedCampaign.update({
+    const updated = await this.prisma.promotedCampaign.update({
       where: { id },
       data: { status: dto.status, reviewedAt: new Date(), reviewedBy: adminUserId },
     });
+
+    await this.notifications.notify(
+      campaign.creatorId,
+      NotificationType.PROMOTE_REVIEW,
+      'Promote campaign reviewed',
+      'One of your Ascend Promote campaigns has been reviewed.',
+      id,
+    );
+
+    return updated;
   }
 
   // --- Admin RBAC (Build Session 9 Part 19) ------------------------------
