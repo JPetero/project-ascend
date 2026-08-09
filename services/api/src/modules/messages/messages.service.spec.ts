@@ -261,4 +261,89 @@ describe('MessagesService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('listConversations', () => {
+    it(
+      'computes every conversation’s unread count from a single batched ' +
+        'directMessage query instead of one per conversation (Build ' +
+        'Session 10 Parts 27-29)',
+      async () => {
+        prisma.directConversationParticipant.findMany.mockResolvedValue([
+          {
+            conversationId: 'conv-1',
+            lastReadAt: new Date('2026-08-01T00:00:00.000Z'),
+            mutedAt: null,
+            conversation: conversation({
+              id: 'conv-1',
+              messages: [{ id: 'm-1', body: 'hi' }],
+            }),
+          },
+          {
+            conversationId: 'conv-2',
+            lastReadAt: null,
+            mutedAt: null,
+            conversation: conversation({
+              id: 'conv-2',
+              participants: [{ userId: 'user-1' }, { userId: 'user-3' }],
+              messages: [],
+            }),
+          },
+        ]);
+        prisma.directMessage.findMany.mockResolvedValue([
+          // conv-1: after lastReadAt — counts.
+          { conversationId: 'conv-1', createdAt: new Date('2026-08-02T00:00:00.000Z') },
+          // conv-1: before lastReadAt — does not count.
+          { conversationId: 'conv-1', createdAt: new Date('2026-07-01T00:00:00.000Z') },
+          // conv-2: never read — both count.
+          { conversationId: 'conv-2', createdAt: new Date('2026-08-01T00:00:00.000Z') },
+          { conversationId: 'conv-2', createdAt: new Date('2026-08-02T00:00:00.000Z') },
+        ]);
+
+        const conversations = await service.listConversations('user-1');
+
+        expect(prisma.directMessage.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.directMessage.findMany).toHaveBeenCalledWith({
+          where: {
+            conversationId: { in: ['conv-1', 'conv-2'] },
+            senderId: { not: 'user-1' },
+            deletedAt: null,
+          },
+          select: { conversationId: true, createdAt: true },
+        });
+        expect(conversations.find((c) => c.id === 'conv-1')!.unreadCount).toBe(1);
+        expect(conversations.find((c) => c.id === 'conv-2')!.unreadCount).toBe(2);
+      },
+    );
+
+    it('returns no unread count and skips the message query for an empty conversation list', async () => {
+      prisma.directConversationParticipant.findMany.mockResolvedValue([]);
+
+      const conversations = await service.listConversations('user-1');
+
+      expect(conversations).toEqual([]);
+      expect(prisma.directMessage.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('unreadCount', () => {
+    it('sums unread messages across conversations via its own lean query, not the full listConversations payload', async () => {
+      prisma.directConversationParticipant.findMany.mockResolvedValue([
+        { conversationId: 'conv-1', lastReadAt: new Date('2026-08-01T00:00:00.000Z') },
+        { conversationId: 'conv-2', lastReadAt: null },
+      ]);
+      prisma.directMessage.findMany.mockResolvedValue([
+        { conversationId: 'conv-1', createdAt: new Date('2026-08-02T00:00:00.000Z') },
+        { conversationId: 'conv-2', createdAt: new Date('2026-08-01T00:00:00.000Z') },
+        { conversationId: 'conv-2', createdAt: new Date('2026-08-02T00:00:00.000Z') },
+      ]);
+
+      const total = await service.unreadCount('user-1');
+
+      expect(total).toBe(3);
+      expect(prisma.directConversationParticipant.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', deletedAt: null },
+        select: { conversationId: true, lastReadAt: true },
+      });
+    });
+  });
 });

@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { ReportMessageDto } from './dto/report-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { SetMutedDto } from './dto/set-muted.dto';
 import { StartConversationDto } from './dto/start-conversation.dto';
 import { MessagesGateway } from './messages.gateway';
 import { MessagesService } from './messages.service';
@@ -68,10 +69,10 @@ export class MessagesController {
   async setMuted(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body('muted') muted: boolean,
+    @Body() dto: SetMutedDto,
   ) {
-    await this.messagesService.setMuted(user.id, id, muted === true);
-    return { muted: muted === true };
+    await this.messagesService.setMuted(user.id, id, dto.muted);
+    return { muted: dto.muted };
   }
 
   @Delete('conversations/:id')

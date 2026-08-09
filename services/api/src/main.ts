@@ -15,9 +15,17 @@ async function bootstrap() {
   const appConfig = configService.get<AppConfig>('app')!;
 
   app.use(helmet());
+  // A wildcard CORS_ORIGIN reflects any request's Origin header back
+  // (NestJS/cors' `origin: true`) rather than actually disabling CORS —
+  // combined with credentials, that lets any site make credentialed
+  // cross-origin requests. Only ever pair `credentials: true` with a
+  // real, explicit origin allowlist; env.validation.ts's validateEnv
+  // additionally refuses to boot with an unset/wildcard CORS_ORIGIN in
+  // production so this can't reach a real deployment silently.
+  const isWildcardOrigin = appConfig.corsOrigin === '*';
   app.enableCors({
-    origin: appConfig.corsOrigin === '*' ? true : appConfig.corsOrigin.split(','),
-    credentials: true,
+    origin: isWildcardOrigin ? true : appConfig.corsOrigin.split(','),
+    credentials: !isWildcardOrigin,
   });
 
   app.useGlobalPipes(

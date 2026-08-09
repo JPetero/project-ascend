@@ -108,6 +108,7 @@ class _ReelsViewerScreenState extends ConsumerState<ReelsViewerScreen> {
                     left: AscendSpacing.sm,
                     child: IconButton(
                       icon: const Icon(Icons.close, color: Colors.white),
+                      tooltip: 'Close',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -186,12 +187,14 @@ class _ReelPage extends StatelessWidget {
                     ? Theme.of(context).colorScheme.error
                     : Colors.white,
                 label: '${post.likeCount}',
+                tooltip: post.isLikedByViewer ? 'Unlike' : 'Like',
                 onPressed: onLike,
               ),
               const SizedBox(height: AscendSpacing.md),
               _ReelActionButton(
                 icon: Icons.mode_comment_outlined,
                 label: '${post.commentCount}',
+                tooltip: 'Comments',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (context) => PostDetailScreen(postId: post.id),
@@ -204,11 +207,13 @@ class _ReelPage extends StatelessWidget {
                     ? Icons.bookmark
                     : Icons.bookmark_border,
                 label: '${post.saveCount}',
+                tooltip: post.isSavedByViewer ? 'Unsave' : 'Save',
                 onPressed: onSave,
               ),
               const SizedBox(height: AscendSpacing.md),
               _ReelActionButton(
                 icon: Icons.ios_share_outlined,
+                tooltip: 'Share',
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (context) => ShareContentScreen(
@@ -230,12 +235,14 @@ class _ReelActionButton extends StatelessWidget {
     required this.icon,
     this.label,
     this.iconColor = Colors.white,
+    required this.tooltip,
     required this.onPressed,
   });
 
   final IconData icon;
   final String? label;
   final Color iconColor;
+  final String tooltip;
   final VoidCallback onPressed;
 
   @override
@@ -245,6 +252,7 @@ class _ReelActionButton extends StatelessWidget {
       children: [
         IconButton(
           icon: Icon(icon, color: iconColor, size: 30),
+          tooltip: tooltip,
           onPressed: onPressed,
         ),
         if (label != null)

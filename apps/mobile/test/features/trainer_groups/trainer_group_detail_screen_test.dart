@@ -86,6 +86,10 @@ void main() {
       );
       await pumpForAsyncSettle(tester);
 
+      // Build Session 10 Parts 27-29 — this icon-only action was missing
+      // a tooltip while its "Schedule a session" neighbor already had one.
+      expect(find.byTooltip('Invite member'), findsOneWidget);
+
       await tester.tap(find.text('Members'));
       await pumpForAsyncSettle(tester);
 

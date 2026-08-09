@@ -68,6 +68,42 @@ void main() {
     },
   );
 
+  testWidgets(
+    'every icon-only control has a tooltip a screen reader can announce '
+    '(Build Session 10 Parts 27-29)',
+    (tester) async {
+      final repository = FakeCommunityRepository(
+        posts: [
+          samplePost(
+            id: 'reel-1',
+            mediaType: CommunityPostMediaType.video,
+            isLikedByViewer: false,
+            isSavedByViewer: false,
+          ),
+        ],
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        communityRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: ReelsViewerScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.byTooltip('Close'), findsOneWidget);
+      expect(find.byTooltip('Like'), findsOneWidget);
+      expect(find.byTooltip('Comments'), findsOneWidget);
+      expect(find.byTooltip('Save'), findsOneWidget);
+      expect(find.byTooltip('Share'), findsOneWidget);
+    },
+  );
+
   testWidgets('tapping like toggles the icon', (tester) async {
     final repository = FakeCommunityRepository(
       posts: [

@@ -7,13 +7,13 @@ describe('PersonalRecordsService', () => {
   let service: PersonalRecordsService;
   let prisma: {
     workoutSet: { findMany: jest.Mock };
-    personalRecord: { findUnique: jest.Mock; upsert: jest.Mock };
+    personalRecord: { findMany: jest.Mock; upsert: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
       workoutSet: { findMany: jest.fn() },
-      personalRecord: { findUnique: jest.fn(), upsert: jest.fn() },
+      personalRecord: { findMany: jest.fn().mockResolvedValue([]), upsert: jest.fn() },
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -49,12 +49,32 @@ describe('PersonalRecordsService', () => {
     });
   });
 
+  it(
+    'batches every exercise’s existing records into a single findMany ' +
+      'instead of one lookup per candidate (Build Session 10 Parts 27-29)',
+    async () => {
+      prisma.workoutSet.findMany.mockResolvedValue([
+        set({ reps: 8, weightKg: 60 }),
+        set({ id: 'set-2', exerciseId: 'exercise-2', reps: 5, weightKg: 40 }),
+      ]);
+      prisma.personalRecord.upsert.mockImplementation(({ create }) =>
+        Promise.resolve({ id: 'pr-1', ...create, exercise: { id: create.exerciseId } }),
+      );
+
+      await service.detectAndRecord('user-1', 'session-1');
+
+      expect(prisma.personalRecord.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.personalRecord.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', exerciseId: { in: ['exercise-1', 'exercise-2'] } },
+      });
+    },
+  );
+
   it('records a first-ever personal record when none existed before', async () => {
     prisma.workoutSet.findMany.mockResolvedValue([
       set({ reps: 8, weightKg: 60 }),
       set({ id: 'set-2', setNumber: 2, reps: 8, weightKg: 65 }),
     ]);
-    prisma.personalRecord.findUnique.mockResolvedValue(null);
     prisma.personalRecord.upsert.mockImplementation(({ create }) =>
       Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
     );
@@ -74,7 +94,6 @@ describe('PersonalRecordsService', () => {
       set({ id: 'set-2', setNumber: 2, reps: 8, weightKg: 65 }),
       set({ id: 'set-3', setNumber: 3, reps: 8, weightKg: 67.5 }),
     ]);
-    prisma.personalRecord.findUnique.mockResolvedValue(null);
     prisma.personalRecord.upsert.mockImplementation(({ create }) =>
       Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
     );
@@ -91,8 +110,13 @@ describe('PersonalRecordsService', () => {
     // of them must already have an unbeatable existing record for "nothing
     // breaks" to hold.
     prisma.workoutSet.findMany.mockResolvedValue([set({ reps: 5, weightKg: 50 })]);
-    prisma.personalRecord.findUnique.mockImplementation(({ where }) =>
-      Promise.resolve({ id: 'existing', value: 999_999, type: where.userId_exerciseId_type.type }),
+    prisma.personalRecord.findMany.mockResolvedValue(
+      [
+        PersonalRecordType.MAX_WEIGHT,
+        PersonalRecordType.MAX_REPS,
+        PersonalRecordType.MAX_VOLUME,
+        PersonalRecordType.ESTIMATED_ONE_REP_MAX,
+      ].map((type) => ({ id: `existing-${type}`, exerciseId: 'exercise-1', type, value: 999_999 })),
     );
 
     const broken = await service.detectAndRecord('user-1', 'session-1');
@@ -103,11 +127,9 @@ describe('PersonalRecordsService', () => {
 
   it('updates a record in place (not append-only) when a new best is set', async () => {
     prisma.workoutSet.findMany.mockResolvedValue([set({ reps: 5, weightKg: 90 })]);
-    prisma.personalRecord.findUnique.mockImplementation(({ where }) =>
-      where.userId_exerciseId_type.type === PersonalRecordType.MAX_WEIGHT
-        ? Promise.resolve({ id: 'existing', value: 80, type: PersonalRecordType.MAX_WEIGHT })
-        : Promise.resolve(null),
-    );
+    prisma.personalRecord.findMany.mockResolvedValue([
+      { id: 'existing', exerciseId: 'exercise-1', type: PersonalRecordType.MAX_WEIGHT, value: 80 },
+    ]);
     // A real Prisma upsert always returns the full row, including fields
     // (userId/exerciseId/type) that live only in `where`/`create`, not in
     // `update` — the mock has to reflect that or `type` comes back
@@ -142,7 +164,6 @@ describe('PersonalRecordsService', () => {
 
   it('does not compute MAX_VOLUME when no set has both reps and weight', async () => {
     prisma.workoutSet.findMany.mockResolvedValue([set({ durationSeconds: 60 })]);
-    prisma.personalRecord.findUnique.mockResolvedValue(null);
     prisma.personalRecord.upsert.mockImplementation(({ create }) =>
       Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
     );
@@ -160,7 +181,6 @@ describe('PersonalRecordsService', () => {
       // being a much lighter, less reliable data point — excluded.
       set({ id: 'set-2', setNumber: 2, reps: 20, weightKg: 100 }),
     ]);
-    prisma.personalRecord.findUnique.mockResolvedValue(null);
     prisma.personalRecord.upsert.mockImplementation(({ create }) =>
       Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
     );
@@ -179,7 +199,6 @@ describe('PersonalRecordsService', () => {
       set({ distanceMeters: 1000, durationSeconds: 300 }),
       set({ id: 'set-2', setNumber: 2, distanceMeters: 500, durationSeconds: 0 }),
     ]);
-    prisma.personalRecord.findUnique.mockResolvedValue(null);
     prisma.personalRecord.upsert.mockImplementation(({ create }) =>
       Promise.resolve({ id: 'pr-1', ...create, exercise: { id: 'exercise-1' } }),
     );

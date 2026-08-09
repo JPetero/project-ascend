@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PersonalRecordType, WorkoutSet } from '@prisma/client';
+import { PersonalRecord, PersonalRecordType, WorkoutSet } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface PersonalRecordCandidate {
@@ -47,13 +47,32 @@ export class PersonalRecordsService {
       }
     }
 
+    // One batched read for every exercise's current-best records instead
+    // of a findUnique per candidate (Build Session 10 Parts 27-29) — a
+    // session with several exercises × several PR types previously meant
+    // dozens of sequential round trips here.
+    const exerciseIds = [...setsByExercise.keys()];
+    const existingRecords = exerciseIds.length
+      ? await this.prisma.personalRecord.findMany({
+          where: { userId, exerciseId: { in: exerciseIds } },
+        })
+      : [];
+    const existingByKey = new Map(existingRecords.map((r) => [`${r.exerciseId}:${r.type}`, r]));
+
     const broken = [];
     for (const [exerciseId, exerciseSets] of setsByExercise) {
       for (const candidate of this.computeCandidates(exerciseSets)) {
-        const result = await this.upsertIfBetter(userId, exerciseId, workoutSessionId, candidate);
-        if (result) {
-          broken.push(result);
-        }
+        const existing = existingByKey.get(`${exerciseId}:${candidate.type}`) ?? null;
+        if (existing && existing.value >= candidate.value) continue;
+
+        const result = await this.upsertIfBetter(
+          userId,
+          exerciseId,
+          workoutSessionId,
+          candidate,
+          existing,
+        );
+        broken.push(result);
       }
     }
 
@@ -147,15 +166,8 @@ export class PersonalRecordsService {
     exerciseId: string,
     workoutSessionId: string,
     candidate: PersonalRecordCandidate,
+    existing: PersonalRecord | null,
   ) {
-    const existing = await this.prisma.personalRecord.findUnique({
-      where: { userId_exerciseId_type: { userId, exerciseId, type: candidate.type } },
-    });
-
-    if (existing && existing.value >= candidate.value) {
-      return null;
-    }
-
     const record = await this.prisma.personalRecord.upsert({
       where: { userId_exerciseId_type: { userId, exerciseId, type: candidate.type } },
       create: {

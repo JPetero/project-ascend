@@ -46,4 +46,34 @@ void main() {
       expect(find.byType(ShareContentScreen), findsOneWidget);
     },
   );
+
+  testWidgets('a photo grid tile carries a semantic label a screen reader can '
+      'announce instead of just "image, button" (Build Session 10 Parts '
+      '27-29)', (tester) async {
+    final repository = FakeGalleryRepository(
+      albums: [sampleGalleryAlbum(id: 'album-1', name: 'Progress')],
+    );
+    repository.mediaByAlbum['album-1'] = [
+      sampleGalleryMedia(id: 'media-1', albumId: 'album-1'),
+    ];
+    final container = await createTestContainer(
+      signedIn: true,
+      galleryRepository: repository,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: GalleryAlbumDetailScreen(albumId: 'album-1'),
+        ),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    final semantics = tester.getSemantics(find.byType(Image));
+    expect(semantics.label, contains('Photo'));
+    expect(semantics.label, contains('opens actions'));
+  });
 }

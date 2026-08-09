@@ -217,5 +217,12 @@ export function validateEnv(config: Record<string, unknown>) {
     throw new Error('Refusing to start in production with development JWT secrets.');
   }
 
+  if (validatedConfig.NODE_ENV === 'production' && validatedConfig.CORS_ORIGIN === '*') {
+    throw new Error(
+      'Refusing to start in production with CORS_ORIGIN unset or "*" — set it to an ' +
+        'explicit comma-separated allowlist of origins.',
+    );
+  }
+
   return validatedConfig;
 }

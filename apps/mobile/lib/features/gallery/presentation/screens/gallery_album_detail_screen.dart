@@ -204,46 +204,52 @@ class GalleryAlbumDetailScreen extends ConsumerWidget {
       itemCount: media.length,
       itemBuilder: (context, index) {
         final item = media[index];
-        return GestureDetector(
-          onTap: () => _showItemActions(context, ref, item),
-          child: ClipRRect(
-            borderRadius: AscendRadius.smallRadius,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  item.url,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.broken_image_outlined),
+        return Semantics(
+          button: true,
+          label: item.poseTag != null
+              ? 'Photo, ${galleryPoseTagLabel(item.poseTag!)}, opens actions'
+              : 'Photo, opens actions',
+          child: GestureDetector(
+            onTap: () => _showItemActions(context, ref, item),
+            child: ClipRRect(
+              borderRadius: AscendRadius.smallRadius,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    item.url,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      child: const Icon(Icons.broken_image_outlined),
+                    ),
                   ),
-                ),
-                if (item.poseTag != null)
-                  Positioned(
-                    left: 4,
-                    bottom: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        galleryPoseTagLabel(item.poseTag!),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
+                  if (item.poseTag != null)
+                    Positioned(
+                      left: 4,
+                      bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          galleryPoseTagLabel(item.poseTag!),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         );
