@@ -189,6 +189,25 @@ export class MessagesService {
       throw new ForbiddenException('This conversation was declined.');
     }
 
+    // getOrCreateConversation blocks a *new* thread between blocked
+    // parties, but a block made after a thread already exists must stop
+    // new messages on it too — otherwise blocking someone mid-conversation
+    // does nothing (Build Session 10 Part 30).
+    const otherParticipant = conversation.participants.find((p) => p.userId !== userId);
+    if (otherParticipant) {
+      const blocked = await this.prisma.communityBlock.findFirst({
+        where: {
+          OR: [
+            { blockerId: userId, blockedId: otherParticipant.userId },
+            { blockerId: otherParticipant.userId, blockedId: userId },
+          ],
+        },
+      });
+      if (blocked) {
+        throw new ForbiddenException('You cannot message this user.');
+      }
+    }
+
     if (conversation.status === DirectConversationStatus.PENDING) {
       if (userId === conversation.initiatorId) {
         const alreadySent = await this.prisma.directMessage.count({

@@ -19,7 +19,7 @@ function conversation(overrides: Partial<Record<string, unknown>> = {}) {
 describe('MessagesService', () => {
   let service: MessagesService;
   let prisma: {
-    communityBlock: { findUnique: jest.Mock };
+    communityBlock: { findUnique: jest.Mock; findFirst: jest.Mock };
     user: { findUnique: jest.Mock };
     directConversation: {
       findFirst: jest.Mock;
@@ -43,7 +43,10 @@ describe('MessagesService', () => {
 
   beforeEach(async () => {
     prisma = {
-      communityBlock: { findUnique: jest.fn().mockResolvedValue(null) },
+      communityBlock: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-2' }) },
       directConversation: {
         findFirst: jest.fn(),
@@ -207,6 +210,19 @@ describe('MessagesService', () => {
           data: expect.objectContaining({ lastMessageAt: expect.any(Date) }),
         }),
       );
+    });
+
+    it('rejects a new message on an already-existing conversation once either side has blocked the other (Build Session 10 Part 30)', async () => {
+      prisma.directConversation.findUnique.mockResolvedValue(conversation());
+      prisma.communityBlock.findFirst.mockResolvedValue({
+        blockerId: 'user-2',
+        blockedId: 'user-1',
+      });
+
+      await expect(
+        service.sendMessage('user-1', 'conv-1', { body: 'still there?' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.directMessage.create).not.toHaveBeenCalled();
     });
   });
 

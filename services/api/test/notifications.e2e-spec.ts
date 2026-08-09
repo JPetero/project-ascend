@@ -12,6 +12,7 @@ describe('Notifications (e2e)', () => {
   let prisma: PrismaService;
   let tokenA: string;
   let tokenB: string;
+  let userIdA: string;
   let userIdB: string;
 
   beforeAll(async () => {
@@ -51,6 +52,7 @@ describe('Notifications (e2e)', () => {
     const b = await register('notifications-b@example.com', 'Bea');
     tokenA = a.token;
     tokenB = b.token;
+    userIdA = a.id;
     userIdB = b.id;
   });
 
@@ -127,6 +129,30 @@ describe('Notifications (e2e)', () => {
       .set(authB())
       .expect(200);
     expect(after.body.data).toBe(before.body.data - 1);
+  });
+
+  it('a direct message creates a notification event for the recipient, the same as a friend request does (Build Session 10 Part 30)', async () => {
+    const conversation = await request(app.getHttpServer())
+      .post('/messages/conversations')
+      .set(authB())
+      .send({ recipientId: userIdA })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/messages/conversations/${conversation.body.data.id}/messages`)
+      .set(authB())
+      .send({ body: 'Hey Ada, got a minute?' })
+      .expect(201);
+
+    const events = await request(app.getHttpServer())
+      .get('/notifications/events')
+      .set(authA())
+      .expect(200);
+    const dmEvent = (events.body.data as Array<{ type: string; readAt: string | null }>).find(
+      (e) => e.type === 'DIRECT_MESSAGE',
+    );
+    expect(dmEvent).toBeDefined();
+    expect(dmEvent!.readAt).toBeNull();
   });
 
   it('disabling social notifications suppresses future friend-request events', async () => {
