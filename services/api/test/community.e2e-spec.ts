@@ -570,4 +570,106 @@ describe('Community profiles/posts/Reels (e2e)', () => {
       .expect(204);
     await request(app.getHttpServer()).get(`/community/posts/${postId}`).set(authA()).expect(404);
   });
+
+  it(
+    "aggregates a creator's own content performance from real like/comment/save " +
+      'counts, sorted by total engagement (Build Session 10 Part 23)',
+    async () => {
+      // A dedicated, freshly-registered user — userC already accumulates
+      // posts from earlier tests in this file, which would make the
+      // totals asserted below order-dependent on the rest of the suite.
+      const registered = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Devon',
+          email: 'community-analytics@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const authDevon = { Authorization: `Bearer ${registered.body.data.tokens.accessToken}` };
+
+      const postX = await request(app.getHttpServer())
+        .post('/community/posts')
+        .set(authDevon)
+        .send({ caption: 'Analytics post one' })
+        .expect(201);
+      const postXId = postX.body.data.id;
+
+      const postY = await request(app.getHttpServer())
+        .post('/community/posts')
+        .set(authDevon)
+        .send({ caption: 'Analytics post two' })
+        .expect(201);
+      const postYId = postY.body.data.id;
+
+      // Post one gets 2 likes + 1 comment + 1 save; post two gets none.
+      await request(app.getHttpServer())
+        .post(`/community/posts/${postXId}/like`)
+        .set(authA())
+        .expect(204);
+      await request(app.getHttpServer())
+        .post(`/community/posts/${postXId}/like`)
+        .set(authB())
+        .expect(204);
+      await request(app.getHttpServer())
+        .post(`/community/posts/${postXId}/comments`)
+        .set(authA())
+        .send({ body: 'Nice work' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/community/posts/${postXId}/save`)
+        .set(authA())
+        .expect(204);
+
+      const analytics = await request(app.getHttpServer())
+        .get('/community/analytics/me')
+        .set(authDevon)
+        .expect(200);
+
+      expect(analytics.body.data.totalPosts).toBe(2);
+      expect(analytics.body.data.totalLikes).toBe(2);
+      expect(analytics.body.data.totalComments).toBe(1);
+      expect(analytics.body.data.totalSaves).toBe(1);
+      expect(analytics.body.data.posts[0]).toMatchObject({
+        id: postXId,
+        likeCount: 2,
+        commentCount: 1,
+        saveCount: 1,
+        engagementTotal: 4,
+      });
+      expect(analytics.body.data.posts[1]).toMatchObject({
+        id: postYId,
+        engagementTotal: 0,
+      });
+    },
+  );
+
+  it('a creator with no posts gets honest zeros, not an error, from the analytics endpoint', async () => {
+    const registered = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Empty',
+        email: 'community-empty@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    const emptyAuth = { Authorization: `Bearer ${registered.body.data.tokens.accessToken}` };
+
+    const analytics = await request(app.getHttpServer())
+      .get('/community/analytics/me')
+      .set(emptyAuth)
+      .expect(200);
+
+    expect(analytics.body.data).toEqual({
+      totalPosts: 0,
+      totalLikes: 0,
+      totalComments: 0,
+      totalSaves: 0,
+      posts: [],
+    });
+  });
 });

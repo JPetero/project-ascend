@@ -50,6 +50,11 @@ export class CommunityController {
     return this.communityService.listSaved(user.id, query);
   }
 
+  @Get('analytics/me')
+  getMyContentAnalytics(@CurrentUser() user: AuthenticatedUser) {
+    return this.communityService.getMyContentAnalytics(user.id);
+  }
+
   @Get('posts/:id')
   getPost(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.communityService.getPost(user.id, id);

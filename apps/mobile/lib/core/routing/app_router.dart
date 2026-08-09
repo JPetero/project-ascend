@@ -16,6 +16,7 @@ import '../../features/cardio/presentation/screens/cardio_log_screen.dart';
 import '../../features/cardio/presentation/screens/live_cardio_screen.dart';
 import '../../features/community/presentation/screens/community_feed_screen.dart';
 import '../../features/community/presentation/screens/community_profile_screen.dart';
+import '../../features/community/presentation/screens/content_analytics_screen.dart';
 import '../../features/community/presentation/screens/create_post_screen.dart';
 import '../../features/community/presentation/screens/edit_community_profile_screen.dart';
 import '../../features/community/presentation/screens/post_detail_screen.dart';
@@ -324,6 +325,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.communityEditProfile,
         builder: (context, state) => const EditCommunityProfileScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.communityContentAnalytics,
+        builder: (context, state) => const ContentAnalyticsScreen(),
       ),
       GoRoute(
         path: RoutePaths.friends,

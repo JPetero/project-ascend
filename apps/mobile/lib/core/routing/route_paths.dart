@@ -43,6 +43,8 @@ abstract final class RoutePaths {
   static const communitySaved = '/social/saved';
   static const communityProfile = '/social/profile/:userId';
   static const communityEditProfile = '/social/profile/edit';
+  // Creator's own content performance — Build Session 10 Part 23.
+  static const communityContentAnalytics = '/social/analytics';
 
   // Trainer Groups — Founder Scenario 24, reachable from the Community
   // tab. Free tier only (see TRAINER_GROUP_* limits in the backend's
