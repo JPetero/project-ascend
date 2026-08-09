@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
+import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../joint_workouts/presentation/providers/joint_workout_sessions_controller.dart';
 import '../../../workout/presentation/providers/workout_plan_controller.dart';
 import '../../domain/trainer_group.dart';
 import '../providers/trainer_group_detail_controller.dart';
@@ -152,6 +155,59 @@ class _TrainerGroupDetailScreenState
     );
   }
 
+  /// Schedules a Joint Workout Session for every current group member —
+  /// Build Session 10 Part 24, reusing the existing friend-only Joint
+  /// Workout Sessions system (via `trainerGroupId`) rather than
+  /// duplicating it. Same owner/moderator + expanded-tier gate as
+  /// announcements, enforced server-side by
+  /// TrainerGroupsService.resolveGroupSessionInvitees.
+  Future<void> _scheduleSession() async {
+    final titleController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Schedule a group session'),
+        content: TextField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            labelText: 'Title (optional)',
+            hintText: 'e.g. Saturday squad session',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Schedule'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final session = await ref
+        .read(jointWorkoutSessionsControllerProvider.notifier)
+        .create(
+          title: titleController.text.trim().isEmpty
+              ? null
+              : titleController.text.trim(),
+          trainerGroupId: widget.groupId,
+        );
+    if (!mounted) return;
+    if (session != null) {
+      context.push(RoutePaths.jointWorkoutDetailPath(session.id));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't schedule the session — try again."),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(
@@ -206,6 +262,12 @@ class _TrainerGroupDetailScreenState
             ],
           ),
           actions: [
+            if (state.group!.isExpanded && (isOwner || isModerator))
+              IconButton(
+                icon: const Icon(Icons.event_available_outlined),
+                tooltip: 'Schedule a session',
+                onPressed: _scheduleSession,
+              ),
             if (isOwner || isModerator)
               IconButton(
                 icon: const Icon(Icons.person_add_alt_1),

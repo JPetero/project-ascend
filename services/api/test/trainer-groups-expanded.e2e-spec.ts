@@ -169,4 +169,80 @@ describe('Trainer groups — expanded tier (e2e)', () => {
       .send({ body: 'Should fail' })
       .expect(403);
   });
+
+  describe('scheduled sessions (Build Session 10 Part 24)', () => {
+    it(
+      'the owner schedules a joint workout session for the whole group, ' +
+        'without either party needing to already be Friends',
+      async () => {
+        const created = await request(app.getHttpServer())
+          .post('/joint-workouts')
+          .set('Authorization', `Bearer ${ownerToken}`)
+          .send({ title: 'Saturday squad session', trainerGroupId: groupId })
+          .expect(201);
+
+        expect(created.body.data.hostId).toBe(ownerId);
+        const participantIds = (
+          created.body.data.participants as { userId: string }[]
+        ).map((p) => p.userId);
+        expect(participantIds).toContain(ownerId);
+        expect(participantIds).toContain(memberId);
+
+        // The invited member can see and accept it despite never having
+        // gone through the Friends flow with the owner.
+        const seenByMember = await request(app.getHttpServer())
+          .get(`/joint-workouts/${created.body.data.id}`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .expect(200);
+        expect(seenByMember.body.data.id).toBe(created.body.data.id);
+
+        await request(app.getHttpServer())
+          .post(`/joint-workouts/${created.body.data.id}/accept`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .expect(201);
+      },
+    );
+
+    it('rejects a regular member scheduling a session for the group', async () => {
+      const another = await register('expanded-nonmod@example.com', 'Nia');
+      const invite = await request(app.getHttpServer())
+        .post(`/trainer-groups/${groupId}/invitations`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ inviteeUserId: another.id })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/trainer-groups/invitations/${invite.body.data.id}/accept`)
+        .set('Authorization', `Bearer ${another.token}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/joint-workouts')
+        .set('Authorization', `Bearer ${another.token}`)
+        .send({ trainerGroupId: groupId })
+        .expect(403);
+    });
+
+    it('rejects scheduling for a free-tier owner’s group', async () => {
+      const freeOwner = await register('free-owner-sessions@example.com', 'Faye');
+      const group = await request(app.getHttpServer())
+        .post('/trainer-groups')
+        .set('Authorization', `Bearer ${freeOwner.token}`)
+        .send({ name: 'Free Squad Sessions' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/joint-workouts')
+        .set('Authorization', `Bearer ${freeOwner.token}`)
+        .send({ trainerGroupId: group.body.data.id })
+        .expect(403);
+    });
+
+    it('rejects passing both inviteeIds and trainerGroupId', async () => {
+      await request(app.getHttpServer())
+        .post('/joint-workouts')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ trainerGroupId: groupId, inviteeIds: [memberId] })
+        .expect(400);
+    });
+  });
 });
