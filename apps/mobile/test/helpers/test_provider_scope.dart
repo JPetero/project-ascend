@@ -14,6 +14,7 @@ import 'package:mobile/features/community/presentation/providers/community_feed_
 import 'package:mobile/features/companion/data/ai_provider.dart';
 import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
+import 'package:mobile/features/companion/presentation/providers/companion_conversations_controller.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_memory_controller.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_voice_controller.dart';
 import 'package:mobile/features/rankings/presentation/providers/rankings_controller.dart';
@@ -58,6 +59,7 @@ import 'fake_achievement_repositories.dart';
 import 'fake_cardio_repositories.dart';
 import 'fake_challenges_repository.dart';
 import 'fake_community_repository.dart';
+import 'fake_companion_conversations_repository.dart';
 import 'fake_companion_memory_repository.dart';
 import 'fake_health_adapter.dart';
 import 'fake_health_metrics_repository.dart';
@@ -123,6 +125,7 @@ Future<ProviderContainer> createTestContainer({
   FakeSubscriptionsRepository? subscriptionsRepository,
   AiProvider? aiProvider,
   FakeCompanionMemoryRepository? companionMemoryRepository,
+  FakeCompanionConversationsRepository? companionConversationsRepository,
   FakeSupportRepository? supportRepository,
   FakePromoteRepository? promoteRepository,
   FakeMediaRepository? mediaRepository,
@@ -264,6 +267,10 @@ Future<ProviderContainer> createTestContainer({
       ),
       companionMemoryRepositoryProvider.overrideWithValue(
         companionMemoryRepository ?? FakeCompanionMemoryRepository(),
+      ),
+      companionConversationsRepositoryProvider.overrideWithValue(
+        companionConversationsRepository ??
+            FakeCompanionConversationsRepository(),
       ),
       supportRepositoryProvider.overrideWithValue(
         supportRepository ?? FakeSupportRepository(),

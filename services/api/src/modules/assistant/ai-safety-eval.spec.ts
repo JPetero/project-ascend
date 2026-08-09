@@ -21,6 +21,7 @@ import {
 } from './assistant-safety.service';
 import { AssistantSafetyCategory, AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
+import { CompanionConversationsService } from './companion-conversations.service';
 import { CompanionMemoryService } from './companion-memory.service';
 import { MemoryExtractionService } from './memory-extraction.service';
 import { CoachingStyleDto, CompanionDto } from './assistant.types';
@@ -55,6 +56,9 @@ function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
     deleteNote: jest.fn().mockResolvedValue(undefined),
     clear: jest.fn().mockResolvedValue(undefined),
   } as unknown as CompanionMemoryService;
+  const conversations = {
+    appendTurn: jest.fn().mockResolvedValue('conversation-1'),
+  } as unknown as CompanionConversationsService;
   const extraction = {
     extractCandidate: jest.fn().mockReturnValue(null),
   } as unknown as MemoryExtractionService;
@@ -78,6 +82,7 @@ function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
     provider,
     prisma,
     memory,
+    conversations,
     safety,
     entitlement,
     extraction,

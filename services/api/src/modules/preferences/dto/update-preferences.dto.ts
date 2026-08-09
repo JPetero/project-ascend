@@ -47,4 +47,12 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   aiMemoryEnabled?: boolean;
+
+  // Build Session 12 Part 8 — deliberately separate from
+  // `aiMemoryEnabled`; see Preference.conversationHistoryEnabled's doc
+  // comment in schema.prisma.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  conversationHistoryEnabled?: boolean;
 }

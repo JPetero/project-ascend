@@ -25,6 +25,8 @@ import '../../features/challenges/presentation/screens/challenge_detail_screen.d
 import '../../features/challenges/presentation/screens/challenges_screen.dart';
 import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
+import '../../features/companion/presentation/screens/companion_conversation_detail_screen.dart';
+import '../../features/companion/presentation/screens/companion_conversations_screen.dart';
 import '../../features/companion/presentation/screens/companion_memory_screen.dart';
 import '../../features/community/presentation/screens/reels_viewer_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -246,6 +248,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.companionMemory,
         builder: (context, state) => const CompanionMemoryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.companionConversations,
+        builder: (context, state) => const CompanionConversationsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.companionConversationDetail,
+        builder: (context, state) => CompanionConversationDetailScreen(
+          conversationId: state.pathParameters['id']!,
+        ),
       ),
       GoRoute(
         path: RoutePaths.gallery,

@@ -1,9 +1,20 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { AssistantReplyDto } from './dto/assistant-reply.dto';
 import { ConfirmMemoryDto } from './dto/confirm-memory.dto';
+import { RenameConversationDto } from './dto/rename-conversation.dto';
 import { AssistantService } from './assistant.service';
 
 @ApiBearerAuth()
@@ -48,5 +59,47 @@ export class AssistantController {
   @HttpCode(HttpStatus.NO_CONTENT)
   clearMemory(@CurrentUser() user: AuthenticatedUser) {
     return this.assistantService.clearMemory(user.id);
+  }
+
+  // Build Session 12 Part 8 — "Conversation history" as a real,
+  // inspectable, manageable surface distinct from "what Ascend
+  // remembers" above: list/open/rename/delete-one/clear-all, entirely
+  // separate storage and separate preference gate
+  // (`Preference.conversationHistoryEnabled`) from memory.
+  @Get('conversations')
+  async listConversations(@CurrentUser() user: AuthenticatedUser) {
+    const conversations = await this.assistantService.listConversations(user.id);
+    return { conversations };
+  }
+
+  @Get('conversations/:id')
+  getConversation(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.assistantService.getConversation(user.id, id);
+  }
+
+  @Patch('conversations/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  renameConversation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: RenameConversationDto,
+  ) {
+    return this.assistantService.renameConversation(user.id, id, dto.title);
+  }
+
+  // Deleting a conversation only ever removes rows in
+  // CompanionConversation/CompanionChatMessage — never touches
+  // CompanionMemoryNote or Preference (see
+  // CompanionConversationsService's doc comment).
+  @Delete('conversations/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteConversation(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.assistantService.deleteConversation(user.id, id);
+  }
+
+  @Delete('conversations')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  clearConversations(@CurrentUser() user: AuthenticatedUser) {
+    return this.assistantService.clearConversations(user.id);
   }
 }

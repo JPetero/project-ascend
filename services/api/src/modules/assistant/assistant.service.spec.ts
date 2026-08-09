@@ -8,6 +8,7 @@ import { AiUsagePolicy } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantSafetyCategory, AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
+import { CompanionConversationsService } from './companion-conversations.service';
 import { CompanionMemoryService } from './companion-memory.service';
 import { MemoryExtractionService } from './memory-extraction.service';
 import { CompanionMemoryCategory } from './memory-extraction.types';
@@ -28,6 +29,8 @@ function buildService(options?: {
   checkAccess?: jest.Mock;
   extractCandidate?: jest.Mock;
   checkWithinLimit?: jest.Mock;
+  conversationHistoryEnabled?: boolean | null;
+  appendTurn?: jest.Mock;
 }) {
   const generateReply = jest.fn().mockResolvedValue('Nice work today!');
   const provider: AiReplyProvider = {
@@ -37,13 +40,14 @@ function buildService(options?: {
   };
   const prisma = {
     preference: {
-      findUnique: jest
-        .fn()
-        .mockResolvedValue(
-          options?.aiMemoryEnabled === null
-            ? null
-            : { aiMemoryEnabled: options?.aiMemoryEnabled ?? true },
-        ),
+      findUnique: jest.fn().mockResolvedValue(
+        options?.aiMemoryEnabled === null
+          ? null
+          : {
+              aiMemoryEnabled: options?.aiMemoryEnabled ?? true,
+              conversationHistoryEnabled: options?.conversationHistoryEnabled ?? true,
+            },
+      ),
     },
   } as unknown as PrismaService;
   const getNotes = jest.fn().mockResolvedValue(options?.memoryNotes ?? []);
@@ -51,6 +55,16 @@ function buildService(options?: {
   const deleteNote = jest.fn().mockResolvedValue(undefined);
   const clear = jest.fn().mockResolvedValue(undefined);
   const memory = { getNotes, remember, deleteNote, clear } as unknown as CompanionMemoryService;
+
+  const appendTurn = options?.appendTurn ?? jest.fn().mockResolvedValue('conversation-1');
+  const conversations = {
+    appendTurn,
+    list: jest.fn().mockResolvedValue([]),
+    get: jest.fn(),
+    rename: jest.fn().mockResolvedValue(undefined),
+    delete: jest.fn().mockResolvedValue(undefined),
+    clearAll: jest.fn().mockResolvedValue(undefined),
+  } as unknown as CompanionConversationsService;
 
   const classify =
     options?.classify ??
@@ -82,12 +96,15 @@ function buildService(options?: {
     provider,
     prisma,
     memory,
+    conversations,
     safety,
     entitlement,
     extraction,
     usagePolicy,
   );
   return {
+    appendTurn,
+    conversations,
     service,
     generateReply,
     prisma,
@@ -387,6 +404,76 @@ describe('AssistantService', () => {
     });
   });
 
+  describe('conversation history (Build Session 12 Part 8)', () => {
+    it('persists the turn and returns the conversation id when history is enabled (the schema default)', async () => {
+      const { service, appendTurn } = buildService();
+
+      const result = await service.reply(dto, 'user-1');
+
+      expect(appendTurn).toHaveBeenCalledWith('user-1', {
+        conversationId: undefined,
+        companion: dto.companion,
+        userText: dto.input,
+        assistantText: 'Nice work today!',
+      });
+      expect(result.conversationId).toBe('conversation-1');
+    });
+
+    it('passes the client-supplied conversationId through so the turn appends to the same thread', async () => {
+      const { service, appendTurn } = buildService();
+
+      await service.reply({ ...dto, conversationId: 'existing-convo' }, 'user-1');
+
+      expect(appendTurn).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ conversationId: 'existing-convo' }),
+      );
+    });
+
+    it('never persists a turn when conversationHistoryEnabled is off, and conversationId is absent from the result', async () => {
+      const { service, appendTurn } = buildService({ conversationHistoryEnabled: false });
+
+      const result = await service.reply(dto, 'user-1');
+
+      expect(appendTurn).not.toHaveBeenCalled();
+      expect(result.conversationId).toBeUndefined();
+    });
+
+    it('never persists a turn for the early safety-gated local response — that path returns before the history gate is ever checked', async () => {
+      const classify = jest.fn().mockReturnValue({
+        category: AssistantSafetyCategory.MEDICAL_RED_FLAG,
+        decision: AssistantSafetyDecisionType.ESCALATE,
+        localResponse: 'Please seek medical attention now.',
+      });
+      const { service, appendTurn } = buildService({ classify });
+
+      await service.reply(dto, 'user-1');
+
+      expect(appendTurn).not.toHaveBeenCalled();
+    });
+
+    it('a history-persistence failure never breaks a reply the user already received', async () => {
+      const appendTurn = jest.fn().mockRejectedValue(new Error('db down'));
+      const { service } = buildService({ appendTurn });
+
+      await expect(service.reply(dto, 'user-1')).resolves.toEqual(
+        expect.objectContaining({ reply: 'Nice work today!', conversationId: undefined }),
+      );
+    });
+
+    it('is completely independent of the memory preference — history persists even when memory is off, and vice versa', async () => {
+      const { service, appendTurn, conversations } = buildService({
+        aiMemoryEnabled: false,
+        conversationHistoryEnabled: true,
+      });
+
+      await service.reply(dto, 'user-1');
+
+      expect(appendTurn).toHaveBeenCalled();
+      expect(conversations.clearAll).not.toHaveBeenCalled();
+    });
+  });
+
   describe('provider resilience usage recording (Build Session 12 Part 6)', () => {
     // Bypasses buildService's plain-object `provider` composition — a
     // real class instance's methods live on its prototype, not as own
@@ -397,7 +484,11 @@ describe('AssistantService', () => {
     // branch, so it constructs `AssistantService` directly instead.
     function buildServiceWithRouter(router: AiReplyProviderRouter) {
       const prisma = {
-        preference: { findUnique: jest.fn().mockResolvedValue({ aiMemoryEnabled: false }) },
+        preference: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ aiMemoryEnabled: false, conversationHistoryEnabled: false }),
+        },
       } as unknown as PrismaService;
       const memory = {
         getNotes: jest.fn().mockResolvedValue([]),
@@ -405,6 +496,9 @@ describe('AssistantService', () => {
         deleteNote: jest.fn().mockResolvedValue(undefined),
         clear: jest.fn().mockResolvedValue(undefined),
       } as unknown as CompanionMemoryService;
+      const conversations = {
+        appendTurn: jest.fn().mockResolvedValue('conversation-1'),
+      } as unknown as CompanionConversationsService;
       const safety = {
         classify: jest.fn().mockReturnValue({
           category: AssistantSafetyCategory.GENERAL,
@@ -433,6 +527,7 @@ describe('AssistantService', () => {
         router,
         prisma,
         memory,
+        conversations,
         safety,
         entitlement,
         extraction,
@@ -534,6 +629,9 @@ describe('AssistantService', () => {
         getNotes: jest.fn().mockResolvedValue([]),
         remember: jest.fn().mockResolvedValue(undefined),
       } as unknown as CompanionMemoryService;
+      const conversations = {
+        appendTurn: jest.fn().mockResolvedValue('conversation-1'),
+      } as unknown as CompanionConversationsService;
       const safety = {
         classify: jest.fn().mockReturnValue({
           category: AssistantSafetyCategory.GENERAL,
@@ -561,6 +659,7 @@ describe('AssistantService', () => {
         provider,
         prisma,
         memory,
+        conversations,
         safety,
         entitlement,
         extraction,

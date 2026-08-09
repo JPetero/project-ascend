@@ -6,6 +6,11 @@ import { AiReplyProviderRouter } from './ai-reply-provider-router';
 import { AiUsagePolicy, FAIR_USE_LIMIT_MESSAGE } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantSafetyDecisionType } from './assistant-safety.types';
+import { CompanionConversationsService } from './companion-conversations.service';
+import {
+  CompanionConversationDetail,
+  CompanionConversationSummary,
+} from './companion-conversations.types';
 import { CompanionMemoryNoteView, CompanionMemoryService } from './companion-memory.service';
 import { AssistantReplyDto } from './dto/assistant-reply.dto';
 import { MemoryExtractionService } from './memory-extraction.service';
@@ -19,6 +24,10 @@ export interface AssistantReplyResult {
    * this?" prompt and, if the user agrees, calls `confirmMemory` with
    * this exact category/value. */
   pendingMemory?: MemoryCandidate;
+  /** Set only when `Preference.conversationHistoryEnabled` is on (Build
+   * Session 12 Part 8) — the client sends this back as `conversationId`
+   * on the next turn to keep appending to the same thread. */
+  conversationId?: string;
 }
 
 /**
@@ -51,6 +60,13 @@ export interface AssistantReplyResult {
  * from (never pain/medical/eating-disorder/self-harm/sexual/dependency/
  * etc. content), and only when the user has explicitly enabled memory
  * (`Preference.aiMemoryEnabled`, opt-in by default now).
+ *
+ * Build Session 12 Part 8 added `CompanionConversationsService` — the
+ * raw transcript, gated on its own `Preference.conversationHistoryEnabled`
+ * (default on, independent of `aiMemoryEnabled`). Deliberately a second
+ * gate rather than reusing `memoryEnabled`: a user can want their chat
+ * to scroll back without Atlas/Nova building a standing fact profile,
+ * or vice versa.
  */
 @Injectable()
 export class AssistantService {
@@ -58,6 +74,7 @@ export class AssistantService {
     @Inject(AI_REPLY_PROVIDER) private readonly provider: AiReplyProvider,
     private readonly prisma: PrismaService,
     private readonly memory: CompanionMemoryService,
+    private readonly conversations: CompanionConversationsService,
     private readonly safety: AssistantSafetyService,
     private readonly entitlement: AiEntitlementService,
     private readonly extraction: MemoryExtractionService,
@@ -97,7 +114,11 @@ export class AssistantService {
       throw new ForbiddenException(FAIR_USE_LIMIT_MESSAGE);
     }
 
-    const memoryEnabled = await this.isMemoryEnabled(userId);
+    const preference = await this.prisma.preference.findUnique({ where: { userId } });
+    // No Preference row yet mirrors each column's own schema default
+    // rather than assuming a value.
+    const memoryEnabled = preference?.aiMemoryEnabled ?? false;
+    const historyEnabled = preference?.conversationHistoryEnabled ?? true;
     const notes = memoryEnabled ? await this.memory.getNotes(userId) : [];
 
     const safetyContext =
@@ -149,7 +170,26 @@ export class AssistantService {
       }
     }
 
-    return { reply, pendingMemory };
+    // Build Session 12 Part 8 — gated on its own preference, checked
+    // only after the entitlement/fair-use gates above pass (like memory,
+    // this only ever persists a real provider-routed reply, not the
+    // early safety-gated local-response return above, which every tier
+    // reaches identically and the mobile client already short-circuits
+    // before it would ever call this endpoint in normal use — see
+    // AiProvider.reply()'s doc comment on the mobile side).
+    let conversationId: string | undefined;
+    if (historyEnabled) {
+      conversationId = await this.conversations
+        .appendTurn(userId, {
+          conversationId: dto.conversationId,
+          companion: dto.companion,
+          userText: dto.input,
+          assistantText: reply,
+        })
+        .catch(() => undefined);
+    }
+
+    return { reply, pendingMemory, conversationId };
   }
 
   /**
@@ -177,10 +217,28 @@ export class AssistantService {
     return this.memory.clear(userId);
   }
 
-  private async isMemoryEnabled(userId: string): Promise<boolean> {
-    const preference = await this.prisma.preference.findUnique({ where: { userId } });
-    // No Preference row yet mirrors the schema's own default (false —
-    // opt-in, Build Session 11 Part 4) rather than assuming enabled.
-    return preference?.aiMemoryEnabled ?? false;
+  // Build Session 12 Part 8 — thin delegates, same shape as the memory
+  // ones above. Kept on this service (rather than the controller
+  // injecting CompanionConversationsService directly) purely for
+  // consistency with the existing memory delegate methods; there's no
+  // cross-service orchestration happening here.
+  listConversations(userId: string): Promise<CompanionConversationSummary[]> {
+    return this.conversations.list(userId);
+  }
+
+  getConversation(userId: string, conversationId: string): Promise<CompanionConversationDetail> {
+    return this.conversations.get(userId, conversationId);
+  }
+
+  renameConversation(userId: string, conversationId: string, title: string): Promise<void> {
+    return this.conversations.rename(userId, conversationId, title);
+  }
+
+  deleteConversation(userId: string, conversationId: string): Promise<void> {
+    return this.conversations.delete(userId, conversationId);
+  }
+
+  clearConversations(userId: string): Promise<void> {
+    return this.conversations.clearAll(userId);
   }
 }

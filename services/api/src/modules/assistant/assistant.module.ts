@@ -6,6 +6,7 @@ import { AiReplyProviderRouter } from './ai-reply-provider-router';
 import { AiUsagePolicy } from './ai-usage-policy.service';
 import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantService } from './assistant.service';
+import { CompanionConversationsService } from './companion-conversations.service';
 import { CompanionMemoryService } from './companion-memory.service';
 import { MemoryExtractionService } from './memory-extraction.service';
 import { AnthropicReplyProvider } from './providers/anthropic-reply-provider';
@@ -42,6 +43,7 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
     AssistantService,
     AssistantSafetyService,
     CompanionMemoryService,
+    CompanionConversationsService,
     MemoryExtractionService,
     AiProviderCircuitBreaker,
     AiUsagePolicy,

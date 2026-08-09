@@ -57,6 +57,7 @@ class PreferencesModel {
     required this.reducedMotion,
     required this.notificationsEnabled,
     required this.aiMemoryEnabled,
+    this.conversationHistoryEnabled = true,
   });
 
   final Companion companion;
@@ -67,6 +68,10 @@ class PreferencesModel {
   final bool reducedMotion;
   final bool notificationsEnabled;
   final bool aiMemoryEnabled;
+  // Build Session 12 Part 8 — deliberately separate from
+  // [aiMemoryEnabled]; see companion_conversations_screen.dart and
+  // Preference.conversationHistoryEnabled's doc comment on the backend.
+  final bool conversationHistoryEnabled;
 
   factory PreferencesModel.fromJson(Map<String, dynamic> json) {
     return PreferencesModel(
@@ -84,6 +89,10 @@ class PreferencesModel {
       // Opt-in by default (Build Session 11 Part 4) — matches the
       // backend's Preference.aiMemoryEnabled schema default.
       aiMemoryEnabled: json['aiMemoryEnabled'] as bool? ?? false,
+      // Opt-out by default, unlike memory — see Preference.
+      // conversationHistoryEnabled's doc comment on the backend.
+      conversationHistoryEnabled:
+          json['conversationHistoryEnabled'] as bool? ?? true,
     );
   }
 
@@ -96,6 +105,7 @@ class PreferencesModel {
     'reducedMotion': reducedMotion,
     'notificationsEnabled': notificationsEnabled,
     'aiMemoryEnabled': aiMemoryEnabled,
+    'conversationHistoryEnabled': conversationHistoryEnabled,
   };
 
   PreferencesModel copyWith({
@@ -107,6 +117,7 @@ class PreferencesModel {
     bool? reducedMotion,
     bool? notificationsEnabled,
     bool? aiMemoryEnabled,
+    bool? conversationHistoryEnabled,
   }) {
     return PreferencesModel(
       companion: companion ?? this.companion,
@@ -117,6 +128,8 @@ class PreferencesModel {
       reducedMotion: reducedMotion ?? this.reducedMotion,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       aiMemoryEnabled: aiMemoryEnabled ?? this.aiMemoryEnabled,
+      conversationHistoryEnabled:
+          conversationHistoryEnabled ?? this.conversationHistoryEnabled,
     );
   }
 }
