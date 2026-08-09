@@ -170,4 +170,12 @@ describe('Vision analysis sessions (e2e)', () => {
       .send(sampleSession({ exercise: 'DEADLIFT' }))
       .expect(400);
   });
+
+  it('rejects an analysisVersion the backend does not recognize (Build Session 11 Part 8)', async () => {
+    await request(app.getHttpServer())
+      .post('/vision/analysis-sessions')
+      .set('Authorization', `Bearer ${premiumToken}`)
+      .send(sampleSession({ analysisVersion: 'pose-v99-made-up' }))
+      .expect(400);
+  });
 });
