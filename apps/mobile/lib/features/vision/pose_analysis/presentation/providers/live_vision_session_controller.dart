@@ -8,7 +8,7 @@ import '../../domain/exercise_pose_analyzer_factory.dart';
 import '../../domain/form_observation.dart';
 import '../../domain/supported_exercise.dart';
 
-enum LiveVisionSessionStatus { idle, running, paused, completed }
+enum LiveVisionSessionStatus { idle, calibrating, running, paused, completed }
 
 class LiveVisionSessionState {
   const LiveVisionSessionState({
@@ -21,6 +21,7 @@ class LiveVisionSessionState {
     this.lastFrameAccepted = false,
     this.cues = const [],
     this.elapsed = Duration.zero,
+    this.calibrationProgress = 0,
   });
 
   final SupportedExercise exercise;
@@ -32,6 +33,11 @@ class LiveVisionSessionState {
   final bool lastFrameAccepted;
   final List<FormObservation> cues;
   final Duration elapsed;
+
+  /// 0.0-1.0 progress toward completing calibration (see
+  /// [LiveVisionSessionController._processCalibrationFrame]) — only
+  /// meaningful while [status] is [LiveVisionSessionStatus.calibrating].
+  final double calibrationProgress;
 
   /// Never negative — a manual "-1" can correct the auto-detected count
   /// down, but the displayed count always floors at zero rather than
@@ -51,6 +57,7 @@ class LiveVisionSessionState {
     bool? lastFrameAccepted,
     List<FormObservation>? cues,
     Duration? elapsed,
+    double? calibrationProgress,
   }) {
     return LiveVisionSessionState(
       exercise: exercise,
@@ -62,6 +69,7 @@ class LiveVisionSessionState {
       lastFrameAccepted: lastFrameAccepted ?? this.lastFrameAccepted,
       cues: cues ?? this.cues,
       elapsed: elapsed ?? this.elapsed,
+      calibrationProgress: calibrationProgress ?? this.calibrationProgress,
     );
   }
 }
@@ -90,12 +98,23 @@ class LiveVisionSessionController
   DateTime? _startedAt;
   DateTime? _pausedAt;
   Duration _totalPaused = Duration.zero;
+  int _calibrationStreak = 0;
+
+  /// Consecutive frames with acceptable overall visibility required before
+  /// rep counting begins (Build Session 11 Part 7) — catches "camera
+  /// pointed at the ceiling" or "nobody in frame yet" before a session
+  /// silently starts counting nothing, without requiring an explicit
+  /// user tap once they're actually in position.
+  static const _calibrationFramesRequired = 5;
 
   void start() {
-    _startedAt = clock.now();
     _totalPaused = Duration.zero;
     _pausedAt = null;
-    state = state.copyWith(status: LiveVisionSessionStatus.running);
+    _calibrationStreak = 0;
+    state = state.copyWith(
+      status: LiveVisionSessionStatus.calibrating,
+      calibrationProgress: 0,
+    );
   }
 
   void pause() {
@@ -123,10 +142,14 @@ class LiveVisionSessionController
     );
   }
 
-  /// The only entry point that advances rep counting/cues — a no-op
-  /// while paused/idle/completed so a frame delivered just after
+  /// The only entry point that advances calibration/rep counting/cues —
+  /// a no-op while paused/idle/completed so a frame delivered just after
   /// [pause] can never sneak in an extra rep.
   void processFrame(PoseFrame frame) {
+    if (state.status == LiveVisionSessionStatus.calibrating) {
+      _processCalibrationFrame(frame);
+      return;
+    }
     if (state.status != LiveVisionSessionStatus.running) return;
 
     final update = _analyzer.onFrame(frame);
@@ -139,6 +162,35 @@ class LiveVisionSessionController
           ? state.cues
           : [...state.cues, ...update.observations],
       elapsed: _elapsedNow(),
+    );
+  }
+
+  /// A frame counts toward calibration on overall landmark visibility
+  /// alone (medium confidence or better) — not exercise-specific joint
+  /// angles, since the point is just "is a person clearly in frame yet,"
+  /// not "are they mid-rep." Any frame below that resets the streak
+  /// rather than partially crediting it, so a fleeting glimpse of the
+  /// subject doesn't calibrate against mostly-empty frames.
+  void _processCalibrationFrame(PoseFrame frame) {
+    final confidence = poseConfidenceFromValue(frame.overallConfidence);
+    final isGoodFrame =
+        confidence == PoseConfidence.high ||
+        confidence == PoseConfidence.medium;
+    _calibrationStreak = isGoodFrame ? _calibrationStreak + 1 : 0;
+
+    if (_calibrationStreak >= _calibrationFramesRequired) {
+      _startedAt = clock.now();
+      state = state.copyWith(
+        status: LiveVisionSessionStatus.running,
+        confidence: confidence,
+        calibrationProgress: 1,
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      confidence: confidence,
+      calibrationProgress: _calibrationStreak / _calibrationFramesRequired,
     );
   }
 

@@ -224,6 +224,12 @@ class _VisionLiveSessionScreenState
             errorMessage: _cameraErrorMessage,
             onStart: _startSession,
           ),
+          LiveVisionSessionStatus.calibrating => _CalibratingBody(
+            cameraController: _cameraController,
+            latestFrame: _latestFrame,
+            imageSize: _latestImageSize,
+            progress: state.calibrationProgress,
+          ),
           LiveVisionSessionStatus.running ||
           LiveVisionSessionStatus.paused => _LiveSessionBody(
             state: state,
@@ -354,6 +360,69 @@ class _GuidanceRow extends StatelessWidget {
           Expanded(child: Text(text)),
         ],
       ),
+    );
+  }
+}
+
+/// Shown between "Start live session" and rep counting actually
+/// beginning (Build Session 11 Part 7) — the camera and skeleton overlay
+/// are already live so the user can see themselves get into frame, but
+/// no reps are counted until [LiveVisionSessionController] confirms
+/// several consecutive frames have good visibility.
+class _CalibratingBody extends StatelessWidget {
+  const _CalibratingBody({
+    required this.cameraController,
+    required this.latestFrame,
+    required this.imageSize,
+    required this.progress,
+  });
+
+  final CameraController? cameraController;
+  final PoseFrame? latestFrame;
+  final Size imageSize;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = cameraController;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (controller != null && controller.value.isInitialized)
+          CameraPreview(controller)
+        else
+          const ColoredBox(color: Colors.black87),
+        if (controller != null && controller.value.isInitialized)
+          CustomPaint(
+            painter: PoseSkeletonPainter(
+              frame: latestFrame,
+              imageSize: imageSize,
+            ),
+          ),
+        Positioned(
+          left: AscendSpacing.md,
+          right: AscendSpacing.md,
+          bottom: AscendSpacing.xl,
+          child: AscendCard(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Getting you in frame…',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: AscendSpacing.xs),
+                const Text(
+                  'Hold still with your full body visible.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AscendSpacing.sm),
+                LinearProgressIndicator(value: progress <= 0 ? null : progress),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

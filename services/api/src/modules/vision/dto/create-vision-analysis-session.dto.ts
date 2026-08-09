@@ -5,6 +5,7 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -15,6 +16,17 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+
+/**
+ * Known pose-analysis algorithm versions (Build Session 11 Part 8) — a
+ * client claiming an unrecognized version is rejected rather than stored,
+ * so a result set can never silently mix data from an algorithm revision
+ * the backend doesn't know how to interpret. Add a new entry here (never
+ * remove an old one — historical sessions still reference it) whenever
+ * `MlKitPoseDetectorAdapter`/the exercise analyzers change in a way that
+ * would make results not directly comparable to prior versions.
+ */
+export const KNOWN_VISION_ANALYSIS_VERSIONS = ['pose-v1'] as const;
 
 export enum VisionExerciseDto {
   BODYWEIGHT_SQUAT = 'BODYWEIGHT_SQUAT',
@@ -79,10 +91,9 @@ export class CreateVisionAnalysisSessionDto {
   @Min(0)
   correctedRepCount!: number;
 
-  @ApiProperty()
+  @ApiProperty({ enum: KNOWN_VISION_ANALYSIS_VERSIONS })
   @IsString()
-  @MinLength(1)
-  @MaxLength(40)
+  @IsIn(KNOWN_VISION_ANALYSIS_VERSIONS)
   analysisVersion!: string;
 
   @ApiProperty({ required: false })
