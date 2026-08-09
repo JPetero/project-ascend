@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { CommunityPostMediaType } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/pagination/pagination-query.dto';
 
 export class QueryCommunityPostsDto extends PaginationQueryDto {
@@ -22,4 +23,13 @@ export class QueryCommunityPostsDto extends PaginationQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   followingOnly?: boolean;
+
+  // Build Session 10 Part 22 — the vertical Reels viewer's own feed:
+  // VIDEO posts only, still filtered through the same visibility rules
+  // as the regular feed. Omitted means every media type, unchanged from
+  // before this filter existed.
+  @ApiPropertyOptional({ enum: CommunityPostMediaType })
+  @IsOptional()
+  @IsEnum(CommunityPostMediaType)
+  mediaType?: CommunityPostMediaType;
 }

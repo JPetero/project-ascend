@@ -25,6 +25,7 @@ import '../../features/challenges/presentation/screens/challenges_screen.dart';
 import '../../features/challenges/presentation/screens/create_challenge_screen.dart';
 import '../../features/companion/presentation/screens/ascend_command_center_screen.dart';
 import '../../features/companion/presentation/screens/companion_memory_screen.dart';
+import '../../features/community/presentation/screens/reels_viewer_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/joint_workouts/presentation/screens/joint_workout_session_detail_screen.dart';
@@ -301,6 +302,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.communityPostDetail,
         builder: (context, state) =>
             PostDetailScreen(postId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.reelsViewer,
+        builder: (context, state) =>
+            ReelsViewerScreen(initialPostId: state.pathParameters['id']),
       ),
       GoRoute(
         path: RoutePaths.communityCreatePost,

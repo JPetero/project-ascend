@@ -47,11 +47,17 @@ class CommunityFeedState {
 /// `CommunityService.buildVisibleWhere` on the backend. Likes/saves are
 /// applied optimistically and rolled back on failure so tapping feels
 /// instant without ever showing a count that doesn't match the server.
+///
+/// [reelsOnly] (Build Session 10 Part 22) drives the full-screen vertical
+/// Reels viewer off the same pagination/like/save/report machinery as
+/// every other feed mode — it's just a `mediaType=VIDEO` filter on the
+/// same `listFeed` call, not a separate data path.
 class CommunityFeedController extends StateNotifier<CommunityFeedState> {
   CommunityFeedController({
     required CommunityRepository repository,
     this.authorId,
     this.savedOnly = false,
+    this.reelsOnly = false,
   }) : _repository = repository,
        super(const CommunityFeedState()) {
     refresh();
@@ -60,6 +66,7 @@ class CommunityFeedController extends StateNotifier<CommunityFeedState> {
   final CommunityRepository _repository;
   final String? authorId;
   final bool savedOnly;
+  final bool reelsOnly;
   static const _limit = 20;
   int _page = 1;
   bool followingOnly = false;
@@ -72,6 +79,7 @@ class CommunityFeedController extends StateNotifier<CommunityFeedState> {
             limit: _limit,
             authorId: authorId,
             followingOnly: followingOnly,
+            mediaType: reelsOnly ? CommunityPostMediaType.video : null,
           );
   }
 
@@ -217,5 +225,20 @@ final communitySavedFeedControllerProvider =
       return CommunityFeedController(
         repository: ref.watch(communityRepositoryProvider),
         savedOnly: true,
+      );
+    });
+
+/// Backs the full-screen vertical Reels viewer (Build Session 10 Part
+/// 22) — a fresh instance per entry so opening the viewer always starts
+/// from a real, current server fetch rather than reusing whatever the
+/// main feed last loaded.
+final communityReelsFeedControllerProvider =
+    StateNotifierProvider.autoDispose<
+      CommunityFeedController,
+      CommunityFeedState
+    >((ref) {
+      return CommunityFeedController(
+        repository: ref.watch(communityRepositoryProvider),
+        reelsOnly: true,
       );
     });

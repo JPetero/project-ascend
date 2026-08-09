@@ -203,6 +203,9 @@ export class CommunityService {
 
   async listFeed(viewerId: string, query: QueryCommunityPostsDto) {
     const where = await this.buildVisibleWhere(viewerId, query.authorId, query.followingOnly);
+    if (query.mediaType) {
+      where.mediaType = query.mediaType;
+    }
 
     const [posts, total] = await Promise.all([
       this.prisma.communityPost.findMany({

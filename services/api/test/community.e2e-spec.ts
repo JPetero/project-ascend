@@ -293,6 +293,39 @@ describe('Community profiles/posts/Reels (e2e)', () => {
       .expect(204);
   });
 
+  it('mediaType=VIDEO filters the feed to Reels only (Build Session 10 Part 22)', async () => {
+    const reel = await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authA())
+      .send({
+        mediaType: 'VIDEO',
+        mediaUrl: 'https://cdn.example.com/reels/reel-filter.mp4',
+        caption: 'A reel for the filter test',
+      })
+      .expect(201);
+    const textPost = await request(app.getHttpServer())
+      .post('/community/posts')
+      .set(authA())
+      .send({ caption: 'A plain text post for the filter test' })
+      .expect(201);
+
+    const videoOnly = await request(app.getHttpServer())
+      .get('/community/posts')
+      .query({ mediaType: 'VIDEO' })
+      .set(authA())
+      .expect(200);
+
+    expect(
+      videoOnly.body.data.data.some((p: { id: string }) => p.id === reel.body.data.id),
+    ).toBe(true);
+    expect(
+      videoOnly.body.data.data.some((p: { id: string }) => p.id === textPost.body.data.id),
+    ).toBe(false);
+    expect(
+      videoOnly.body.data.data.every((p: { mediaType: string }) => p.mediaType === 'VIDEO'),
+    ).toBe(true);
+  });
+
   it('keeps a PRIVATE post visible only to its own author', async () => {
     const created = await request(app.getHttpServer())
       .post('/community/posts')

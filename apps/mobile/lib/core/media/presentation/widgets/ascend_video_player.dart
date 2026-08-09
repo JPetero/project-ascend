@@ -5,6 +5,12 @@ import 'package:video_player/video_player.dart';
 /// for reviewing a freshly-recorded clip before upload and for playing
 /// back a published Reel (Part 4). No autoplay audio unless [autoplay]
 /// and [startMuted] are explicitly overridden by the caller.
+///
+/// [autoplay] is also read after construction (Build Session 10 Part
+/// 22): the vertical Reels viewer keeps one persistent instance per
+/// post (keyed by post id) across page changes and flips [autoplay] to
+/// play/pause it as the user swipes, rather than tearing down and
+/// re-buffering the controller every time a page becomes current again.
 class AscendVideoPlayer extends StatefulWidget {
   const AscendVideoPlayer({
     super.key,
@@ -45,6 +51,15 @@ class _AscendVideoPlayerState extends State<AscendVideoPlayer> {
             if (!mounted) return;
             setState(() => _hasError = true);
           });
+  }
+
+  @override
+  void didUpdateWidget(covariant AscendVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoplay != oldWidget.autoplay &&
+        _controller.value.isInitialized) {
+      widget.autoplay ? _controller.play() : _controller.pause();
+    }
   }
 
   @override

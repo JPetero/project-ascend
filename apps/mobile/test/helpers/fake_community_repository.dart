@@ -116,6 +116,7 @@ class FakeCommunityRepository implements CommunityRepository {
     int limit = 20,
     String? authorId,
     bool followingOnly = false,
+    CommunityPostMediaType? mediaType,
   }) async {
     _maybeThrow();
     lastFollowingOnly = followingOnly;
@@ -126,6 +127,9 @@ class FakeCommunityRepository implements CommunityRepository {
       filtered = filtered
           .where((p) => p.isOwnPost || followedUserIds.contains(p.authorId))
           .toList();
+    }
+    if (mediaType != null) {
+      filtered = filtered.where((p) => p.mediaType == mediaType).toList();
     }
     final start = (page - 1) * limit;
     if (start >= filtered.length) return [];
