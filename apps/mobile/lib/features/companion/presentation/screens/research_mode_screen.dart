@@ -5,14 +5,13 @@ import '../../../../core/design_system/design_system.dart';
 import '../../domain/research_answer.dart';
 import '../providers/companion_chat_controller.dart';
 
-/// Premium future "research mode" per
+/// Premium "research mode" per
 /// packages/docs/product/user-scenario-bible.md Scenario 19: detailed,
-/// citation-backed answers with evidence-quality labels. No live,
-/// source-verified research provider exists this session (see
-/// [AiProvider.researchReply]'s default implementation), so this screen
-/// only ever shows the honest "not available yet" state — never a
-/// fabricated summary or citation. Mirrors the Premium Vision module
-/// screens' "on its way" pattern.
+/// citation-backed answers with evidence-quality labels. Premium accounts
+/// get a real, source-verified answer via [LiveAiProvider.researchReply]
+/// (Build Session 10 Part 16); Free accounts and any failure/unconfigured
+/// state fall back to [AiProvider.researchReply]'s honest "not available"
+/// default — never a fabricated summary or citation either way.
 class ResearchModeScreen extends ConsumerStatefulWidget {
   const ResearchModeScreen({super.key});
 
@@ -105,9 +104,9 @@ class _ResearchResult extends StatelessWidget {
       );
     }
 
-    // No implementation this session ever sets isAvailable to true (see
-    // AiProvider.researchReply's default), but a future live provider
-    // will — rendered here so that path already has somewhere to go.
+    // Real, source-verified results from LiveAiProvider.researchReply
+    // (Build Session 10 Part 16) — every field below is literal text a
+    // real search returned, never a fabricated summary or citation.
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,11 +116,36 @@ class _ResearchResult extends StatelessWidget {
         const SizedBox(height: AscendSpacing.md),
         for (final source in answer.sources)
           Padding(
-            padding: const EdgeInsets.only(bottom: AscendSpacing.xs),
-            child: Text(
-              '${source.label} · ${source.evidenceQuality.name} evidence'
-              '${source.publicationYear != null ? ' · ${source.publicationYear}' : ''}',
-              style: theme.textTheme.bodySmall,
+            padding: const EdgeInsets.only(bottom: AscendSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${source.label} · ${source.evidenceQuality.name} evidence'
+                  '${source.publicationYear != null ? ' · ${source.publicationYear}' : ''}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (source.snippet != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AscendSpacing.xs),
+                    child: Text(
+                      source.snippet!,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                if (source.url != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AscendSpacing.xs),
+                    child: SelectableText(
+                      source.url!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
       ],

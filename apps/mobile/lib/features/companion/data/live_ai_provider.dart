@@ -1,6 +1,7 @@
 import '../../../core/networking/api_client.dart';
 import '../../profile/domain/preferences_model.dart';
 import '../domain/chat_message.dart';
+import '../domain/research_answer.dart';
 import 'ai_provider.dart';
 
 /// Build Session 9 Part 15/16 — the first real live provider: calls the
@@ -19,12 +20,15 @@ import 'ai_provider.dart';
 /// of the honest-degradation pattern; the backend's own honesty ("not
 /// configured" rather than a fabricated reply) is AssistantService's job.
 ///
-/// Deliberately does not override [AiProvider.researchReply] — inherits
-/// the honest "not available" default. Research Mode still has no
-/// verified-citation pipeline behind it; Scenario 19's hard rule ("must
-/// never invent a citation... must include source verification before it
-/// ships") isn't satisfied by an LLM call alone, so that stays future
-/// work rather than shipping a plausible-sounding but unverified answer.
+/// [researchReply] (Build Session 10 Part 16) follows the same
+/// degradation pattern, calling `POST /research/query` — see
+/// `BraveSearchResearchProvider`'s doc comment for why that pipeline
+/// never risks Scenario 19's "must never invent a citation" rule: it's
+/// pure retrieval against a curated trusted-domain allowlist, with no
+/// generative summarization step to hallucinate from. Any failure (not
+/// configured, not Premium, offline, server error) falls back to
+/// [AiProvider.researchReply]'s honest "not available" default rather
+/// than surfacing a raw error.
 class LiveAiProvider extends AiProvider {
   LiveAiProvider({required ApiClient apiClient, required AiProvider fallback})
     : _apiClient = apiClient,
@@ -65,5 +69,43 @@ class LiveAiProvider extends AiProvider {
       style: style,
       history: history,
     );
+  }
+
+  @override
+  Future<ResearchAnswer> researchReply({required String query}) async {
+    try {
+      final envelope = await _apiClient.post(
+        '/research/query',
+        (data) => data as Map<String, dynamic>,
+        data: {'query': query},
+      );
+      final body = envelope.data;
+      if (body == null) {
+        return super.researchReply(query: query);
+      }
+      final rawSources = body['sources'] as List<dynamic>? ?? const [];
+      return ResearchAnswer(
+        isAvailable: true,
+        summary: body['summary'] as String?,
+        sources: rawSources
+            .cast<Map<String, dynamic>>()
+            .map(
+              (source) => ResearchSource(
+                label: source['label'] as String,
+                evidenceQuality: EvidenceQuality.values.byName(
+                  (source['evidenceQuality'] as String).toLowerCase(),
+                ),
+                url: source['url'] as String?,
+                snippet: source['snippet'] as String?,
+                publicationYear: source['publicationYear'] as int?,
+              ),
+            )
+            .toList(),
+      );
+    } catch (_) {
+      // Not configured, not Premium, offline, or a server error — never
+      // surfaces a raw error to the Research Mode screen.
+      return super.researchReply(query: query);
+    }
   }
 }

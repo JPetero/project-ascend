@@ -42,6 +42,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { PromoteModule } from './modules/promote/promote.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ResearchModule } from './modules/research/research.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { SportsModule } from './modules/sports/sports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -119,6 +120,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AssistantModule,
     PurchasesModule,
     VisionModule,
+    ResearchModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

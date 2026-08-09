@@ -58,6 +58,16 @@ export interface AiConfig {
   geminiModel: string;
 }
 
+export interface ResearchConfig {
+  // A Brave Search API subscription token, used to call the real Web
+  // Search API for Research Mode (Build Session 10 Part 16). Undefined
+  // means research retrieval is not configured this environment —
+  // ResearchModule falls back to NoopResearchProvider, which honestly
+  // rejects rather than fabricating a citation. See
+  // BraveSearchResearchProvider's doc comment.
+  braveSearchApiKey?: string;
+}
+
 export interface PushConfig {
   // A Firebase service-account key (the raw JSON key file content), used
   // to obtain an OAuth access token for the FCM HTTP v1 send API.
@@ -93,6 +103,7 @@ export default (): {
   email: EmailConfig;
   socialAuth: SocialAuthConfig;
   ai: AiConfig;
+  research: ResearchConfig;
   push: PushConfig;
   iap: IapConfig;
 } => ({
@@ -139,6 +150,9 @@ export default (): {
     openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
     geminiApiKey: process.env.GEMINI_API_KEY,
     geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.0-flash-001',
+  },
+  research: {
+    braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY,
   },
   push: {
     fcmServiceAccountJson: process.env.FCM_SERVICE_ACCOUNT_JSON,
