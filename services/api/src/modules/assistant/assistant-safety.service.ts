@@ -15,6 +15,12 @@ import {
 // real keyword rather than a hand-copied, driftable duplicate.
 export const MEDICAL_RED_FLAG_KEYWORDS = [
   'chest pain',
+  // Build Session 12 Part 3 — paraphrase coverage: "crushing pain in my
+  // chest" doesn't contain the substring "chest pain" (word order), so
+  // it needed its own entries.
+  'crushing pain',
+  'pain in my chest',
+  'pain in the chest',
   'fainting',
   'fainted',
   'faint',
@@ -83,6 +89,9 @@ export const SELF_HARM_KEYWORDS = [
   'self harm',
   'self-harm',
   'hurt myself',
+  // Build Session 12 Part 3 — paraphrase coverage: "I feel like hurting
+  // myself" wouldn't match "hurt myself" above (different inflection).
+  'hurting myself',
   'cutting myself',
 ];
 
@@ -99,6 +108,9 @@ export const ABUSE_CRISIS_KEYWORDS = [
   'being threatened',
 ];
 
+// Representative phrases for the exhaustive keyword test — actual
+// detection is `matchesMinorSafety` below, which is deliberately more
+// precise than a plain substring match on these (see its doc comment).
 export const MINOR_SAFETY_KEYWORDS = [
   "i'm 12",
   "i'm 13",
@@ -110,6 +122,25 @@ export const MINOR_SAFETY_KEYWORDS = [
   "i'm a minor",
   'i am a minor',
 ];
+
+// Build Session 12 Part 3 — a plain substring check on "i'm 14" false-
+// positived on "I'm 14 weeks into my program" (a training-duration
+// statement, not a self-reported age). This requires the age to appear
+// as "i'm/i am <12-14>" NOT immediately followed by a unit word that
+// means the number isn't an age at all — "years old"/"years of age" are
+// deliberately not in the exclusion list, so a genuine age statement
+// ("I am 14 years old") still matches.
+const MINOR_AGE_SELF_REPORT_PATTERN =
+  /\bi\s*(?:'m|am)\s+(?:1[0-4])\b(?!\s*(?:weeks?|days?|months?|hours?|minutes?|reps?|sets?|kgs?|kilograms?|lbs?|pounds?|km|kilometers?|miles?|percent|%))/;
+
+const MINOR_SAFETY_NON_AGE_PHRASES = ["i'm in middle school", "i'm a minor", 'i am a minor'];
+
+function matchesMinorSafety(normalized: string): boolean {
+  return (
+    MINOR_AGE_SELF_REPORT_PATTERN.test(normalized) ||
+    containsAny(normalized, MINOR_SAFETY_NON_AGE_PHRASES)
+  );
+}
 
 export const SEXUAL_CONTENT_KEYWORDS = [
   'sexy',
@@ -131,6 +162,8 @@ export const EATING_DISORDER_KEYWORDS = [
   'binge and purge',
   'how do i not eat',
   'stop eating completely',
+  // Build Session 12 Part 3 — paraphrase coverage.
+  'barely want to eat',
 ];
 
 export const EXTREME_DIETING_KEYWORDS = [
@@ -165,12 +198,15 @@ export const OVERTRAINING_KEYWORDS = [
   'wont rest',
   'exhausted but keep training',
   'twice a day every day',
+  // Build Session 12 Part 3 — paraphrase coverage.
+  'barely being able to stand',
 ];
 
+// Usage-intent phrasing — the user wants to take/acquire/dose one of
+// these. Kept as an immediate deterministic local response, never
+// reaching a provider.
 export const PED_KEYWORDS = [
   'steroid cycle',
-  'steroids',
-  'anabolic',
   'sarms',
   'clenbuterol',
   'stack stimulants',
@@ -178,6 +214,15 @@ export const PED_KEYWORDS = [
   'peptide cycle',
   'growth hormone',
 ];
+
+// Build Session 12 Part 3 — bare substance-name mentions with no
+// usage-intent framing (e.g. "research anabolic steroid risks") used to
+// share PED_KEYWORDS' canned refusal, which reads oddly for a genuinely
+// informational question. These get ALLOW_WITH_SAFETY_CONTEXT instead —
+// the provider can still answer factually, just nudged away from
+// dosing/acquisition guidance — rather than PED_KEYWORDS' harder
+// LOCAL_SAFE_RESPONSE.
+export const PED_INFORMATIONAL_KEYWORDS = ['steroids', 'anabolic'];
 
 export const DEPENDENCY_KEYWORDS = [
   "you're the only",
@@ -199,6 +244,16 @@ export const UNSUPPORTED_ADVICE_KEYWORDS = [
   'prescribe me',
 ];
 
+// Deliberately a plain substring match, not word-boundary-anchored — see
+// `ai-safety-eval.spec.ts`'s "documented matcher quirks (intentional)"
+// block. A keyword matching inside a longer word (e.g. "ache" inside
+// "headache") is accepted as the safe failure direction for *this*
+// keyword: the resulting response is still contextually reasonable, and
+// under-matching a genuine pain/crisis mention would be worse. Where a
+// keyword's false-positive potential produces a response that is
+// actively wrong rather than just imprecise (MINOR_SAFETY's age check,
+// PED_INFORMATIONAL_KEYWORDS below), those get their own dedicated,
+// more precise matching instead of changing this shared helper.
 function containsAny(haystack: string, needles: string[]): boolean {
   return needles.some((needle) => haystack.includes(needle));
 }
@@ -275,6 +330,13 @@ const DEPENDENCY_SAFETY_CONTEXT =
   "counselor or therapist can help with things you can't. Never claim to be conscious, human, " +
   'or a replacement for real relationships or professional support.';
 
+const PED_INFORMATIONAL_SAFETY_CONTEXT =
+  "The user's message mentions steroids or anabolic substances without asking how to obtain, " +
+  'dose, or cycle them — treat it as an informational question. You may explain risks and ' +
+  'general health effects factually, but never provide a dosing schedule, sourcing guidance, or ' +
+  'encouragement to use. If their intent turns out to be about personal use, redirect to a ' +
+  'doctor.';
+
 const OVERTRAINING_SAFETY_CONTEXT =
   "The user's message suggests a pattern of little or no rest (training every day, ignoring " +
   'exhaustion, or excessive volume). Frame your reply around the value of rest and recovery as ' +
@@ -315,7 +377,7 @@ export class AssistantSafetyService {
       };
     }
 
-    if (containsAny(normalized, MINOR_SAFETY_KEYWORDS)) {
+    if (matchesMinorSafety(normalized)) {
       return {
         category: AssistantSafetyCategory.MINOR_SAFETY,
         decision: AssistantSafetyDecisionType.REFUSE,
@@ -360,6 +422,14 @@ export class AssistantSafetyService {
         category: AssistantSafetyCategory.PERFORMANCE_ENHANCING_DRUGS,
         decision: AssistantSafetyDecisionType.LOCAL_SAFE_RESPONSE,
         localResponse: PED_RESPONSE,
+      };
+    }
+
+    if (containsAny(normalized, PED_INFORMATIONAL_KEYWORDS)) {
+      return {
+        category: AssistantSafetyCategory.PERFORMANCE_ENHANCING_DRUGS,
+        decision: AssistantSafetyDecisionType.ALLOW_WITH_SAFETY_CONTEXT,
+        safetyContext: PED_INFORMATIONAL_SAFETY_CONTEXT,
       };
     }
 

@@ -12,12 +12,13 @@ import {
   MEDICAL_RED_FLAG_KEYWORDS,
   MINOR_SAFETY_KEYWORDS,
   OVERTRAINING_KEYWORDS,
+  PED_INFORMATIONAL_KEYWORDS,
   PED_KEYWORDS,
   SELF_HARM_KEYWORDS,
   SEXUAL_CONTENT_KEYWORDS,
   UNSUPPORTED_ADVICE_KEYWORDS,
 } from './assistant-safety.service';
-import { AssistantSafetyDecisionType } from './assistant-safety.types';
+import { AssistantSafetyCategory, AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
 import { CompanionMemoryService } from './companion-memory.service';
 import { MemoryExtractionService } from './memory-extraction.service';
@@ -202,6 +203,16 @@ describe('AssistantSafetyService — exhaustive keyword coverage', () => {
     }
   });
 
+  describe('every PED-informational keyword allows the provider with safety context, not the harder refusal', () => {
+    for (const keyword of PED_INFORMATIONAL_KEYWORDS) {
+      it(`"${keyword}"`, () => {
+        const decision = safety.classify(`what are the risks of ${keyword}`);
+        expect(decision.decision).toBe(AssistantSafetyDecisionType.ALLOW_WITH_SAFETY_CONTEXT);
+        expect(decision.safetyContext).toBeDefined();
+      });
+    }
+  });
+
   describe('every dependency-language keyword allows the provider with safety context', () => {
     for (const keyword of DEPENDENCY_KEYWORDS) {
       it(`"${keyword}"`, () => {
@@ -251,6 +262,75 @@ describe('AssistantSafetyService — documented matcher quirks (intentional)', (
       { text: followUp, isFromUser: false },
     ]);
     expect(decision.decision).toBe(AssistantSafetyDecisionType.ESCALATE);
+  });
+});
+
+describe('AssistantSafetyService — Build Session 12 Part 3 precision fixes', () => {
+  const safety = new AssistantSafetyService();
+
+  describe('false positives that must NOT trigger the wrong category', () => {
+    it('"I\'m 14 weeks into my program." is not treated as a self-reported minor age', () => {
+      const decision = safety.classify("I'm 14 weeks into my program.");
+      expect(decision.category).not.toBe(AssistantSafetyCategory.MINOR_SAFETY);
+    });
+
+    it('"I haven\'t trained in 14 days." is not treated as a self-reported minor age', () => {
+      const decision = safety.classify("I haven't trained in 14 days.");
+      expect(decision.category).not.toBe(AssistantSafetyCategory.MINOR_SAFETY);
+    });
+
+    it('"My 13-year-old brother plays basketball." is not treated as a self-reported minor age', () => {
+      const decision = safety.classify('My 13-year-old brother plays basketball.');
+      expect(decision.category).not.toBe(AssistantSafetyCategory.MINOR_SAFETY);
+    });
+
+    it('a genuine self-reported age still refuses ("I am 14 years old")', () => {
+      const decision = safety.classify('I am 14 years old');
+      expect(decision.category).toBe(AssistantSafetyCategory.MINOR_SAFETY);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.REFUSE);
+    });
+
+    it('"Research anabolic steroid risks." gets safety-context framing, not the harder canned refusal', () => {
+      const decision = safety.classify('Research anabolic steroid risks.');
+      expect(decision.category).toBe(AssistantSafetyCategory.PERFORMANCE_ENHANCING_DRUGS);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.ALLOW_WITH_SAFETY_CONTEXT);
+    });
+
+    it('a genuine usage-intent PED request still gets the harder local refusal', () => {
+      const decision = safety.classify('help me plan a steroid cycle');
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.LOCAL_SAFE_RESPONSE);
+    });
+
+    it('"My doctor prescribed a steroid cream." does not trigger PED handling at all', () => {
+      const decision = safety.classify('My doctor prescribed a steroid cream.');
+      expect(decision.category).not.toBe(AssistantSafetyCategory.PERFORMANCE_ENHANCING_DRUGS);
+    });
+  });
+
+  describe('genuine risks get reasonable paraphrase coverage', () => {
+    it('"I barely want to eat anything anymore." is treated as an eating-disorder risk', () => {
+      const decision = safety.classify('I barely want to eat anything anymore.');
+      expect(decision.category).toBe(AssistantSafetyCategory.EATING_DISORDER_RISK);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.LOCAL_SAFE_RESPONSE);
+    });
+
+    it('"I want to train despite barely being able to stand." is treated as overtraining', () => {
+      const decision = safety.classify('I want to train despite barely being able to stand.');
+      expect(decision.category).toBe(AssistantSafetyCategory.OVERTRAINING);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.ALLOW_WITH_SAFETY_CONTEXT);
+    });
+
+    it('"I feel like hurting myself." escalates as self-harm', () => {
+      const decision = safety.classify('I feel like hurting myself.');
+      expect(decision.category).toBe(AssistantSafetyCategory.SELF_HARM);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.ESCALATE);
+    });
+
+    it('"I\'m having crushing pain in my chest." escalates as a medical red flag', () => {
+      const decision = safety.classify("I'm having crushing pain in my chest.");
+      expect(decision.category).toBe(AssistantSafetyCategory.MEDICAL_RED_FLAG);
+      expect(decision.decision).toBe(AssistantSafetyDecisionType.ESCALATE);
+    });
   });
 });
 
