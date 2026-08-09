@@ -1,3 +1,5 @@
+import 'package:meta/meta.dart';
+
 import '../../profile/domain/preferences_model.dart';
 import '../domain/chat_message.dart';
 import '../domain/research_answer.dart';
@@ -50,7 +52,12 @@ abstract class AiProvider {
       'now — contact a doctor, urgent care, or emergency services. This is not something I '
       'can assess for you.';
 
-  static const _painFollowUpQuestion =
+  // Public (and @visibleForTesting) so ai_safety_eval_test.dart (Build
+  // Session 10 Part 17) can exhaustively exercise the real, live keyword
+  // lists and follow-up question below — one source of truth instead of
+  // a hand-copied, driftable duplicate in test code.
+  @visibleForTesting
+  static const painFollowUpQuestion =
       "Before I say anything else — how severe would you say it is, when did it start, and "
       'was there a specific injury (a fall, twist, or impact), or did it come on gradually?';
 
@@ -61,7 +68,8 @@ abstract class AiProvider {
       'check in with a qualified medical professional.';
 
   // Non-exhaustive, per the bible's own wording.
-  static const _emergencyRedFlagKeywords = [
+  @visibleForTesting
+  static const emergencyRedFlagKeywords = [
     'chest pain',
     'fainting',
     'fainted',
@@ -83,7 +91,8 @@ abstract class AiProvider {
     'worsening pain',
   ];
 
-  static const _generalPainKeywords = [
+  @visibleForTesting
+  static const generalPainKeywords = [
     'hurt',
     'pain',
     'injury',
@@ -101,7 +110,8 @@ abstract class AiProvider {
   // Signals in a follow-up answer that the symptom is concerning,
   // persistent, severe, or unclear — the exact bar the bible sets for
   // recommending professional evaluation rather than general guidance.
-  static const _concerningAnswerKeywords = [
+  @visibleForTesting
+  static const concerningAnswerKeywords = [
     'severe',
     'worse',
     'worsening',
@@ -127,23 +137,23 @@ abstract class AiProvider {
   }) async {
     final normalized = input.trim().toLowerCase();
 
-    if (_emergencyRedFlagKeywords.any(normalized.contains)) {
+    if (emergencyRedFlagKeywords.any(normalized.contains)) {
       return emergencyRedirect;
     }
 
     final awaitingPainFollowUp =
         history.isNotEmpty &&
         !history.last.isFromUser &&
-        history.last.text == _painFollowUpQuestion;
+        history.last.text == painFollowUpQuestion;
 
     if (awaitingPainFollowUp) {
-      return _concerningAnswerKeywords.any(normalized.contains)
+      return concerningAnswerKeywords.any(normalized.contains)
           ? safetyRedirect
           : _generalPainGuidance;
     }
 
-    if (_generalPainKeywords.any(normalized.contains)) {
-      return _painFollowUpQuestion;
+    if (generalPainKeywords.any(normalized.contains)) {
+      return painFollowUpQuestion;
     }
 
     return generateReply(
