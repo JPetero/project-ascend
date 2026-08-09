@@ -527,6 +527,29 @@ describe('Community profiles/posts/Reels (e2e)', () => {
     await request(app.getHttpServer()).post(`/community/block/${userIdA}`).set(authA()).expect(400);
   });
 
+  it('lists blocked accounts, and unblocking removes them from the list', async () => {
+    await request(app.getHttpServer()).post(`/community/block/${userIdA}`).set(authB()).expect(204);
+
+    const blocked = await request(app.getHttpServer())
+      .get('/community/blocks')
+      .set(authB())
+      .expect(200);
+    expect(blocked.body.data.some((b: { userId: string }) => b.userId === userIdA)).toBe(true);
+
+    await request(app.getHttpServer())
+      .delete(`/community/block/${userIdA}`)
+      .set(authB())
+      .expect(204);
+
+    const afterUnblock = await request(app.getHttpServer())
+      .get('/community/blocks')
+      .set(authB())
+      .expect(200);
+    expect(afterUnblock.body.data.some((b: { userId: string }) => b.userId === userIdA)).toBe(
+      false,
+    );
+  });
+
   it('files a report against a real post and 404s against a made-up one', async () => {
     const created = await request(app.getHttpServer())
       .post('/community/posts')

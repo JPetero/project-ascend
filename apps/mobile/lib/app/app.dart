@@ -28,9 +28,17 @@ class AscendApp extends ConsumerWidget {
         (s) => s.asData?.value?.reducedMotion ?? false,
       ),
     );
+    final textScale = ref.watch(
+      preferencesControllerProvider.select(
+        (s) => s.asData?.value?.textScale ?? 1.0,
+      ),
+    );
 
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(disableAnimations: reducedMotion),
+      data: MediaQuery.of(context).copyWith(
+        disableAnimations: reducedMotion,
+        textScaler: TextScaler.linear(textScale),
+      ),
       child: MaterialApp.router(
         title: 'Project Ascend',
         debugShowCheckedModeBanner: false,

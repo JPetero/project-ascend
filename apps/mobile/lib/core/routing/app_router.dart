@@ -29,7 +29,11 @@ import '../../features/companion/presentation/screens/companion_conversation_det
 import '../../features/companion/presentation/screens/companion_conversations_screen.dart';
 import '../../features/companion/presentation/screens/companion_memory_screen.dart';
 import '../../features/community/presentation/screens/reels_viewer_screen.dart';
+import '../../features/accessibility/presentation/screens/accessibility_center_screen.dart';
+import '../../features/community/presentation/screens/blocked_accounts_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/permissions/presentation/screens/permission_center_screen.dart';
+import '../../features/privacy/presentation/screens/privacy_center_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
 import '../../features/joint_workouts/presentation/screens/joint_workout_session_detail_screen.dart';
 import '../../features/joint_workouts/presentation/screens/joint_workout_sessions_screen.dart';
@@ -195,6 +199,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.subscription,
         builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.privacyCenter,
+        builder: (context, state) => const PrivacyCenterScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.blockedAccounts,
+        builder: (context, state) => const BlockedAccountsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.permissionCenter,
+        builder: (context, state) => const PermissionCenterScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.accessibilityCenter,
+        builder: (context, state) => const AccessibilityCenterScreen(),
       ),
       GoRoute(
         path: RoutePaths.support,

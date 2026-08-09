@@ -1,4 +1,5 @@
 import '../../../core/networking/api_client.dart';
+import '../domain/blocked_user.dart';
 import '../domain/community_post.dart';
 import '../domain/community_profile.dart';
 import '../domain/content_analytics.dart';
@@ -231,6 +232,16 @@ class CommunityRepository {
 
   Future<void> unblock(String userId) async {
     await _apiClient.delete('/community/block/$userId', (_) => null);
+  }
+
+  Future<List<BlockedUser>> listBlocked() async {
+    final envelope = await _apiClient.get(
+      '/community/blocks',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map((b) => BlockedUser.fromJson(b as Map<String, dynamic>))
+        .toList();
   }
 
   // --- Reports --------------------------------------------------------

@@ -354,6 +354,8 @@ class FakePreferencesRepository extends PreferencesRepository {
       reducedMotion: patch['reducedMotion'] as bool?,
       notificationsEnabled: patch['notificationsEnabled'] as bool?,
       aiMemoryEnabled: patch['aiMemoryEnabled'] as bool?,
+      conversationHistoryEnabled: patch['conversationHistoryEnabled'] as bool?,
+      textScale: (patch['textScale'] as num?)?.toDouble(),
     );
     return _preferences;
   }

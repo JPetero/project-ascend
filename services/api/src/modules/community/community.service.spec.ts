@@ -40,7 +40,7 @@ describe('CommunityService', () => {
       findUnique: jest.Mock;
       count: jest.Mock;
     };
-    communityBlock: { upsert: jest.Mock; findFirst: jest.Mock };
+    communityBlock: { upsert: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
     communityReport: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -68,7 +68,7 @@ describe('CommunityService', () => {
         findUnique: jest.fn(),
         count: jest.fn(),
       },
-      communityBlock: { upsert: jest.fn(), findFirst: jest.fn() },
+      communityBlock: { upsert: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
       communityReport: { create: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
@@ -201,6 +201,34 @@ describe('CommunityService', () => {
           ],
         },
       });
+    });
+  });
+
+  describe('listBlocked', () => {
+    it('maps blocked rows to display-ready entries, most recent first', async () => {
+      const blockedAt = new Date();
+      prisma.communityBlock.findMany.mockResolvedValue([
+        {
+          blockedId: 'user-2',
+          createdAt: blockedAt,
+          blocked: { communityProfile: { displayName: 'Bea', avatarUrl: 'a.png' } },
+        },
+        {
+          blockedId: 'user-3',
+          createdAt: blockedAt,
+          blocked: { communityProfile: null },
+        },
+      ]);
+
+      const result = await service.listBlocked('user-1');
+
+      expect(prisma.communityBlock.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { blockerId: 'user-1' } }),
+      );
+      expect(result).toEqual([
+        { userId: 'user-2', displayName: 'Bea', avatarUrl: 'a.png', blockedAt },
+        { userId: 'user-3', displayName: null, avatarUrl: null, blockedAt },
+      ]);
     });
   });
 

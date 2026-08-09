@@ -136,6 +136,11 @@ export class CommunityController {
     return this.communityService.listFollowing(userId, query);
   }
 
+  @Get('blocks')
+  listBlocked(@CurrentUser() user: AuthenticatedUser) {
+    return this.communityService.listBlocked(user.id);
+  }
+
   @Post('block/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   block(@CurrentUser() user: AuthenticatedUser, @Param('userId') userId: string) {

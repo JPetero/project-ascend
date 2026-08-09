@@ -1,4 +1,5 @@
 import 'package:mobile/features/community/data/community_repository.dart';
+import 'package:mobile/features/community/domain/blocked_user.dart';
 import 'package:mobile/features/community/domain/community_post.dart';
 import 'package:mobile/features/community/domain/community_profile.dart';
 import 'package:mobile/features/community/domain/content_analytics.dart';
@@ -271,11 +272,20 @@ class FakeCommunityRepository implements CommunityRepository {
     return [];
   }
 
-  @override
-  Future<void> block(String userId) async {}
+  final List<BlockedUser> blocked = [];
 
   @override
-  Future<void> unblock(String userId) async {}
+  Future<void> block(String userId) async {
+    blocked.add(BlockedUser(userId: userId, blockedAt: DateTime.now()));
+  }
+
+  @override
+  Future<void> unblock(String userId) async {
+    blocked.removeWhere((b) => b.userId == userId);
+  }
+
+  @override
+  Future<List<BlockedUser>> listBlocked() async => List.unmodifiable(blocked);
 
   @override
   Future<void> report({

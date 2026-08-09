@@ -58,6 +58,7 @@ class PreferencesModel {
     required this.notificationsEnabled,
     required this.aiMemoryEnabled,
     this.conversationHistoryEnabled = true,
+    this.textScale = 1.0,
   });
 
   final Companion companion;
@@ -72,6 +73,11 @@ class PreferencesModel {
   // [aiMemoryEnabled]; see companion_conversations_screen.dart and
   // Preference.conversationHistoryEnabled's doc comment on the backend.
   final bool conversationHistoryEnabled;
+  // Build Session 12 Part 12-14 (Accessibility Center) — a linear
+  // multiplier applied on top of the OS's own text scale via
+  // `MediaQuery.textScaler` in app.dart, not a replacement for it. See
+  // AccessibilityCenterScreen for the fixed set of values it's set to.
+  final double textScale;
 
   factory PreferencesModel.fromJson(Map<String, dynamic> json) {
     return PreferencesModel(
@@ -93,6 +99,7 @@ class PreferencesModel {
       // conversationHistoryEnabled's doc comment on the backend.
       conversationHistoryEnabled:
           json['conversationHistoryEnabled'] as bool? ?? true,
+      textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
     );
   }
 
@@ -106,6 +113,7 @@ class PreferencesModel {
     'notificationsEnabled': notificationsEnabled,
     'aiMemoryEnabled': aiMemoryEnabled,
     'conversationHistoryEnabled': conversationHistoryEnabled,
+    'textScale': textScale,
   };
 
   PreferencesModel copyWith({
@@ -118,6 +126,7 @@ class PreferencesModel {
     bool? notificationsEnabled,
     bool? aiMemoryEnabled,
     bool? conversationHistoryEnabled,
+    double? textScale,
   }) {
     return PreferencesModel(
       companion: companion ?? this.companion,
@@ -130,6 +139,7 @@ class PreferencesModel {
       aiMemoryEnabled: aiMemoryEnabled ?? this.aiMemoryEnabled,
       conversationHistoryEnabled:
           conversationHistoryEnabled ?? this.conversationHistoryEnabled,
+      textScale: textScale ?? this.textScale,
     );
   }
 }

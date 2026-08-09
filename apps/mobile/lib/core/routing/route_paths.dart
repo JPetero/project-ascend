@@ -76,6 +76,14 @@ abstract final class RoutePaths {
   static const dashboard = '/dashboard';
   static const subscription = '/subscription';
 
+  // Privacy/Permission/Accessibility Centers — Build Session 12 Part
+  // 12-14, reachable from the dashboard. Discoverability hubs over
+  // existing controls, not new subsystems.
+  static const privacyCenter = '/privacy-center';
+  static const blockedAccounts = '/privacy-center/blocked';
+  static const permissionCenter = '/permission-center';
+  static const accessibilityCenter = '/accessibility-center';
+
   // Premium Vision modular shell — Founder Scenario 21/free-premium-
   // policy.md. Pushed on top of the Vision tab, same "pushed, not a
   // nested tab route" pattern as Workout Engine/Meal Prep above.
