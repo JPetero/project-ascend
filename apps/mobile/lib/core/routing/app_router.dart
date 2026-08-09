@@ -38,6 +38,8 @@ import '../../features/messages/presentation/screens/conversations_screen.dart';
 import '../../features/sports/presentation/screens/sport_match_detail_screen.dart';
 import '../../features/sports/presentation/screens/sports_matches_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
+import '../../features/trainer_groups/presentation/screens/my_assignments_screen.dart';
+import '../../features/trainer_groups/presentation/screens/trainer_dashboard_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
 import '../../features/rankings/presentation/screens/rankings_screen.dart';
@@ -385,9 +387,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CreateTrainerGroupScreen(),
       ),
       GoRoute(
+        path: RoutePaths.trainerDashboard,
+        builder: (context, state) => const TrainerDashboardScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.trainerGroupDetail,
         builder: (context, state) =>
             TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.myAssignments,
+        builder: (context, state) => const MyAssignmentsScreen(),
       ),
       GoRoute(
         path: RoutePaths.promoteCampaigns,

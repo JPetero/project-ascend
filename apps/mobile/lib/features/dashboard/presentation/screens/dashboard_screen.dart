@@ -217,6 +217,20 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AscendSpacing.sm),
+              // Build Session 12 Part 9 — a member's own to-do list of
+              // workouts a trainer assigned them, across every group.
+              AscendCard(
+                onTap: () => context.push(RoutePaths.myAssignments),
+                child: const Row(
+                  children: [
+                    Icon(Icons.assignment_ind_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Assigned workouts')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
               AscendCard(
                 onTap: () => context.push(RoutePaths.dataExport),
                 child: const Row(

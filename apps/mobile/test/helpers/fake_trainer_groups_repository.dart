@@ -49,6 +49,13 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
   roleChanges = [];
   bool failSetMemberRole = false;
   bool failPostAnnouncement = false;
+  final List<WorkoutAssignment> assignments = [];
+  final List<TrainerGroupScheduledSession> scheduledSessions = [];
+  TrainerDashboard dashboard = const TrainerDashboard(
+    groups: [],
+    upcomingSessions: [],
+    recentAssignments: [],
+  );
 
   @override
   Future<TrainerGroup> createGroup({
@@ -236,4 +243,109 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
   Future<void> unsharePlan(String groupId, String sharedPlanId) async {
     sharedPlansByGroup[groupId]?.removeWhere((p) => p.id == sharedPlanId);
   }
+
+  @override
+  Future<List<WorkoutAssignment>> createAssignments(
+    String groupId, {
+    required String workoutPlanId,
+    required List<String> assigneeUserIds,
+    String? note,
+  }) async {
+    final created = [
+      for (final assigneeId in assigneeUserIds)
+        WorkoutAssignment(
+          id: 'assignment-${assignments.length}',
+          groupId: groupId,
+          assignedById: 'me',
+          assigneeId: assigneeId,
+          sourcePlanId: workoutPlanId,
+          sourcePlanName: 'Plan $workoutPlanId',
+          note: note,
+          status: WorkoutAssignmentStatus.pending,
+          createdAt: DateTime.now(),
+        ),
+    ];
+    assignments.addAll(created);
+    return created;
+  }
+
+  @override
+  Future<List<WorkoutAssignment>> listGroupAssignments(String groupId) async {
+    return List.unmodifiable(assignments.where((a) => a.groupId == groupId));
+  }
+
+  @override
+  Future<List<WorkoutAssignment>> listMyAssignments() async =>
+      List.unmodifiable(assignments);
+
+  @override
+  Future<String> acceptAssignment(String assignmentId) async {
+    final index = assignments.indexWhere((a) => a.id == assignmentId);
+    final existing = assignments[index];
+    final clonedPlanId = 'cloned-${existing.sourcePlanId}';
+    assignments[index] = WorkoutAssignment(
+      id: existing.id,
+      groupId: existing.groupId,
+      assignedById: existing.assignedById,
+      assigneeId: existing.assigneeId,
+      sourcePlanId: existing.sourcePlanId,
+      sourcePlanName: existing.sourcePlanName,
+      assignedPlanId: clonedPlanId,
+      note: existing.note,
+      dueAt: existing.dueAt,
+      status: WorkoutAssignmentStatus.accepted,
+      createdAt: existing.createdAt,
+    );
+    return clonedPlanId;
+  }
+
+  @override
+  Future<void> cancelAssignment(String assignmentId) async {
+    assignments.removeWhere((a) => a.id == assignmentId);
+  }
+
+  @override
+  Future<TrainerGroupScheduledSession> createScheduledSession(
+    String groupId, {
+    required DateTime scheduledAt,
+    String? title,
+    int? durationMinutes,
+    String? location,
+    String? videoLink,
+    String? description,
+  }) async {
+    final session = TrainerGroupScheduledSession(
+      id: 'session-${scheduledSessions.length}',
+      groupId: groupId,
+      createdById: 'me',
+      title: title,
+      scheduledAt: scheduledAt,
+      durationMinutes: durationMinutes,
+      location: location,
+      videoLink: videoLink,
+      description: description,
+      createdAt: DateTime.now(),
+    );
+    scheduledSessions.add(session);
+    return session;
+  }
+
+  @override
+  Future<List<TrainerGroupScheduledSession>> listScheduledSessions(
+    String groupId,
+  ) async {
+    return List.unmodifiable(
+      scheduledSessions.where(
+        (s) => s.groupId == groupId && s.canceledAt == null,
+      ),
+    );
+  }
+
+  @override
+  Future<void> cancelScheduledSession(String sessionId) async {
+    scheduledSessions.removeWhere((s) => s.id == sessionId);
+  }
+
+  @override
+  Future<TrainerDashboard> getTrainerDashboard() async => dashboard;
 }

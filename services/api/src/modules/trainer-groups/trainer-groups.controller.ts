@@ -16,6 +16,8 @@ import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { CreateTrainerGroupAnnouncementDto } from './dto/create-trainer-group-announcement.dto';
 import { CreateTrainerGroupDto } from './dto/create-trainer-group.dto';
+import { CreateTrainerGroupScheduledSessionDto } from './dto/create-trainer-group-scheduled-session.dto';
+import { CreateWorkoutAssignmentDto } from './dto/create-workout-assignment.dto';
 import { InviteTrainerGroupMemberDto } from './dto/invite-trainer-group-member.dto';
 import { SendTrainerGroupMessageDto } from './dto/send-trainer-group-message.dto';
 import { SetTrainerGroupMemberRoleDto } from './dto/set-trainer-group-member-role.dto';
@@ -68,6 +70,45 @@ export class TrainerGroupsController {
     @Param('invitationId') invitationId: string,
   ) {
     return this.trainerGroupsService.cancelInvitation(user.id, invitationId);
+  }
+
+  // Registered ahead of GET/DELETE /:id for the same reason
+  // "invitations" is — "dashboard", "assignments" and
+  // "scheduled-sessions" must never be mistaken for a group id.
+  @Get('dashboard')
+  getTrainerDashboard(@CurrentUser() user: AuthenticatedUser) {
+    return this.trainerGroupsService.getTrainerDashboard(user.id);
+  }
+
+  @Get('assignments/mine')
+  listMyAssignments(@CurrentUser() user: AuthenticatedUser) {
+    return this.trainerGroupsService.listMyAssignments(user.id);
+  }
+
+  @Post('assignments/:assignmentId/accept')
+  acceptAssignment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.trainerGroupsService.acceptAssignment(user.id, assignmentId);
+  }
+
+  @Delete('assignments/:assignmentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  cancelAssignment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.trainerGroupsService.cancelAssignment(user.id, assignmentId);
+  }
+
+  @Delete('scheduled-sessions/:sessionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  cancelScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.trainerGroupsService.cancelScheduledSession(user.id, sessionId);
   }
 
   @Get(':id')
@@ -164,5 +205,33 @@ export class TrainerGroupsController {
     @Param('sharedPlanId') sharedPlanId: string,
   ) {
     return this.trainerGroupsService.unsharePlan(user.id, id, sharedPlanId);
+  }
+
+  @Post(':id/assignments')
+  createAssignments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateWorkoutAssignmentDto,
+  ) {
+    return this.trainerGroupsService.createAssignments(user.id, id, dto);
+  }
+
+  @Get(':id/assignments')
+  listGroupAssignments(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.trainerGroupsService.listGroupAssignments(user.id, id);
+  }
+
+  @Post(':id/scheduled-sessions')
+  createScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateTrainerGroupScheduledSessionDto,
+  ) {
+    return this.trainerGroupsService.createScheduledSession(user.id, id, dto);
+  }
+
+  @Get(':id/scheduled-sessions')
+  listScheduledSessions(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.trainerGroupsService.listScheduledSessions(user.id, id);
   }
 }

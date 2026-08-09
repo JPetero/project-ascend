@@ -5,6 +5,7 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import { PrismaService } from '../../prisma/prisma.service';
 import { AchievementsService } from '../achievements/achievements.service';
 import { PersonalRecordsService } from '../personal-records/personal-records.service';
+import { TrainerGroupsService } from '../trainer-groups/trainer-groups.service';
 import { FinishWorkoutSessionDto } from './dto/finish-workout-session.dto';
 import { LogSetDto } from './dto/log-set.dto';
 import { StartWorkoutSessionDto } from './dto/start-workout-session.dto';
@@ -38,6 +39,7 @@ export class WorkoutSessionsService {
     private readonly prisma: PrismaService,
     private readonly personalRecordsService: PersonalRecordsService,
     private readonly achievementsService: AchievementsService,
+    private readonly trainerGroupsService: TrainerGroupsService,
     private readonly auditService: AuditService,
     private readonly idempotencyService: IdempotencyService,
   ) {}
@@ -141,6 +143,9 @@ export class WorkoutSessionsService {
     // Evaluated after personal-record detection so a PR set in this very
     // session counts toward the "first personal record" achievement.
     const newAchievements = await this.achievementsService.evaluateWorkoutAchievements(userId);
+    // Build Session 12 Part 9 — resolves any trainer-assigned workout
+    // this session was started from; a no-op for an ordinary session.
+    await this.trainerGroupsService.completeAssignmentsForSession(userId, session.workoutPlanId);
     await this.auditService.record({
       userId,
       action: 'workout.session_completed',

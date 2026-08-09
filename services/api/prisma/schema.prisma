@@ -172,6 +172,9 @@ model User {
   trainerGroupInvitesReceived      TrainerGroupInvitation[]        @relation("TrainerGroupInvitee")
   trainerGroupSharedPlans          TrainerGroupSharedPlan[]
   trainerGroupAnnouncements        TrainerGroupAnnouncement[]
+  workoutAssignmentsCreated        WorkoutAssignment[]             @relation("WorkoutAssignmentAssignedBy")
+  workoutAssignmentsReceived       WorkoutAssignment[]             @relation("WorkoutAssignmentAssignee")
+  trainerGroupScheduledSessions    TrainerGroupScheduledSession[]
   rankingOptIn                     RankingOptIn?
   createdChallenges                Challenge[]
   challengeParticipations          ChallengeParticipant[]
@@ -729,11 +732,13 @@ model WorkoutPlan {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workout        Workout?                 @relation(fields: [workoutId], references: [id], onDelete: SetNull)
-  exercises      WorkoutPlanExercise[]
-  sessions       WorkoutSession[]
-  sharedInGroups TrainerGroupSharedPlan[]
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout          Workout?                 @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercises        WorkoutPlanExercise[]
+  sessions         WorkoutSession[]
+  sharedInGroups   TrainerGroupSharedPlan[]
+  assignedAsSource WorkoutAssignment[]      @relation("WorkoutAssignmentSourcePlan")
+  assignedAsClone  WorkoutAssignment[]      @relation("WorkoutAssignmentClonedPlan")
 
   @@index([userId])
   @@map("workout_plans")
@@ -1558,12 +1563,14 @@ model TrainerGroup {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner         User                       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  members       TrainerGroupMember[]
-  messages      TrainerGroupMessage[]
-  invitations   TrainerGroupInvitation[]
-  sharedPlans   TrainerGroupSharedPlan[]
-  announcements TrainerGroupAnnouncement[]
+  owner             User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  members           TrainerGroupMember[]
+  messages          TrainerGroupMessage[]
+  invitations       TrainerGroupInvitation[]
+  sharedPlans       TrainerGroupSharedPlan[]
+  announcements     TrainerGroupAnnouncement[]
+  assignments       WorkoutAssignment[]
+  scheduledSessions TrainerGroupScheduledSession[]
 
   @@index([ownerId])
   @@map("trainer_groups")
@@ -1661,6 +1668,77 @@ model TrainerGroupAnnouncement {
 
   @@index([groupId, createdAt])
   @@map("trainer_group_announcements")
+}
+
+enum WorkoutAssignmentStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  CANCELED
+}
+
+// Build Session 12 Part 9 — a trainer assigning one of their own
+// WorkoutPlans to a specific group member as a to-do. Accepting clones
+// the exercises into a brand-new WorkoutPlan owned by the assignee (see
+// TrainerGroupsService.acceptAssignment) rather than loosening
+// WorkoutSessionsService's ownership check, so starting/logging a
+// session from it needs zero changes anywhere in the workout engine.
+// status flips to COMPLETED automatically the moment the assignee
+// finishes a WorkoutSession against that cloned plan (see
+// WorkoutSessionsService.finish's call into
+// TrainerGroupsService.completeAssignmentsForSession) — never something
+// either party has to remember to mark by hand.
+model WorkoutAssignment {
+  id             String                  @id @default(uuid())
+  groupId        String
+  assignedById   String
+  assigneeId     String
+  sourcePlanId   String
+  assignedPlanId String?
+  note           String?
+  dueAt          DateTime?
+  status         WorkoutAssignmentStatus @default(PENDING)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  completedAt    DateTime?
+
+  group        TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  assignedBy   User         @relation("WorkoutAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+  assignee     User         @relation("WorkoutAssignmentAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  sourcePlan   WorkoutPlan  @relation("WorkoutAssignmentSourcePlan", fields: [sourcePlanId], references: [id], onDelete: Cascade)
+  assignedPlan WorkoutPlan? @relation("WorkoutAssignmentClonedPlan", fields: [assignedPlanId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([assigneeId, status])
+  @@map("workout_assignments")
+}
+
+// A date/time-based booking (Build Session 12 Part 10), distinct from
+// Joint Workout Sessions' invite-now/start-now flow (see
+// TrainerGroupsService's module doc comment) — this is "book a slot for
+// next Tuesday," with no session lifecycle of its own. Free to view for
+// any group member; creating one is owner/moderator + expanded-tier
+// gated, the same bar as postAnnouncement and
+// resolveGroupSessionInvitees, since it notifies the whole group.
+model TrainerGroupScheduledSession {
+  id              String    @id @default(uuid())
+  groupId         String
+  createdById     String
+  title           String?
+  scheduledAt     DateTime
+  durationMinutes Int?
+  location        String?
+  videoLink       String?
+  description     String?
+  canceledAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  group     TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([groupId, scheduledAt])
+  @@map("trainer_group_scheduled_sessions")
 }
 
 // --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by
@@ -2837,6 +2915,10 @@ enum NotificationType {
   MODERATION_APPEAL_UPDATE
   PROMOTE_REVIEW
   ELIGIBILITY_VERIFICATION_UPDATE
+  // Build Session 12 Part 9/10 — a trainer assigning a workout to a
+  // group member, or scheduling a session for the group.
+  WORKOUT_ASSIGNED
+  GROUP_SESSION_SCHEDULED
 }
 
 model NotificationPreference {

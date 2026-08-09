@@ -44,6 +44,10 @@ IconData _iconFor(NotificationEventType type) {
       return Icons.verified_outlined;
     case NotificationEventType.eligibilityVerificationUpdate:
       return Icons.workspace_premium_outlined;
+    case NotificationEventType.workoutAssigned:
+      return Icons.assignment_ind_outlined;
+    case NotificationEventType.groupSessionScheduled:
+      return Icons.event_available_outlined;
     case NotificationEventType.unknown:
       return Icons.notifications_outlined;
   }

@@ -151,4 +151,77 @@ void main() {
     expect(controller.state.announcements, hasLength(1));
     expect(controller.state.announcements.single.body, 'Leg day tomorrow!');
   });
+
+  test(
+    'createAssignments adds the new assignments to state (Build Session 12 Part 9)',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final ok = await controller.createAssignments(
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['member-a', 'member-b'],
+      );
+
+      expect(ok, isTrue);
+      expect(controller.state.assignments, hasLength(2));
+    },
+  );
+
+  test(
+    'cancelAssignment removes it from state and rolls back on failure',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      await controller.createAssignments(
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['member-a'],
+      );
+      final assignmentId = controller.state.assignments.single.id;
+
+      final ok = await controller.cancelAssignment(assignmentId);
+
+      expect(ok, isTrue);
+      expect(controller.state.assignments, isEmpty);
+    },
+  );
+
+  test(
+    'createScheduledSession adds the new session to state, kept sorted (Build Session 12 Part 10)',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      final later = DateTime.now().add(const Duration(days: 2));
+      final sooner = DateTime.now().add(const Duration(days: 1));
+
+      await controller.createScheduledSession(scheduledAt: later);
+      final ok = await controller.createScheduledSession(scheduledAt: sooner);
+
+      expect(ok, isTrue);
+      expect(controller.state.scheduledSessions, hasLength(2));
+      expect(controller.state.scheduledSessions.first.scheduledAt, sooner);
+    },
+  );
+
+  test(
+    'cancelScheduledSession removes it from state and rolls back on failure',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      await controller.createScheduledSession(
+        scheduledAt: DateTime.now().add(const Duration(days: 1)),
+      );
+      final sessionId = controller.state.scheduledSessions.single.id;
+
+      final ok = await controller.cancelScheduledSession(sessionId);
+
+      expect(ok, isTrue);
+      expect(controller.state.scheduledSessions, isEmpty);
+    },
+  );
 }

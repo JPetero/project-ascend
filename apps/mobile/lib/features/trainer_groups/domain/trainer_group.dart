@@ -206,3 +206,178 @@ class TrainerGroupAnnouncement {
     );
   }
 }
+
+enum WorkoutAssignmentStatus { pending, accepted, completed, canceled }
+
+WorkoutAssignmentStatus workoutAssignmentStatusFromJson(String value) =>
+    WorkoutAssignmentStatus.values.firstWhere(
+      (s) => s.name.toUpperCase() == value,
+      orElse: () => WorkoutAssignmentStatus.pending,
+    );
+
+/// A trainer assigning one of their own workout plans to a group member
+/// as a to-do (Build Session 12 Part 9). Accepting clones the exercises
+/// into a brand-new plan the assignee owns — [assignedPlanId] is that
+/// clone's id, present once [status] passes [WorkoutAssignmentStatus.pending].
+/// [status] flips to [WorkoutAssignmentStatus.completed] automatically
+/// the moment the assignee finishes a session against that cloned plan —
+/// there is no "mark done" action to call.
+class WorkoutAssignment {
+  const WorkoutAssignment({
+    required this.id,
+    required this.groupId,
+    required this.assignedById,
+    required this.assigneeId,
+    required this.sourcePlanId,
+    required this.sourcePlanName,
+    this.assignedPlanId,
+    this.note,
+    this.dueAt,
+    required this.status,
+    required this.createdAt,
+    this.completedAt,
+  });
+
+  final String id;
+  final String groupId;
+  final String assignedById;
+  final String assigneeId;
+  final String sourcePlanId;
+  final String sourcePlanName;
+  final String? assignedPlanId;
+  final String? note;
+  final DateTime? dueAt;
+  final WorkoutAssignmentStatus status;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+
+  factory WorkoutAssignment.fromJson(Map<String, dynamic> json) {
+    return WorkoutAssignment(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      assignedById: json['assignedById'] as String,
+      assigneeId: json['assigneeId'] as String,
+      sourcePlanId: json['sourcePlanId'] as String,
+      sourcePlanName: json['sourcePlanName'] as String,
+      assignedPlanId: json['assignedPlanId'] as String?,
+      note: json['note'] as String?,
+      dueAt: json['dueAt'] != null
+          ? DateTime.parse(json['dueAt'] as String)
+          : null,
+      status: workoutAssignmentStatusFromJson(json['status'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'] as String)
+          : null,
+    );
+  }
+}
+
+/// A date/time-based booking for a group (Build Session 12 Part 10) —
+/// distinct from a Joint Workout Session's invite-now/start-now flow.
+/// Creating one requires the group owner's expanded (Premium) tier; any
+/// member can view the upcoming list.
+class TrainerGroupScheduledSession {
+  const TrainerGroupScheduledSession({
+    required this.id,
+    required this.groupId,
+    required this.createdById,
+    this.title,
+    required this.scheduledAt,
+    this.durationMinutes,
+    this.location,
+    this.videoLink,
+    this.description,
+    this.canceledAt,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String groupId;
+  final String createdById;
+  final String? title;
+  final DateTime scheduledAt;
+  final int? durationMinutes;
+  final String? location;
+  final String? videoLink;
+  final String? description;
+  final DateTime? canceledAt;
+  final DateTime createdAt;
+
+  factory TrainerGroupScheduledSession.fromJson(Map<String, dynamic> json) {
+    return TrainerGroupScheduledSession(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      createdById: json['createdById'] as String,
+      title: json['title'] as String?,
+      scheduledAt: DateTime.parse(json['scheduledAt'] as String),
+      durationMinutes: json['durationMinutes'] as int?,
+      location: json['location'] as String?,
+      videoLink: json['videoLink'] as String?,
+      description: json['description'] as String?,
+      canceledAt: json['canceledAt'] != null
+          ? DateTime.parse(json['canceledAt'] as String)
+          : null,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+}
+
+/// A read-only summary of one group a caller owns or moderates, for
+/// [TrainerDashboard] (Build Session 12 Part 11).
+class TrainerDashboardGroup {
+  const TrainerDashboardGroup({
+    required this.id,
+    required this.name,
+    required this.memberCount,
+    required this.pendingAssignmentCount,
+  });
+
+  final String id;
+  final String name;
+  final int memberCount;
+  final int pendingAssignmentCount;
+
+  factory TrainerDashboardGroup.fromJson(Map<String, dynamic> json) {
+    return TrainerDashboardGroup(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      memberCount: json['memberCount'] as int,
+      pendingAssignmentCount: json['pendingAssignmentCount'] as int,
+    );
+  }
+}
+
+/// A read-only aggregate across every group the caller owns or
+/// moderates (Build Session 12 Part 11) — composed entirely from
+/// existing membership/assignment/scheduled-session data, no new write
+/// model behind it.
+class TrainerDashboard {
+  const TrainerDashboard({
+    required this.groups,
+    required this.upcomingSessions,
+    required this.recentAssignments,
+  });
+
+  final List<TrainerDashboardGroup> groups;
+  final List<TrainerGroupScheduledSession> upcomingSessions;
+  final List<WorkoutAssignment> recentAssignments;
+
+  factory TrainerDashboard.fromJson(Map<String, dynamic> json) {
+    return TrainerDashboard(
+      groups: (json['groups'] as List<dynamic>)
+          .map((g) => TrainerDashboardGroup.fromJson(g as Map<String, dynamic>))
+          .toList(),
+      upcomingSessions: (json['upcomingSessions'] as List<dynamic>)
+          .map(
+            (s) => TrainerGroupScheduledSession.fromJson(
+              s as Map<String, dynamic>,
+            ),
+          )
+          .toList(),
+      recentAssignments: (json['recentAssignments'] as List<dynamic>)
+          .map((a) => WorkoutAssignment.fromJson(a as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
