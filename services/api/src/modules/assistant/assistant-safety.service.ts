@@ -10,8 +10,10 @@ import {
 // keyword lists so the two independently-maintained classifiers agree on
 // the obvious cases — not a shared source of truth (Dart/TS can't share
 // one), but the backend is what's authoritative now (see this file's
-// class doc comment).
-const MEDICAL_RED_FLAG_KEYWORDS = [
+// class doc comment). Exported (the Dart file's @visibleForTesting
+// equivalent) so ai-safety-eval.spec.ts can exhaustively exercise every
+// real keyword rather than a hand-copied, driftable duplicate.
+export const MEDICAL_RED_FLAG_KEYWORDS = [
   'chest pain',
   'fainting',
   'fainted',
@@ -36,7 +38,7 @@ const MEDICAL_RED_FLAG_KEYWORDS = [
   'worsening pain',
 ];
 
-const GENERAL_PAIN_KEYWORDS = [
+export const GENERAL_PAIN_KEYWORDS = [
   'hurt',
   'pain',
   'injury',
@@ -51,7 +53,7 @@ const GENERAL_PAIN_KEYWORDS = [
   'aches',
 ];
 
-const CONCERNING_ANSWER_KEYWORDS = [
+export const CONCERNING_ANSWER_KEYWORDS = [
   'severe',
   'worse',
   'worsening',
@@ -69,7 +71,7 @@ const CONCERNING_ANSWER_KEYWORDS = [
   'dont know',
 ];
 
-const SELF_HARM_KEYWORDS = [
+export const SELF_HARM_KEYWORDS = [
   'kill myself',
   'end my life',
   'want to die',
@@ -84,7 +86,7 @@ const SELF_HARM_KEYWORDS = [
   'cutting myself',
 ];
 
-const ABUSE_CRISIS_KEYWORDS = [
+export const ABUSE_CRISIS_KEYWORDS = [
   'being abused',
   'is abusing me',
   'hits me',
@@ -97,7 +99,7 @@ const ABUSE_CRISIS_KEYWORDS = [
   'being threatened',
 ];
 
-const MINOR_SAFETY_KEYWORDS = [
+export const MINOR_SAFETY_KEYWORDS = [
   "i'm 12",
   "i'm 13",
   "i'm 14",
@@ -109,7 +111,7 @@ const MINOR_SAFETY_KEYWORDS = [
   'i am a minor',
 ];
 
-const SEXUAL_CONTENT_KEYWORDS = [
+export const SEXUAL_CONTENT_KEYWORDS = [
   'sexy',
   'sexual',
   'nsfw',
@@ -121,7 +123,7 @@ const SEXUAL_CONTENT_KEYWORDS = [
   'naked photos',
 ];
 
-const EATING_DISORDER_KEYWORDS = [
+export const EATING_DISORDER_KEYWORDS = [
   'purge',
   'purging',
   'throw up after eating',
@@ -131,7 +133,7 @@ const EATING_DISORDER_KEYWORDS = [
   'stop eating completely',
 ];
 
-const EXTREME_DIETING_KEYWORDS = [
+export const EXTREME_DIETING_KEYWORDS = [
   '500 calories',
   '300 calories',
   '400 calories',
@@ -145,7 +147,7 @@ const EXTREME_DIETING_KEYWORDS = [
   'starving myself',
 ];
 
-const DEHYDRATION_KEYWORDS = [
+export const DEHYDRATION_KEYWORDS = [
   'dehydrate for the scale',
   'dehydrate myself',
   'cut water weight',
@@ -153,7 +155,7 @@ const DEHYDRATION_KEYWORDS = [
   'no water before weigh-in',
 ];
 
-const OVERTRAINING_KEYWORDS = [
+export const OVERTRAINING_KEYWORDS = [
   'every single day',
   'train every day',
   'lift every day',
@@ -165,7 +167,7 @@ const OVERTRAINING_KEYWORDS = [
   'twice a day every day',
 ];
 
-const PED_KEYWORDS = [
+export const PED_KEYWORDS = [
   'steroid cycle',
   'steroids',
   'anabolic',
@@ -177,7 +179,7 @@ const PED_KEYWORDS = [
   'growth hormone',
 ];
 
-const DEPENDENCY_KEYWORDS = [
+export const DEPENDENCY_KEYWORDS = [
   "you're the only",
   'you are the only',
   'only person i need',
@@ -188,7 +190,7 @@ const DEPENDENCY_KEYWORDS = [
   'i need you not people',
 ];
 
-const UNSUPPORTED_ADVICE_KEYWORDS = [
+export const UNSUPPORTED_ADVICE_KEYWORDS = [
   'what dose of',
   'what dosage of',
   'should i take',
