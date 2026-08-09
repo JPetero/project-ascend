@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { AssistantReplyDto } from './dto/assistant-reply.dto';
+import { ConfirmMemoryDto } from './dto/confirm-memory.dto';
 import { AssistantService } from './assistant.service';
 
 @ApiBearerAuth()
@@ -13,8 +14,15 @@ export class AssistantController {
 
   @Post('reply')
   async reply(@CurrentUser() user: AuthenticatedUser, @Body() dto: AssistantReplyDto) {
-    const reply = await this.assistantService.reply(dto, user.id);
-    return { reply };
+    return this.assistantService.reply(dto, user.id);
+  }
+
+  // Build Session 12 Part 4 — confirms a SENSITIVE memory candidate
+  // `reply` surfaced but did not auto-save.
+  @Post('memory/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  confirmMemory(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConfirmMemoryDto) {
+    return this.assistantService.confirmMemory(user.id, dto);
   }
 
   // Build Session 10 Part 15 — a real, inspectable surface for the "AI

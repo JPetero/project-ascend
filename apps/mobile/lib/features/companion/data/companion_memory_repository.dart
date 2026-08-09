@@ -6,7 +6,8 @@ import '../domain/companion_memory_note.dart';
 /// toggle in dashboard_screen.dart's `_SettingsCard`. Build Session 11
 /// Part 4: notes are now structured (category/value/createdAt) instead
 /// of raw remembered sentences, and a single note can be deleted without
-/// clearing everything.
+/// clearing everything. Build Session 12 Part 4 added
+/// `confirmPendingMemory` for the SENSITIVE-category confirm flow.
 class CompanionMemoryRepository {
   CompanionMemoryRepository({required ApiClient apiClient})
     : _apiClient = apiClient;
@@ -31,5 +32,19 @@ class CompanionMemoryRepository {
 
   Future<void> clear() async {
     await _apiClient.delete('/assistant/memory', (_) => null);
+  }
+
+  /// Persists a candidate `POST /assistant/reply` surfaced but did not
+  /// auto-save because [PendingCompanionMemory.category] is SENSITIVE —
+  /// the user just explicitly agreed via the "Remember" prompt.
+  Future<void> confirmPendingMemory(PendingCompanionMemory candidate) async {
+    await _apiClient.post(
+      '/assistant/memory/confirm',
+      (_) => null,
+      data: {
+        'category': categoryToJson(candidate.category),
+        'value': candidate.value,
+      },
+    );
   }
 }

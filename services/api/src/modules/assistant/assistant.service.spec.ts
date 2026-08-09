@@ -106,11 +106,11 @@ describe('AssistantService', () => {
       ],
     });
 
-    const reply = await service.reply(dto, 'user-1');
+    const result = await service.reply(dto, 'user-1');
 
     expect(generateReply).toHaveBeenCalledWith(dto, ['Training for a 10k.'], undefined);
     expect(normalizeOutput).toHaveBeenCalledWith('Nice work today!');
-    expect(reply).toBe('Nice work today!');
+    expect(result.reply).toBe('Nice work today!');
   });
 
   it('never reads or writes memory when aiMemoryEnabled is false', async () => {
@@ -200,7 +200,48 @@ describe('AssistantService', () => {
         remember: jest.fn().mockRejectedValue(new Error('db down')),
       });
 
-      await expect(service.reply(dto, 'user-1')).resolves.toBe('Nice work today!');
+      await expect(service.reply(dto, 'user-1')).resolves.toEqual(
+        expect.objectContaining({ reply: 'Nice work today!' }),
+      );
+    });
+  });
+
+  describe('sensitive memory confirmation (Build Session 12 Part 4)', () => {
+    it('never auto-saves a SENSITIVE-category candidate, and surfaces it as pendingMemory instead', async () => {
+      const candidate = {
+        category: CompanionMemoryCategory.ACCESSIBILITY_PREFERENCE,
+        value: 'Uses a wheelchair.',
+      };
+      const extractCandidate = jest.fn().mockReturnValue(candidate);
+      const { service, remember } = buildService({ aiMemoryEnabled: true, extractCandidate });
+
+      const result = await service.reply(dto, 'user-1');
+
+      expect(remember).not.toHaveBeenCalled();
+      expect(result.pendingMemory).toEqual(candidate);
+    });
+
+    it('still auto-saves a STANDARD-category candidate and never sets pendingMemory', async () => {
+      const candidate = { category: CompanionMemoryCategory.GOAL, value: 'Goal: build strength.' };
+      const extractCandidate = jest.fn().mockReturnValue(candidate);
+      const { service, remember } = buildService({ aiMemoryEnabled: true, extractCandidate });
+
+      const result = await service.reply(dto, 'user-1');
+
+      expect(remember).toHaveBeenCalledWith('user-1', candidate);
+      expect(result.pendingMemory).toBeUndefined();
+    });
+
+    it('confirmMemory saves the candidate via CompanionMemoryService.remember', async () => {
+      const { service, remember } = buildService();
+      const candidate = {
+        category: CompanionMemoryCategory.DIETARY_RESTRICTION,
+        value: 'Allergic to peanuts.',
+      };
+
+      await service.confirmMemory('user-1', candidate);
+
+      expect(remember).toHaveBeenCalledWith('user-1', candidate);
     });
   });
 
@@ -214,9 +255,9 @@ describe('AssistantService', () => {
       });
       const { service, generateReply, checkAccess } = buildService({ classify });
 
-      const reply = await service.reply(dto, 'user-1');
+      const result = await service.reply(dto, 'user-1');
 
-      expect(reply).toBe('Please seek medical attention right now.');
+      expect(result.reply).toBe('Please seek medical attention right now.');
       expect(generateReply).not.toHaveBeenCalled();
       expect(checkAccess).not.toHaveBeenCalled();
     });
@@ -232,7 +273,9 @@ describe('AssistantService', () => {
         .mockResolvedValue({ allowed: false, feature: AiFeature.ADVANCED_CONVERSATION });
       const { service } = buildService({ classify, checkAccess });
 
-      await expect(service.reply(dto, 'user-1')).resolves.toBe('Safe redirect content.');
+      await expect(service.reply(dto, 'user-1')).resolves.toEqual(
+        expect.objectContaining({ reply: 'Safe redirect content.' }),
+      );
     });
 
     it('passes safetyContext to the provider only for ALLOW_WITH_SAFETY_CONTEXT', async () => {
@@ -256,7 +299,9 @@ describe('AssistantService', () => {
       const normalizeOutput = jest.fn().mockReturnValue('normalized');
       const { service } = buildService({ normalizeOutput });
 
-      await expect(service.reply(dto, 'user-1')).resolves.toBe('normalized');
+      await expect(service.reply(dto, 'user-1')).resolves.toEqual(
+        expect.objectContaining({ reply: 'normalized' }),
+      );
     });
   });
 

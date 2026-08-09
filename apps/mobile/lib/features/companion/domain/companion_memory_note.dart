@@ -42,6 +42,34 @@ CompanionMemoryCategory _categoryFromJson(String raw) {
   }
 }
 
+/// Inverse of [_categoryFromJson] — needed only by
+/// `POST /assistant/memory/confirm` (Build Session 12 Part 4), which
+/// re-sends the exact category the server offered rather than an id.
+String categoryToJson(CompanionMemoryCategory category) {
+  switch (category) {
+    case CompanionMemoryCategory.workoutPreference:
+      return 'WORKOUT_PREFERENCE';
+    case CompanionMemoryCategory.equipment:
+      return 'EQUIPMENT';
+    case CompanionMemoryCategory.schedulePreference:
+      return 'SCHEDULE_PREFERENCE';
+    case CompanionMemoryCategory.foodPreference:
+      return 'FOOD_PREFERENCE';
+    case CompanionMemoryCategory.dietaryRestriction:
+      return 'DIETARY_RESTRICTION';
+    case CompanionMemoryCategory.goal:
+      return 'GOAL';
+    case CompanionMemoryCategory.coachingStyle:
+      return 'COACHING_STYLE';
+    case CompanionMemoryCategory.companionPreference:
+      return 'COMPANION_PREFERENCE';
+    case CompanionMemoryCategory.unitPreference:
+      return 'UNIT_PREFERENCE';
+    case CompanionMemoryCategory.accessibilityPreference:
+      return 'ACCESSIBILITY_PREFERENCE';
+  }
+}
+
 /// Short, human-readable label for [CompanionMemoryScreen] — never the
 /// raw enum name.
 extension CompanionMemoryCategoryLabel on CompanionMemoryCategory {
@@ -96,4 +124,36 @@ class CompanionMemoryNote {
   final CompanionMemoryCategory category;
   final String value;
   final DateTime createdAt;
+}
+
+/// A SENSITIVE-category fact (Build Session 12 Part 4) the assistant
+/// noticed but did not auto-save — surfaced by `POST /assistant/reply`'s
+/// `pendingMemory` field so the client can show a non-blocking "remember
+/// this?" prompt before `CompanionMemoryRepository.confirmPendingMemory`
+/// actually persists it. Unlike [CompanionMemoryNote] this never has an
+/// id — nothing exists server-side for it yet.
+class PendingCompanionMemory {
+  const PendingCompanionMemory({required this.category, required this.value});
+
+  factory PendingCompanionMemory.fromJson(Map<String, dynamic> json) {
+    return PendingCompanionMemory(
+      category: _categoryFromJson(json['category'] as String),
+      value: json['value'] as String,
+    );
+  }
+
+  final CompanionMemoryCategory category;
+  final String value;
+
+  /// Same category+value pair are equal — used to recognize "the user
+  /// already said not now to this exact fact" so it isn't re-prompted
+  /// within the same chat session.
+  String get dedupeKey => '${categoryToJson(category)}|$value';
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingCompanionMemory && other.dedupeKey == dedupeKey;
+
+  @override
+  int get hashCode => dedupeKey.hashCode;
 }

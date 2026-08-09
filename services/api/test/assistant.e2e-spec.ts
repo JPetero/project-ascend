@@ -332,4 +332,53 @@ describe('Assistant memory (e2e)', () => {
       .delete('/assistant/memory/00000000-0000-0000-0000-000000000000')
       .expect(401);
   });
+
+  // Build Session 12 Part 4 — sensitive-memory confirmation. The
+  // pending-candidate half of this flow only happens inside
+  // AssistantService.reply(), which needs a live provider this
+  // environment doesn't have (see the file-level comment above), but
+  // /assistant/memory/confirm itself has no such dependency — it writes
+  // straight through CompanionMemoryService.remember(), same as the
+  // structured-note test above.
+  it('confirming a memory candidate persists it, visible via GET /assistant/memory', async () => {
+    const before = await request(app.getHttpServer())
+      .get('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(
+      before.body.data.notes.some(
+        (n: { category: string }) => n.category === 'DIETARY_RESTRICTION',
+      ),
+    ).toBe(false);
+
+    await request(app.getHttpServer())
+      .post('/assistant/memory/confirm')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ category: 'DIETARY_RESTRICTION', value: 'Allergic to peanuts.' })
+      .expect(204);
+
+    const after = await request(app.getHttpServer())
+      .get('/assistant/memory')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const saved = after.body.data.notes.find(
+      (n: { category: string }) => n.category === 'DIETARY_RESTRICTION',
+    );
+    expect(saved).toMatchObject({ category: 'DIETARY_RESTRICTION', value: 'Allergic to peanuts.' });
+  });
+
+  it('rejects confirming a memory candidate with an invalid category', async () => {
+    await request(app.getHttpServer())
+      .post('/assistant/memory/confirm')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ category: 'NOT_A_REAL_CATEGORY', value: 'Something.' })
+      .expect(400);
+  });
+
+  it('rejects an unauthenticated request to confirm a memory candidate', async () => {
+    await request(app.getHttpServer())
+      .post('/assistant/memory/confirm')
+      .send({ category: 'GOAL', value: 'Goal: build strength.' })
+      .expect(401);
+  });
 });

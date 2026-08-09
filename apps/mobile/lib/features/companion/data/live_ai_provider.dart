@@ -1,6 +1,7 @@
 import '../../../core/networking/api_client.dart';
 import '../../profile/domain/preferences_model.dart';
 import '../domain/chat_message.dart';
+import '../domain/companion_memory_note.dart';
 import '../domain/research_answer.dart';
 import 'ai_provider.dart';
 
@@ -37,6 +38,17 @@ class LiveAiProvider extends AiProvider {
   final ApiClient _apiClient;
   final AiProvider _fallback;
 
+  /// Set when the backend's last `/assistant/reply` response included a
+  /// SENSITIVE-category `pendingMemory` (Build Session 12 Part 4) —
+  /// `AiProvider.reply()`'s return type is a plain `String`, shared by
+  /// every provider, so this is a narrow side-channel read by
+  /// `CompanionChatController` via an `is LiveAiProvider` check right
+  /// after calling `reply()`, rather than widening that shared contract
+  /// for one provider's feature. Always reset at the start of each
+  /// `generateReply` call so a stale candidate from an earlier turn is
+  /// never mistaken for this turn's.
+  PendingCompanionMemory? pendingMemoryCandidate;
+
   @override
   Future<String> generateReply({
     required String input,
@@ -44,6 +56,7 @@ class LiveAiProvider extends AiProvider {
     required CoachingStyle style,
     List<ChatMessage> history = const [],
   }) async {
+    pendingMemoryCandidate = null;
     try {
       final envelope = await _apiClient.post(
         '/assistant/reply',
@@ -58,6 +71,13 @@ class LiveAiProvider extends AiProvider {
         },
       );
       final reply = envelope.data?['reply'] as String?;
+      final rawPendingMemory =
+          envelope.data?['pendingMemory'] as Map<String, dynamic>?;
+      if (rawPendingMemory != null) {
+        pendingMemoryCandidate = PendingCompanionMemory.fromJson(
+          rawPendingMemory,
+        );
+      }
       if (reply != null && reply.trim().isNotEmpty) return reply;
     } catch (_) {
       // Falls through to the fallback below — never surfaces a raw

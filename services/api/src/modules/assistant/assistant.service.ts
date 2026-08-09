@@ -7,7 +7,17 @@ import { AssistantSafetyDecisionType } from './assistant-safety.types';
 import { CompanionMemoryNoteView, CompanionMemoryService } from './companion-memory.service';
 import { AssistantReplyDto } from './dto/assistant-reply.dto';
 import { MemoryExtractionService } from './memory-extraction.service';
+import { MemoryCandidate, MemorySensitivity, memorySensitivityOf } from './memory-extraction.types';
 import { AI_REPLY_PROVIDER, AiReplyProvider } from './providers/ai-reply-provider.interface';
+
+export interface AssistantReplyResult {
+  reply: string;
+  /** Set only when extraction found a SENSITIVE-category fact (Build
+   * Session 12 Part 4) — never auto-saved. The client shows a "remember
+   * this?" prompt and, if the user agrees, calls `confirmMemory` with
+   * this exact category/value. */
+  pendingMemory?: MemoryCandidate;
+}
 
 /**
  * The only server-side call site for a live LLM in this codebase — see
@@ -55,14 +65,14 @@ export class AssistantService {
     return this.provider.isConfigured;
   }
 
-  async reply(dto: AssistantReplyDto, userId: string): Promise<string> {
+  async reply(dto: AssistantReplyDto, userId: string): Promise<AssistantReplyResult> {
     const safetyDecision = this.safety.classify(dto.input, dto.history);
 
     // LOCAL_SAFE_RESPONSE / ESCALATE / REFUSE all mean "never reaches a
     // provider" — available to every tier, never blocked, never costs
     // provider budget, and never offered to the memory extractor either.
     if (safetyDecision.localResponse) {
-      return safetyDecision.localResponse;
+      return { reply: safetyDecision.localResponse };
     }
 
     const access = await this.entitlement.checkAccess(userId, AiFeature.ADVANCED_CONVERSATION);
@@ -88,16 +98,36 @@ export class AssistantService {
     );
     const reply = this.safety.normalizeOutput(rawReply);
 
+    let pendingMemory: MemoryCandidate | undefined;
     if (memoryEnabled) {
       const candidate = this.extraction.extractCandidate(dto.input, safetyDecision.category);
       if (candidate) {
-        // Best-effort — a memory write failing must never take down a
-        // reply the user already received.
-        await this.memory.remember(userId, candidate).catch(() => undefined);
+        if (memorySensitivityOf(candidate.category) === MemorySensitivity.SENSITIVE) {
+          // Never auto-saved — surfaced to the client for explicit
+          // confirmation instead (see `confirmMemory`).
+          pendingMemory = candidate;
+        } else {
+          // Best-effort — a memory write failing must never take down a
+          // reply the user already received.
+          await this.memory.remember(userId, candidate).catch(() => undefined);
+        }
       }
     }
 
-    return reply;
+    return { reply, pendingMemory };
+  }
+
+  /**
+   * Explicit user confirmation for a SENSITIVE candidate `reply` earlier
+   * surfaced but did not save (Build Session 12 Part 4). Deliberately
+   * does not re-derive sensitivity or re-run extraction — the client is
+   * confirming a specific fact it was already shown, not submitting
+   * arbitrary free text (`ConfirmMemoryDto` still bounds the category to
+   * the same allowed enum and the value to the same length limit
+   * extraction itself enforces).
+   */
+  confirmMemory(userId: string, candidate: MemoryCandidate): Promise<void> {
+    return this.memory.remember(userId, candidate);
   }
 
   getMemory(userId: string): Promise<CompanionMemoryNoteView[]> {

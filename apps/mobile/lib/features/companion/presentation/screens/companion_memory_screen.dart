@@ -68,9 +68,9 @@ class CompanionMemoryScreen extends ConsumerWidget {
         .read(companionMemoryControllerProvider.notifier)
         .deleteNote(note.id);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Forgotten.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Forgotten.')));
     }
   }
 

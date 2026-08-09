@@ -1,12 +1,42 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/networking/api_client.dart';
+import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/companion/data/ai_provider.dart';
+import 'package:mobile/features/companion/data/live_ai_provider.dart';
+import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
 import 'package:mobile/features/companion/domain/chat_message.dart';
+import 'package:mobile/features/companion/domain/companion_memory_note.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 
+import '../../helpers/fake_companion_memory_repository.dart';
 import '../../helpers/test_provider_scope.dart';
+
+/// A [LiveAiProvider] stand-in that sets [pendingMemoryCandidate] the way
+/// a real backend response with `pendingMemory` would, without making an
+/// HTTP call (Build Session 12 Part 4).
+class _FakeLiveProviderWithPendingMemory extends LiveAiProvider {
+  _FakeLiveProviderWithPendingMemory({this.candidate})
+    : super(
+        apiClient: ApiClient(tokenStorage: SecureTokenStorage()),
+        fallback: const LocalDeterministicAiProvider(),
+      );
+
+  final PendingCompanionMemory? candidate;
+
+  @override
+  Future<String> generateReply({
+    required String input,
+    required Companion companion,
+    required CoachingStyle style,
+    List<ChatMessage> history = const [],
+  }) async {
+    pendingMemoryCandidate = candidate;
+    return 'LIVE REPLY: $input';
+  }
+}
 
 /// A stand-in "future live provider" — proves the controller genuinely
 /// doesn't care which [AiProvider] is plugged in.
@@ -186,4 +216,124 @@ void main() {
       await tester.pump(const Duration(milliseconds: 700));
     },
   );
+
+  group('sensitive memory confirmation (Build Session 12 Part 4)', () {
+    const candidate = PendingCompanionMemory(
+      category: CompanionMemoryCategory.accessibilityPreference,
+      value: 'Uses a wheelchair.',
+    );
+
+    testWidgets(
+      'a pendingMemory candidate from the live provider surfaces in state',
+      (tester) async {
+        final container = await createTestContainer(
+          aiProvider: _FakeLiveProviderWithPendingMemory(candidate: candidate),
+        );
+        addTearDown(container.dispose);
+        container.listen(companionChatControllerProvider, (_, _) {});
+        final controller = container.read(
+          companionChatControllerProvider.notifier,
+        );
+
+        unawaited(controller.sendMessage('I use a wheelchair'));
+        await pumpUntil(
+          tester,
+          () =>
+              container.read(companionChatControllerProvider).pendingMemory !=
+              null,
+        );
+
+        expect(
+          container.read(companionChatControllerProvider).pendingMemory,
+          candidate,
+        );
+
+        await tester.pump(const Duration(milliseconds: 700));
+      },
+    );
+
+    testWidgets(
+      'confirming saves the candidate through the memory repository and '
+      'clears the prompt',
+      (tester) async {
+        final memoryRepository = FakeCompanionMemoryRepository();
+        final container = await createTestContainer(
+          aiProvider: _FakeLiveProviderWithPendingMemory(candidate: candidate),
+          companionMemoryRepository: memoryRepository,
+        );
+        addTearDown(container.dispose);
+        container.listen(companionChatControllerProvider, (_, _) {});
+        final controller = container.read(
+          companionChatControllerProvider.notifier,
+        );
+
+        unawaited(controller.sendMessage('I use a wheelchair'));
+        await pumpUntil(
+          tester,
+          () =>
+              container.read(companionChatControllerProvider).pendingMemory !=
+              null,
+        );
+
+        await controller.confirmPendingMemory();
+
+        expect(
+          container.read(companionChatControllerProvider).pendingMemory,
+          isNull,
+        );
+        expect(memoryRepository.confirmedCandidates, [candidate]);
+
+        await tester.pump(const Duration(milliseconds: 700));
+      },
+    );
+
+    testWidgets(
+      'dismissing clears the prompt without saving, and the exact same fact '
+      'is never re-prompted again this session',
+      (tester) async {
+        final memoryRepository = FakeCompanionMemoryRepository();
+        final container = await createTestContainer(
+          aiProvider: _FakeLiveProviderWithPendingMemory(candidate: candidate),
+          companionMemoryRepository: memoryRepository,
+        );
+        addTearDown(container.dispose);
+        container.listen(companionChatControllerProvider, (_, _) {});
+        final controller = container.read(
+          companionChatControllerProvider.notifier,
+        );
+
+        unawaited(controller.sendMessage('I use a wheelchair'));
+        await pumpUntil(
+          tester,
+          () =>
+              container.read(companionChatControllerProvider).pendingMemory !=
+              null,
+        );
+
+        controller.dismissPendingMemory();
+        expect(
+          container.read(companionChatControllerProvider).pendingMemory,
+          isNull,
+        );
+        expect(memoryRepository.confirmedCandidates, isEmpty);
+        await tester.pump(const Duration(milliseconds: 700));
+
+        // Same candidate arrives again on a later turn — must not be
+        // re-shown after the earlier "Not now".
+        unawaited(controller.sendMessage('I use a wheelchair'));
+        await pumpUntil(
+          tester,
+          () =>
+              container.read(companionChatControllerProvider).messages.length >=
+              4,
+        );
+        expect(
+          container.read(companionChatControllerProvider).pendingMemory,
+          isNull,
+        );
+
+        await tester.pump(const Duration(milliseconds: 700));
+      },
+    );
+  });
 }
