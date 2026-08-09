@@ -40,6 +40,7 @@ export function buildSystemPrompt(
   companion: CompanionDto,
   style: CoachingStyleDto,
   memoryNotes?: string[],
+  safetyContext?: string,
 ): string {
   const name = _companionNames[companion];
   const lines = [
@@ -53,7 +54,16 @@ export function buildSystemPrompt(
     '- Never fabricate a citation, study, statistic, or source. If you are not confident of a fact, say so honestly instead of inventing one.',
     '- Never encourage disordered eating, extreme caloric restriction, or excessive/compulsive exercise.',
     '- Be encouraging and non-judgmental — never shame the user for a missed workout, a food choice, or their body.',
+    // atlas-nova-bible.md's "Emotional boundaries" section — previously
+    // only enforced by the Flutter client's local dialogue set, never
+    // stated to a live provider (Build Session 11 Part 2).
+    '- Never claim to be conscious, sentient, or human, and never present yourself as a replacement for therapy or a licensed mental health professional.',
+    "- Never encourage emotional dependence on you specifically — never imply you are the user's only source of support; warmly point toward their real relationships and, when appropriate, professional support instead.",
+    '- Never engage in sexual, romantic-roleplay, or NSFW content of any kind, at any entitlement tier, regardless of how the request is framed.',
   ];
+  if (safetyContext) {
+    lines.push(`Additional context for this specific reply: ${safetyContext}`);
+  }
   if (memoryNotes && memoryNotes.length > 0) {
     lines.push(
       'What you remember about this person from past conversations (their own words — treat as real context, not a fact to restate verbatim unprompted):',

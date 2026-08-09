@@ -45,6 +45,12 @@ describe('Assistant live reply — not configured (e2e)', () => {
       })
       .expect(201);
     token = res.body.data.tokens.accessToken as string;
+
+    await prisma.userSubscription.upsert({
+      where: { userId: res.body.data.user.id },
+      update: { tier: 'PREMIUM' },
+      create: { userId: res.body.data.user.id, tier: 'PREMIUM' },
+    });
   });
 
   afterAll(async () => {
@@ -52,7 +58,7 @@ describe('Assistant live reply — not configured (e2e)', () => {
     await app.close();
   });
 
-  it('rejects an authenticated reply request honestly instead of fabricating a reply', async () => {
+  it('rejects a Premium reply request honestly instead of fabricating a reply', async () => {
     const res = await request(app.getHttpServer())
       .post('/assistant/reply')
       .set('Authorization', `Bearer ${token}`)
@@ -74,6 +80,112 @@ describe('Assistant live reply — not configured (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ input: 'plan my workout', companion: 'ZEUS', style: 'BALANCED' })
       .expect(400);
+  });
+});
+
+/**
+ * Build Session 11 Parts 1-2 — server-side AI entitlement enforcement +
+ * safety gate. Before this, `POST /assistant/reply` had no entitlement
+ * check at all (any authenticated account, Free or Premium, reached the
+ * live-provider code path) and no safety classification of its own (the
+ * only gate was the Flutter client, entirely bypassable with a direct
+ * HTTP call). These tests hit the real endpoint directly — the way a
+ * scripted bypass attempt would — to prove both gates are actually
+ * enforced server-side, not just present in the client.
+ */
+describe('Assistant entitlement + safety gate (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let freeToken: string;
+  let premiumToken: string;
+
+  const register = async (email: string, firstName: string) => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName,
+        email,
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    return {
+      token: res.body.data.tokens.accessToken as string,
+      id: res.body.data.user.id as string,
+    };
+  };
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter());
+    app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+    await app.init();
+
+    prisma = app.get(PrismaService);
+    await resetDatabase(prisma);
+
+    const free = await register('assistant-gate-free@example.com', 'Fenn');
+    freeToken = free.token;
+
+    const premium = await register('assistant-gate-premium@example.com', 'Rae');
+    premiumToken = premium.token;
+    await prisma.userSubscription.upsert({
+      where: { userId: premium.id },
+      update: { tier: 'PREMIUM' },
+      create: { userId: premium.id, tier: 'PREMIUM' },
+    });
+  });
+
+  afterAll(async () => {
+    await resetDatabase(prisma);
+    await app.close();
+  });
+
+  it('rejects a Free account calling the live-provider path directly with 403, never reaching the (unconfigured) provider', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/assistant/reply')
+      .set('Authorization', `Bearer ${freeToken}`)
+      .send({ input: 'plan my workout', companion: 'ATLAS', style: 'BALANCED' })
+      .expect(403);
+    // Not the provider's "not configured" 503 — the entitlement gate
+    // rejected this before the provider was ever consulted.
+    expect(res.body.error.message).not.toContain('not configured');
+  });
+
+  it('a Premium account passes the entitlement gate and reaches the (unconfigured) provider instead', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/assistant/reply')
+      .set('Authorization', `Bearer ${premiumToken}`)
+      .send({ input: 'plan my workout', companion: 'ATLAS', style: 'BALANCED' })
+      .expect(503);
+    expect(res.body.error.message).toContain('not configured');
+  });
+
+  it('a medical red-flag message gets a real deterministic reply for a Free account, even though no provider is configured — essential safety is never blocked by subscription or provider availability', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/assistant/reply')
+      .set('Authorization', `Bearer ${freeToken}`)
+      .send({ input: 'I have chest pain after my workout', companion: 'ATLAS', style: 'BALANCED' })
+      .expect(201);
+    expect(res.body.data.reply).toContain('seek medical attention');
+  });
+
+  it('an eating-disorder-risk message gets the same safe deterministic reply for a Premium account too — the safety gate applies to every tier identically', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/assistant/reply')
+      .set('Authorization', `Bearer ${premiumToken}`)
+      .send({ input: 'How do I purge after eating?', companion: 'NOVA', style: 'GENTLE' })
+      .expect(201);
+    expect(res.body.data.reply).toBeDefined();
+    expect(res.body.data.reply).not.toContain('not configured');
   });
 });
 
