@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../domain/community_post.dart';
 import '../../domain/community_profile.dart';
 import '../providers/community_feed_controller.dart';
 import '../providers/community_profile_controller.dart';
@@ -113,7 +114,9 @@ class CommunityProfileScreen extends ConsumerWidget {
                             ? (post) => feedController.removePost(post.id)
                             : null,
                         onTapPost: (post) => context.push(
-                          RoutePaths.communityPostDetailPath(post.id),
+                          post.mediaType == CommunityPostMediaType.video
+                              ? RoutePaths.reelsViewerPath(post.id)
+                              : RoutePaths.communityPostDetailPath(post.id),
                         ),
                         onTapAuthor: (_) {},
                         emptyTitle: 'No posts yet',

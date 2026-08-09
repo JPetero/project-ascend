@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/features/community/domain/community_post.dart';
 import 'package:mobile/features/community/presentation/providers/community_feed_controller.dart';
 
 import '../../helpers/fake_community_repository.dart';
@@ -13,10 +14,12 @@ void main() {
   CommunityFeedController buildController({
     String? authorId,
     bool savedOnly = false,
+    bool reelsOnly = false,
   }) => CommunityFeedController(
     repository: repository,
     authorId: authorId,
     savedOnly: savedOnly,
+    reelsOnly: reelsOnly,
   );
 
   test('loads the feed on construction', () async {
@@ -171,4 +174,29 @@ void main() {
       expect(controller.state.error, isNotNull);
     },
   );
+
+  test('reelsOnly loads just VIDEO posts, driving the Reels viewer off the '
+      'same pagination/like/save machinery as every other feed mode '
+      '(Build Session 10 Part 22)', () async {
+    repository.posts.addAll([
+      samplePost(id: 'reel-1', mediaType: CommunityPostMediaType.video),
+      samplePost(id: 'text-1'),
+      samplePost(id: 'reel-2', mediaType: CommunityPostMediaType.video),
+    ]);
+    final controller = buildController(reelsOnly: true);
+    addTearDown(controller.dispose);
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.posts.map((p) => p.id).toSet(), {
+      'reel-1',
+      'reel-2',
+    });
+    expect(
+      controller.state.posts.every(
+        (p) => p.mediaType == CommunityPostMediaType.video,
+      ),
+      isTrue,
+    );
+  });
 }

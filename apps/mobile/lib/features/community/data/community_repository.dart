@@ -75,6 +75,7 @@ class CommunityRepository {
     int limit = 20,
     String? authorId,
     bool followingOnly = false,
+    CommunityPostMediaType? mediaType,
   }) async {
     final envelope = await _apiClient.get(
       '/community/posts',
@@ -84,6 +85,8 @@ class CommunityRepository {
         'limit': limit,
         'authorId': ?authorId,
         if (followingOnly) 'followingOnly': true,
+        if (mediaType != null)
+          'mediaType': communityPostMediaTypeToJson(mediaType),
       },
     );
     final items = envelope.data!['data'] as List<dynamic>;

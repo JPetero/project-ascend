@@ -7,6 +7,7 @@ import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../messages/presentation/providers/conversations_controller.dart';
+import '../../domain/community_post.dart';
 import '../providers/community_feed_controller.dart';
 import '../widgets/community_post_list_view.dart';
 
@@ -116,8 +117,11 @@ class CommunityFeedScreen extends ConsumerWidget {
                 onDelete: (post) => controller.removePost(post.id),
                 onReport: (post, reason) =>
                     controller.reportPost(post.id, reason),
-                onTapPost: (post) =>
-                    context.push(RoutePaths.communityPostDetailPath(post.id)),
+                onTapPost: (post) => context.push(
+                  post.mediaType == CommunityPostMediaType.video
+                      ? RoutePaths.reelsViewerPath(post.id)
+                      : RoutePaths.communityPostDetailPath(post.id),
+                ),
                 onTapAuthor: (post) => context.push(
                   RoutePaths.communityProfilePath(post.authorId),
                 ),

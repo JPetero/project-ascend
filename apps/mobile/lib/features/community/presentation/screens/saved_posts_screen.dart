@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_paths.dart';
+import '../../domain/community_post.dart';
 import '../providers/community_feed_controller.dart';
 import '../widgets/community_post_list_view.dart';
 
@@ -23,8 +24,11 @@ class SavedPostsScreen extends ConsumerWidget {
           onLoadMore: controller.loadMore,
           onLike: (post) => controller.toggleLike(post.id),
           onSave: (post) => controller.toggleSave(post.id),
-          onTapPost: (post) =>
-              context.push(RoutePaths.communityPostDetailPath(post.id)),
+          onTapPost: (post) => context.push(
+            post.mediaType == CommunityPostMediaType.video
+                ? RoutePaths.reelsViewerPath(post.id)
+                : RoutePaths.communityPostDetailPath(post.id),
+          ),
           onTapAuthor: (post) =>
               context.push(RoutePaths.communityProfilePath(post.authorId)),
           emptyTitle: 'Nothing saved yet',

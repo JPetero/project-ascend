@@ -35,6 +35,10 @@ abstract final class RoutePaths {
   // Community — pushed on top of the shell, same pattern as Workout
   // Engine/Meal Prep above.
   static const communityPostDetail = '/social/posts/:id';
+  // Vertical Reels viewer — Build Session 10 Part 22. Tapping a VIDEO
+  // post opens here instead of the ordinary post-detail route.
+  static const reelsViewer = '/social/reels/:id';
+  static String reelsViewerPath(String id) => '/social/reels/$id';
   static const communityCreatePost = '/social/new';
   static const communitySaved = '/social/saved';
   static const communityProfile = '/social/profile/:userId';
