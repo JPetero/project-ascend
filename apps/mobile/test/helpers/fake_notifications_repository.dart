@@ -40,6 +40,8 @@ class FakeNotificationsRepository implements NotificationsRepository {
 
   NotificationPreferences preferences;
   List<NotificationEvent> events;
+  final List<String> registeredTokens = [];
+  final List<String> unregisteredTokens = [];
 
   @override
   Future<NotificationPreferences> getPreferences() async => preferences;
@@ -102,5 +104,18 @@ class FakeNotificationsRepository implements NotificationsRepository {
           readAt: event.readAt ?? DateTime(2026, 1, 2),
         ),
     ];
+  }
+
+  @override
+  Future<void> registerDeviceToken({
+    required String token,
+    String? platform,
+  }) async {
+    registeredTokens.add(token);
+  }
+
+  @override
+  Future<void> unregisterDeviceToken(String token) async {
+    unregisteredTokens.add(token);
   }
 }

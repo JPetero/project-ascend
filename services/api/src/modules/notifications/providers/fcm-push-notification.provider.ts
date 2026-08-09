@@ -65,10 +65,20 @@ export class FcmPushNotificationProvider implements PushNotificationProvider {
             message: {
               token: token.token,
               notification: { title: payload.title, body: payload.body },
-              // FCM's `data` payload must be a flat map of strings — the
-              // free-form deep-link context (e.g. a conversationId) is
-              // the only field the client needs.
-              ...(payload.data ? { data: { payload: payload.data } } : {}),
+              // FCM's `data` payload must be a flat map of strings.
+              // `type` (Build Session 11 Part 5) plus `payload` (the
+              // free-form deep-link context, e.g. a conversationId) is
+              // everything the client needs to reconstruct the same
+              // `deepLinkPathFor(type, data)` call the in-app
+              // notifications inbox already uses.
+              ...(payload.data || payload.type
+                ? {
+                    data: {
+                      ...(payload.type ? { type: payload.type } : {}),
+                      ...(payload.data ? { payload: payload.data } : {}),
+                    },
+                  }
+                : {}),
             },
           },
         });

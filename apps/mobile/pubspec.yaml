@@ -88,6 +88,15 @@ dependencies:
   google_sign_in: ^7.1.0
   sign_in_with_apple: ^7.0.1
 
+  # Remote push notifications (Build Session 11 Part 5) — the backend's
+  # FcmPushNotificationProvider already sends via FCM's HTTP v1 API; these
+  # are the client-side plugins that receive it. No live Firebase project
+  # exists in this environment (no google-services.json/
+  # GoogleService-Info.plist), so `Firebase.initializeApp()` is wrapped
+  # defensively — see FirebasePushNotificationService.
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

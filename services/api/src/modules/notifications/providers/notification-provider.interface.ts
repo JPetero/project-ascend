@@ -13,6 +13,12 @@ export interface NotificationPayload {
   title: string;
   body: string;
   data?: string;
+  // Build Session 11 Part 5 — the FCM data payload previously carried
+  // only `data` (a bare entity id like a conversationId), with no way
+  // for the client to know *what kind* of entity it was. A tapped push
+  // needs both to reconstruct a deep link the same way the in-app
+  // notifications inbox already does via `deepLinkPathFor` on mobile.
+  type?: string;
 }
 
 export interface DeliveryResult {

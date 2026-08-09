@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design_system/ascend_theme.dart';
 import '../core/routing/app_router.dart';
 import '../features/achievements/presentation/widgets/achievement_celebration_overlay.dart';
+import '../features/notifications/presentation/providers/push_registration_controller.dart';
 import '../features/profile/domain/preferences_model.dart';
 import '../features/profile/presentation/providers/preferences_controller.dart';
 
@@ -13,6 +14,10 @@ class AscendApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    // Riverpod providers are lazy — watching this here is what actually
+    // starts remote push registration/tap-navigation (Build Session 11
+    // Part 5/6), not just a value read.
+    ref.watch(pushRegistrationControllerProvider);
     final themeMode = ref.watch(
       preferencesControllerProvider.select(
         (s) => s.asData?.value?.themeMode ?? AppThemeMode.system,
