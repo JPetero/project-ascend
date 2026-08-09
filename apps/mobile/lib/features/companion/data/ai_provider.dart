@@ -167,20 +167,19 @@ abstract class AiProvider {
     List<ChatMessage> history = const [],
   });
 
-  /// Premium future "research mode" per user-scenario-bible.md Scenario
-  /// 19: detailed explanations with citations, evidence-quality labels,
-  /// and study dates — sourced only from peer-reviewed research,
-  /// professional medical organizations, government health agencies,
-  /// established universities, and official clinical guidance. No
-  /// general web search result is ever presented as if it were one of
-  /// those. The system must admit uncertainty and must never invent a
-  /// citation.
+  /// "Research mode" per user-scenario-bible.md Scenario 19: detailed
+  /// explanations with citations, evidence-quality labels, and study
+  /// dates — sourced only from peer-reviewed research, professional
+  /// medical organizations, government health agencies, established
+  /// universities, and official clinical guidance. No general web search
+  /// result is ever presented as if it were one of those. The system
+  /// must admit uncertainty and must never invent a citation.
   ///
-  /// This default implementation is the only one this session: no live,
-  /// source-verified research provider exists yet, so the honest answer
-  /// is "not available" rather than a fabricated summary. A future live
-  /// research provider overrides this method; nothing else needs to
-  /// change.
+  /// This default implementation (still the only one for the local
+  /// providers) always reports "not available" — [LiveAiProvider]
+  /// overrides this method with a real call to `POST /research/query`
+  /// (Build Session 10 Part 16's `BraveSearchResearchProvider`); nothing
+  /// else needs to change.
   Future<ResearchAnswer> researchReply({required String query}) async {
     return const ResearchAnswer(
       isAvailable: false,

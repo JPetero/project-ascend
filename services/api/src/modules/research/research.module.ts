@@ -1,0 +1,39 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ResearchConfig } from '../../config/configuration';
+import { ResearchController } from './research.controller';
+import { BraveSearchResearchProvider } from './providers/brave-search-research-provider';
+import { NoopResearchProvider } from './providers/noop-research-provider';
+import { RESEARCH_PROVIDER } from './providers/research-provider.interface';
+
+/**
+ * Selects the active `ResearchProvider` from `research.braveSearchApiKey`
+ * (`BRAVE_SEARCH_API_KEY` env) — the same config-driven-factory pattern
+ * AssistantModule/NotificationsModule use. Defaults to the Noop adapter,
+ * which is also what every test in this repository runs against, since
+ * no Brave Search key exists in this environment.
+ * `CapabilityService`/`PrismaService` come from the global
+ * `EntitlementsModule`/`PrismaModule`, so nothing else needs importing
+ * here.
+ */
+@Module({
+  imports: [ConfigModule],
+  controllers: [ResearchController],
+  providers: [
+    NoopResearchProvider,
+    BraveSearchResearchProvider,
+    {
+      provide: RESEARCH_PROVIDER,
+      useFactory: (
+        configService: ConfigService,
+        noop: NoopResearchProvider,
+        brave: BraveSearchResearchProvider,
+      ) => {
+        const research = configService.get<ResearchConfig>('research');
+        return research?.braveSearchApiKey ? brave : noop;
+      },
+      inject: [ConfigService, NoopResearchProvider, BraveSearchResearchProvider],
+    },
+  ],
+})
+export class ResearchModule {}

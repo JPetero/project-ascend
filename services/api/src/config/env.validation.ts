@@ -153,6 +153,14 @@ class EnvironmentVariables {
   @IsOptional()
   GEMINI_MODEL?: string;
 
+  // Research Mode retrieval (Build Session 10 Part 16) — optional.
+  // Undefined means ResearchModule falls back to NoopResearchProvider,
+  // which honestly rejects with "not configured" rather than fabricating
+  // a citation. See BraveSearchResearchProvider.
+  @IsString()
+  @IsOptional()
+  BRAVE_SEARCH_API_KEY?: string;
+
   // Store purchase verification (Build Session 9 Part 17/18) — both
   // optional. Undefined means that platform's purchase verifier
   // honestly rejects with "not configured" rather than pretending a
