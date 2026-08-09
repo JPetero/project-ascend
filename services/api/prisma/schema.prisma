@@ -207,40 +207,40 @@ model User {
   adminPermissionGrants            AdminPermissionGrant[]
   visionAnalysisSessions           VisionAnalysisSession[]
   pushDeviceTokens                 PushDeviceToken[]
-  companionMemory                  CompanionMemory?
+  companionMemoryNotes             CompanionMemoryNote[]
 
   @@index([status])
   @@map("users")
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String
+  id               String    @id @default(uuid())
+  userId           String
   // Shared by every token descended from the same login/register — i.e. the
   // original token and every token it was rotated into. Lets us revoke an
   // entire session lineage at once when reuse of an already-rotated token
   // indicates possible theft (see AuthService.handleRefreshTokenReuse).
-  familyId   String
-  tokenHash  String
-  expiresAt  DateTime
-  revokedAt  DateTime?
+  familyId         String
+  tokenHash        String
+  expiresAt        DateTime
+  revokedAt        DateTime?
   // Set only when this specific token was revoked as part of family-wide
   // reuse handling (AuthService.handleRefreshTokenReuse), never on an
   // ordinary rotation revoke — lets an auditor distinguish "rotated
   // normally" from "killed because a stolen/replayed token surfaced" just
   // by reading the row, without needing the AuditEvent log.
-  reusedAt   DateTime?
-  deviceName String?
+  reusedAt         DateTime?
+  deviceName       String?
   // Freeform client-reported platform label ("ios" | "android" | "web"),
   // purely informational for the "Your devices" list — never used for any
   // security decision.
-  platform   String?
+  platform         String?
   // Copied forward unchanged on every rotation (Build Session 10 Part 11),
   // unlike `createdAt` which resets to "now" on each rotated row. This is
   // what lets the sessions list show "signed in 3 days ago" for a device
   // that has silently refreshed many times since.
-  sessionCreatedAt DateTime @default(now())
-  createdAt  DateTime  @default(now())
+  sessionCreatedAt DateTime  @default(now())
+  createdAt        DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -328,7 +328,12 @@ model Preference {
   themeMode            ThemeMode     @default(SYSTEM)
   reducedMotion        Boolean       @default(false)
   notificationsEnabled Boolean       @default(true)
-  aiMemoryEnabled      Boolean       @default(true)
+  // Build Session 11 Part 4 — defaults OFF (was ON): durable
+  // conversational memory is opt-in now that the extractor's category
+  // allowlist exists, matching the directive's "default privacy-
+  // conscious" guidance. A user who wants Atlas/Nova to remember
+  // preferences across conversations turns this on explicitly.
+  aiMemoryEnabled      Boolean       @default(false)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
@@ -2894,25 +2899,44 @@ model PushDeviceToken {
   @@map("push_device_tokens")
 }
 
-// Build Session 10 Part 15 — real, durable Atlas/Nova memory, tied to
-// the `Preference.aiMemoryEnabled` toggle that already existed but was
-// never read anywhere (see roadmap.md's "AI gateway" section). `notes`
-// is a small, capped list of the user's own substantive statements
-// (goals, injuries, equipment, preferences), stored verbatim — never an
-// LLM-generated summary — so nothing here is ever a fabricated or
-// misremembered fact, matching the "never invent" rule used elsewhere
-// in the assistant/research pipeline. AssistantService caps and prunes
-// this list; the schema itself places no limit.
-model CompanionMemory {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  notes     String[] @default([])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Build Session 11 Part 4 — replaces the original (Build Session 10
+// Part 15) single-row `notes: String[]` shape, which stored *any*
+// substantive-looking message verbatim regardless of content — an
+// emotional crisis disclosure or a private medical symptom was just as
+// "rememberable" as a stated equipment preference. Every row here is
+// one structured, categorized fact instead: `category` is always one of
+// `CompanionMemoryCategory`'s narrow allowlist (never
+// self-harm/abuse/sexual/medical/free-form content — see
+// MemoryExtractionService's doc comment for the full boundary), so what
+// can be stored is a property of the schema itself, not just
+// application-layer discipline. One row per remembered fact (not one
+// JSON array per user) so an individual memory can be listed with its
+// own creation date and deleted on its own — the "What Ascend
+// remembers" screen's real requirement.
+enum CompanionMemoryCategory {
+  WORKOUT_PREFERENCE
+  EQUIPMENT
+  SCHEDULE_PREFERENCE
+  FOOD_PREFERENCE
+  DIETARY_RESTRICTION
+  GOAL
+  COACHING_STYLE
+  COMPANION_PREFERENCE
+  UNIT_PREFERENCE
+  ACCESSIBILITY_PREFERENCE
+}
+
+model CompanionMemoryNote {
+  id        String                  @id @default(uuid())
+  userId    String
+  category  CompanionMemoryCategory
+  value     String
+  createdAt DateTime                @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("companion_memories")
+  @@index([userId, createdAt])
+  @@map("companion_memory_notes")
 }
 
 // Build Session 10 Part 6 — private, user-owned results from a live

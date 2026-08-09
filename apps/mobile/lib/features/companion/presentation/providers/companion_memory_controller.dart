@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/core_providers.dart';
 import '../../data/companion_memory_repository.dart';
+import '../../domain/companion_memory_note.dart';
 
 final companionMemoryRepositoryProvider = Provider<CompanionMemoryRepository>((
   ref,
@@ -16,12 +17,12 @@ class CompanionMemoryState {
     this.error,
   });
 
-  final List<String> notes;
+  final List<CompanionMemoryNote> notes;
   final bool isLoading;
   final String? error;
 
   CompanionMemoryState copyWith({
-    List<String>? notes,
+    List<CompanionMemoryNote>? notes,
     bool? isLoading,
     String? error,
   }) {
@@ -35,8 +36,8 @@ class CompanionMemoryState {
 
 /// Backs the "manage memory" screen reachable from the "AI memory"
 /// toggle in dashboard_screen.dart (Build Session 10 Part 15) — a real,
-/// inspectable view of what Atlas/Nova remembers, and a real clear
-/// action, rather than invisible state.
+/// inspectable view of what Atlas/Nova remembers, with both a per-note
+/// delete and a clear-all action (Build Session 11 Part 4).
 class CompanionMemoryController extends StateNotifier<CompanionMemoryState> {
   CompanionMemoryController({required CompanionMemoryRepository repository})
     : _repository = repository,
@@ -54,6 +55,13 @@ class CompanionMemoryController extends StateNotifier<CompanionMemoryState> {
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
+  }
+
+  Future<void> deleteNote(String id) async {
+    await _repository.deleteNote(id);
+    state = state.copyWith(
+      notes: state.notes.where((note) => note.id != id).toList(),
+    );
   }
 
   Future<void> clear() async {

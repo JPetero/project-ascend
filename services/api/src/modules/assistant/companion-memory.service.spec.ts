@@ -1,74 +1,136 @@
+import { NotFoundException } from '@nestjs/common';
 import { CompanionMemoryService } from './companion-memory.service';
+import { CompanionMemoryCategory } from './memory-extraction.types';
 import { PrismaService } from '../../prisma/prisma.service';
+
+function note(
+  overrides: Partial<{
+    id: string;
+    category: CompanionMemoryCategory;
+    value: string;
+    createdAt: Date;
+  }> = {},
+) {
+  return {
+    id: 'note-1',
+    category: CompanionMemoryCategory.GOAL,
+    value: 'Goal: build strength.',
+    createdAt: new Date('2026-01-01'),
+    ...overrides,
+  };
+}
 
 describe('CompanionMemoryService', () => {
   let prisma: {
-    companionMemory: { findUnique: jest.Mock; upsert: jest.Mock; deleteMany: jest.Mock };
+    companionMemoryNote: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+      deleteMany: jest.Mock;
+    };
   };
   let service: CompanionMemoryService;
 
   beforeEach(() => {
     prisma = {
-      companionMemory: {
-        findUnique: jest.fn().mockResolvedValue(null),
-        upsert: jest.fn(),
-        deleteMany: jest.fn(),
+      companionMemoryNote: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue(undefined),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     service = new CompanionMemoryService(prisma as unknown as PrismaService);
   });
 
   describe('getNotes', () => {
-    it('returns an empty list when no memory row exists yet', async () => {
+    it('returns an empty list when nothing is remembered yet', async () => {
       await expect(service.getNotes('user-1')).resolves.toEqual([]);
     });
 
-    it('returns the stored notes', async () => {
-      prisma.companionMemory.findUnique.mockResolvedValue({ notes: ['a fact', 'another fact'] });
-      await expect(service.getNotes('user-1')).resolves.toEqual(['a fact', 'another fact']);
+    it('returns the stored structured notes, oldest first', async () => {
+      const notes = [note({ id: 'a' }), note({ id: 'b' })];
+      prisma.companionMemoryNote.findMany.mockResolvedValue(notes);
+      await expect(service.getNotes('user-1')).resolves.toEqual(notes);
+      expect(prisma.companionMemoryNote.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        orderBy: { createdAt: 'asc' },
+      });
     });
   });
 
   describe('remember', () => {
-    it('skips short, non-substantive input rather than storing conversational filler', async () => {
-      await service.remember('user-1', 'ok thanks');
-      expect(prisma.companionMemory.upsert).not.toHaveBeenCalled();
-    });
-
-    it('stores a substantive statement verbatim, trimmed', async () => {
-      await service.remember('user-1', '  Training for a half marathon in the spring.  ');
-      expect(prisma.companionMemory.upsert).toHaveBeenCalledWith({
-        where: { userId: 'user-1' },
-        update: { notes: ['Training for a half marathon in the spring.'] },
-        create: { userId: 'user-1', notes: ['Training for a half marathon in the spring.'] },
+    it('creates a new structured note for a fresh candidate', async () => {
+      await service.remember('user-1', {
+        category: CompanionMemoryCategory.EQUIPMENT,
+        value: 'Has access to: dumbbells.',
+      });
+      expect(prisma.companionMemoryNote.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          category: CompanionMemoryCategory.EQUIPMENT,
+          value: 'Has access to: dumbbells.',
+        },
       });
     });
 
-    it('skips an exact consecutive duplicate of the most recent note', async () => {
-      prisma.companionMemory.findUnique.mockResolvedValue({
-        notes: ['Training for a half marathon in the spring.'],
+    it('skips an exact duplicate of an already-known fact in the same category', async () => {
+      prisma.companionMemoryNote.findMany.mockResolvedValue([
+        note({ category: CompanionMemoryCategory.GOAL, value: 'Goal: build strength.' }),
+      ]);
+      await service.remember('user-1', {
+        category: CompanionMemoryCategory.GOAL,
+        value: 'Goal: build strength.',
       });
-      await service.remember('user-1', 'Training for a half marathon in the spring.');
-      expect(prisma.companionMemory.upsert).not.toHaveBeenCalled();
+      expect(prisma.companionMemoryNote.create).not.toHaveBeenCalled();
     });
 
-    it('caps the notes list, dropping the oldest entry once full', async () => {
-      const existing = Array.from({ length: 12 }, (_, i) => `note number ${i}`);
-      prisma.companionMemory.findUnique.mockResolvedValue({ notes: existing });
+    it('stores the same value under a different category (not deduped across categories)', async () => {
+      prisma.companionMemoryNote.findMany.mockResolvedValue([
+        note({ category: CompanionMemoryCategory.GOAL, value: 'Marathon' }),
+      ]);
+      await service.remember('user-1', {
+        category: CompanionMemoryCategory.WORKOUT_PREFERENCE,
+        value: 'Marathon',
+      });
+      expect(prisma.companionMemoryNote.create).toHaveBeenCalled();
+    });
 
-      await service.remember('user-1', 'a brand new remembered fact');
+    it('evicts the oldest note once the cap is exceeded', async () => {
+      const existing = Array.from({ length: 12 }, (_, i) =>
+        note({ id: `note-${i}`, value: `fact ${i}`, createdAt: new Date(2026, 0, i + 1) }),
+      );
+      prisma.companionMemoryNote.findMany.mockResolvedValue(existing);
 
-      const [[call]] = prisma.companionMemory.upsert.mock.calls;
-      expect(call.update.notes).toHaveLength(12);
-      expect(call.update.notes[0]).toBe('note number 1');
-      expect(call.update.notes.at(-1)).toBe('a brand new remembered fact');
+      await service.remember('user-1', {
+        category: CompanionMemoryCategory.GOAL,
+        value: 'a brand new fact',
+      });
+
+      expect(prisma.companionMemoryNote.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['note-0'] } },
+      });
+    });
+  });
+
+  describe('deleteNote', () => {
+    it('scopes deletion to both the note id and the caller', async () => {
+      await service.deleteNote('user-1', 'note-1');
+      expect(prisma.companionMemoryNote.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'note-1', userId: 'user-1' },
+      });
+    });
+
+    it('404s when the note does not exist or belongs to someone else', async () => {
+      prisma.companionMemoryNote.deleteMany.mockResolvedValue({ count: 0 });
+      await expect(service.deleteNote('user-1', 'not-mine')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
     });
   });
 
   describe('clear', () => {
     it('scopes the delete to the caller', async () => {
       await service.clear('user-1');
-      expect(prisma.companionMemory.deleteMany).toHaveBeenCalledWith({
+      expect(prisma.companionMemoryNote.deleteMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
       });
     });

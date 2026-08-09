@@ -20,6 +20,7 @@ import {
 import { AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
 import { CompanionMemoryService } from './companion-memory.service';
+import { MemoryExtractionService } from './memory-extraction.service';
 import { CoachingStyleDto, CompanionDto } from './assistant.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiReplyProvider } from './providers/ai-reply-provider.interface';
@@ -49,8 +50,12 @@ function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
   const memory = {
     getNotes: jest.fn().mockResolvedValue([]),
     remember: jest.fn().mockResolvedValue(undefined),
+    deleteNote: jest.fn().mockResolvedValue(undefined),
     clear: jest.fn().mockResolvedValue(undefined),
   } as unknown as CompanionMemoryService;
+  const extraction = {
+    extractCandidate: jest.fn().mockReturnValue(null),
+  } as unknown as MemoryExtractionService;
 
   const safety = new AssistantSafetyService();
   const capabilityService = {
@@ -60,7 +65,7 @@ function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
   } as unknown as CapabilityService;
   const entitlement = new AiEntitlementService(capabilityService);
 
-  const service = new AssistantService(provider, prisma, memory, safety, entitlement);
+  const service = new AssistantService(provider, prisma, memory, safety, entitlement, extraction);
   return { service, generateReply };
 }
 

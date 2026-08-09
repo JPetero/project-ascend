@@ -5,6 +5,8 @@ import { AssistantSafetyService } from './assistant-safety.service';
 import { AssistantSafetyCategory, AssistantSafetyDecisionType } from './assistant-safety.types';
 import { AssistantService } from './assistant.service';
 import { CompanionMemoryService } from './companion-memory.service';
+import { MemoryExtractionService } from './memory-extraction.service';
+import { CompanionMemoryCategory } from './memory-extraction.types';
 import { AiReplyProvider } from './providers/ai-reply-provider.interface';
 import { CoachingStyleDto, CompanionDto } from './assistant.types';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -12,11 +14,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 function buildService(options?: {
   provider?: Partial<AiReplyProvider>;
   aiMemoryEnabled?: boolean | null;
-  memoryNotes?: string[];
+  memoryNotes?: { id: string; category: CompanionMemoryCategory; value: string; createdAt: Date }[];
   remember?: jest.Mock;
   classify?: jest.Mock;
   normalizeOutput?: jest.Mock;
   checkAccess?: jest.Mock;
+  extractCandidate?: jest.Mock;
 }) {
   const generateReply = jest.fn().mockResolvedValue('Nice work today!');
   const provider: AiReplyProvider = {
@@ -37,8 +40,9 @@ function buildService(options?: {
   } as unknown as PrismaService;
   const getNotes = jest.fn().mockResolvedValue(options?.memoryNotes ?? []);
   const remember = options?.remember ?? jest.fn().mockResolvedValue(undefined);
+  const deleteNote = jest.fn().mockResolvedValue(undefined);
   const clear = jest.fn().mockResolvedValue(undefined);
-  const memory = { getNotes, remember, clear } as unknown as CompanionMemoryService;
+  const memory = { getNotes, remember, deleteNote, clear } as unknown as CompanionMemoryService;
 
   const classify =
     options?.classify ??
@@ -54,17 +58,22 @@ function buildService(options?: {
     jest.fn().mockResolvedValue({ allowed: true, feature: AiFeature.ADVANCED_CONVERSATION });
   const entitlement = { checkAccess } as unknown as AiEntitlementService;
 
-  const service = new AssistantService(provider, prisma, memory, safety, entitlement);
+  const extractCandidate = options?.extractCandidate ?? jest.fn().mockReturnValue(null);
+  const extraction = { extractCandidate } as unknown as MemoryExtractionService;
+
+  const service = new AssistantService(provider, prisma, memory, safety, entitlement, extraction);
   return {
     service,
     generateReply,
     prisma,
     getNotes,
     remember,
+    deleteNote,
     clear,
     classify,
     normalizeOutput,
     checkAccess,
+    extractCandidate,
   };
 }
 
@@ -85,9 +94,16 @@ describe('AssistantService', () => {
     expect(service.isConfigured).toBe(false);
   });
 
-  it('reply() passes the dto and current memory notes to the provider and returns its normalized result', async () => {
+  it('reply() passes the dto and current memory note values to the provider and returns its normalized result', async () => {
     const { service, generateReply, normalizeOutput } = buildService({
-      memoryNotes: ['Training for a 10k.'],
+      memoryNotes: [
+        {
+          id: 'n1',
+          category: CompanionMemoryCategory.GOAL,
+          value: 'Training for a 10k.',
+          createdAt: new Date(),
+        },
+      ],
     });
 
     const reply = await service.reply(dto, 'user-1');
@@ -97,48 +113,43 @@ describe('AssistantService', () => {
     expect(reply).toBe('Nice work today!');
   });
 
-  it('records the input as a new memory note after a successful reply when memory is enabled', async () => {
-    const { service, remember } = buildService({ aiMemoryEnabled: true });
-
-    await service.reply(dto, 'user-1');
-
-    expect(remember).toHaveBeenCalledWith('user-1', dto.input);
-  });
-
   it('never reads or writes memory when aiMemoryEnabled is false', async () => {
-    const { service, generateReply, getNotes, remember } = buildService({
+    const { service, generateReply, getNotes, remember, extractCandidate } = buildService({
       aiMemoryEnabled: false,
     });
 
     await service.reply(dto, 'user-1');
 
     expect(getNotes).not.toHaveBeenCalled();
+    expect(extractCandidate).not.toHaveBeenCalled();
     expect(remember).not.toHaveBeenCalled();
     expect(generateReply).toHaveBeenCalledWith(dto, [], undefined);
   });
 
-  it('treats a missing Preference row as memory enabled, matching the schema default', async () => {
+  it('treats a missing Preference row as memory DISABLED, matching the new opt-in schema default (Build Session 11 Part 4)', async () => {
     const { service, remember } = buildService({ aiMemoryEnabled: null });
 
     await service.reply(dto, 'user-1');
 
-    expect(remember).toHaveBeenCalledWith('user-1', dto.input);
-  });
-
-  it('a failed memory write never fails the reply itself', async () => {
-    const { service } = buildService({
-      aiMemoryEnabled: true,
-      remember: jest.fn().mockRejectedValue(new Error('db down')),
-    });
-
-    await expect(service.reply(dto, 'user-1')).resolves.toBe('Nice work today!');
+    expect(remember).not.toHaveBeenCalled();
   });
 
   it('getMemory() delegates to CompanionMemoryService.getNotes', async () => {
-    const { service, getNotes } = buildService({ memoryNotes: ['a fact'] });
+    const notes = [
+      { id: 'n1', category: CompanionMemoryCategory.GOAL, value: 'a fact', createdAt: new Date() },
+    ];
+    const { service, getNotes } = buildService({ memoryNotes: notes });
 
-    await expect(service.getMemory('user-1')).resolves.toEqual(['a fact']);
+    await expect(service.getMemory('user-1')).resolves.toEqual(notes);
     expect(getNotes).toHaveBeenCalledWith('user-1');
+  });
+
+  it('deleteMemory() delegates to CompanionMemoryService.deleteNote', async () => {
+    const { service, deleteNote } = buildService();
+
+    await service.deleteMemory('user-1', 'note-1');
+
+    expect(deleteNote).toHaveBeenCalledWith('user-1', 'note-1');
   });
 
   it('clearMemory() delegates to CompanionMemoryService.clear', async () => {
@@ -147,6 +158,50 @@ describe('AssistantService', () => {
     await service.clearMemory('user-1');
 
     expect(clear).toHaveBeenCalledWith('user-1');
+  });
+
+  describe('structured memory extraction (Build Session 11 Part 4)', () => {
+    it('saves the candidate MemoryExtractionService finds, when memory is enabled', async () => {
+      const candidate = { category: CompanionMemoryCategory.GOAL, value: 'Goal: build strength.' };
+      const extractCandidate = jest.fn().mockReturnValue(candidate);
+      const { service, remember } = buildService({ aiMemoryEnabled: true, extractCandidate });
+
+      await service.reply(dto, 'user-1');
+
+      expect(remember).toHaveBeenCalledWith('user-1', candidate);
+    });
+
+    it('never calls remember when the extractor finds nothing to save', async () => {
+      const { service, remember, extractCandidate } = buildService({ aiMemoryEnabled: true });
+
+      await service.reply(dto, 'user-1');
+
+      expect(extractCandidate).toHaveBeenCalledWith(dto.input, AssistantSafetyCategory.GENERAL);
+      expect(remember).not.toHaveBeenCalled();
+    });
+
+    it('passes the classified safety category to the extractor, not a hardcoded one', async () => {
+      const classify = jest.fn().mockReturnValue({
+        category: AssistantSafetyCategory.NUTRITION,
+        decision: AssistantSafetyDecisionType.ALLOW_PROVIDER,
+      });
+      const { service, extractCandidate } = buildService({ aiMemoryEnabled: true, classify });
+
+      await service.reply(dto, 'user-1');
+
+      expect(extractCandidate).toHaveBeenCalledWith(dto.input, AssistantSafetyCategory.NUTRITION);
+    });
+
+    it('a failed memory write never fails the reply itself', async () => {
+      const candidate = { category: CompanionMemoryCategory.GOAL, value: 'Goal: build strength.' };
+      const { service } = buildService({
+        aiMemoryEnabled: true,
+        extractCandidate: jest.fn().mockReturnValue(candidate),
+        remember: jest.fn().mockRejectedValue(new Error('db down')),
+      });
+
+      await expect(service.reply(dto, 'user-1')).resolves.toBe('Nice work today!');
+    });
   });
 
   // Build Session 11 Parts 1-2 — server-side entitlement + safety gate.
