@@ -1,6 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EvidenceQualityDto } from '../research.types';
+import { EvidenceCategoryDto, EvidenceQualityDto } from '../research.types';
 import { BraveSearchResearchProvider } from './brave-search-research-provider';
 
 function configServiceWith(braveSearchApiKey: string | undefined): ConfigService {
@@ -16,7 +16,7 @@ describe('BraveSearchResearchProvider', () => {
     const provider = new BraveSearchResearchProvider(configServiceWith(undefined));
 
     expect(provider.isConfigured).toBe(false);
-    await expect(provider.search('shin splints')).rejects.toBeInstanceOf(
+    await expect(provider.fetchDocuments('shin splints')).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
   });
@@ -29,7 +29,7 @@ describe('BraveSearchResearchProvider', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('keeps only results from trusted domain tiers, classifies each correctly, and never invents a source', async () => {
+  it('keeps only results from trusted evidence categories, classifies each correctly, and never invents a source', async () => {
     const provider = new BraveSearchResearchProvider(configServiceWith('test-key'));
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -49,6 +49,11 @@ describe('BraveSearchResearchProvider', () => {
               description: 'Symptoms, causes, and treatment.',
             },
             {
+              title: 'Exercise guidance for shin pain',
+              url: 'https://www.nhs.uk/conditions/shin-splints/',
+              description: 'NHS guidance on shin splints.',
+            },
+            {
               title: 'What are shin splints?',
               url: 'https://www.healthline.com/health/shin-splints',
               description: 'A general-audience explainer.',
@@ -63,20 +68,59 @@ describe('BraveSearchResearchProvider', () => {
       }),
     } as unknown as Response);
 
-    const answer = await provider.search('shin splints');
+    const documents = await provider.fetchDocuments('shin splints');
 
-    expect(answer.sources).toHaveLength(3);
-    expect(answer.sources.map((s) => s.evidenceQuality)).toEqual([
-      EvidenceQualityDto.HIGH,
-      EvidenceQualityDto.MODERATE,
-      EvidenceQualityDto.LOW,
+    expect(documents).toHaveLength(3);
+    expect(documents.map((d) => d.evidenceCategory)).toEqual([
+      EvidenceCategoryDto.PEER_REVIEWED,
+      EvidenceCategoryDto.HEALTH_SYSTEM,
+      EvidenceCategoryDto.GOVERNMENT,
     ]);
-    expect(answer.sources.every((s) => s.url.startsWith('https://'))).toBe(true);
-    expect(answer.sources[0].publicationYear).toBe(2022);
-    expect(answer.sources[1].publicationYear).toBeUndefined();
-    expect(answer.summary).toContain('3 verified sources');
-    // The untrusted blog is never surfaced, at any evidence tier.
-    expect(answer.sources.some((s) => s.url.includes('example-running-blog'))).toBe(false);
+    expect(documents.map((d) => d.evidenceQuality)).toEqual([
+      EvidenceQualityDto.HIGH,
+      EvidenceQualityDto.LOW,
+      EvidenceQualityDto.HIGH,
+    ]);
+    expect(documents.every((d) => d.url.startsWith('https://'))).toBe(true);
+    expect(documents.every((d) => d.sourceId === d.url)).toBe(true);
+    expect(documents[0].publisher).toBe('PubMed');
+    expect(documents[0].publicationYear).toBe(2022);
+    expect(documents[1].publicationYear).toBeUndefined();
+    // Neither the un-trusted health publisher nor the personal blog is
+    // ever surfaced, at any evidence tier.
+    expect(documents.some((d) => d.url.includes('healthline'))).toBe(false);
+    expect(documents.some((d) => d.url.includes('example-running-blog'))).toBe(false);
+  });
+
+  it('classifies international government and university TLDs, not just US-centric hosts', async () => {
+    const provider = new BraveSearchResearchProvider(configServiceWith('test-key'));
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        web: {
+          results: [
+            {
+              title: 'Physical activity guidelines',
+              url: 'https://www.health.gov.au/topics/physical-activity',
+              description: 'Australian government physical activity guidance.',
+            },
+            {
+              title: 'Sports medicine research',
+              url: 'https://www.some-university.ac.uk/research/sports-medicine',
+              description: 'A UK university research summary.',
+            },
+          ],
+        },
+      }),
+    } as unknown as Response);
+
+    const documents = await provider.fetchDocuments('physical activity guidelines');
+
+    expect(documents.map((d) => d.evidenceCategory)).toEqual([
+      EvidenceCategoryDto.GOVERNMENT,
+      EvidenceCategoryDto.UNIVERSITY,
+    ]);
   });
 
   it('honestly reports no verified sources rather than fabricating one when nothing trusted matches', async () => {
@@ -91,17 +135,16 @@ describe('BraveSearchResearchProvider', () => {
       }),
     } as unknown as Response);
 
-    const answer = await provider.search('made up query');
+    const documents = await provider.fetchDocuments('made up query');
 
-    expect(answer.sources).toEqual([]);
-    expect(answer.summary).toContain('No verified, source-backed information');
+    expect(documents).toEqual([]);
   });
 
   it('rejects with a service-unavailable error when Brave Search itself fails', async () => {
     const provider = new BraveSearchResearchProvider(configServiceWith('test-key'));
     jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 500 } as Response);
 
-    await expect(provider.search('shin splints')).rejects.toBeInstanceOf(
+    await expect(provider.fetchDocuments('shin splints')).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
   });

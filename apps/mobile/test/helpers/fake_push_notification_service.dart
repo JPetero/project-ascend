@@ -11,7 +11,8 @@ class FakePushNotificationService implements PushNotificationService {
   final String? _token;
   int requestPermissionCallCount = 0;
   final _tokenRefreshController = StreamController<String>.broadcast();
-  final _messageTapController = StreamController<PushNotificationMessage>.broadcast();
+  final _messageTapController =
+      StreamController<PushNotificationMessage>.broadcast();
   PushNotificationMessage? initialMessage;
 
   @override

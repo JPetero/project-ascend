@@ -3,55 +3,64 @@ import { AiEntitlementService } from '../../common/entitlements/ai-entitlement.s
 import { AiFeature } from '../../common/entitlements/ai-entitlement.types';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { ResearchController } from './research.controller';
-import { ResearchProvider } from './providers/research-provider.interface';
+import { ResearchSynthesisService } from './research-synthesis.service';
 
 function fakeUser(): AuthenticatedUser {
   return { id: 'user-1', email: 'ada@example.com' } as AuthenticatedUser;
 }
 
 describe('ResearchController', () => {
-  it('rejects a query from a user without RESEARCH access instead of ever calling the provider', async () => {
+  it('rejects a query from a user without RESEARCH access instead of ever calling the synthesis pipeline', async () => {
     const entitlement = {
       checkAccess: jest
         .fn()
         .mockResolvedValue({ allowed: false, feature: AiFeature.RESEARCH, reason: 'nope' }),
     } as unknown as AiEntitlementService;
-    const provider: ResearchProvider = { isConfigured: true, search: jest.fn() };
-    const controller = new ResearchController(entitlement, provider);
+    const synthesis = { answer: jest.fn() } as unknown as ResearchSynthesisService;
+    const controller = new ResearchController(entitlement, synthesis);
 
     await expect(controller.query(fakeUser(), { query: 'shin splints' })).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(provider.search).not.toHaveBeenCalled();
+    expect(synthesis.answer).not.toHaveBeenCalled();
   });
 
   it('checks access for AiFeature.RESEARCH specifically', async () => {
     const checkAccess = jest.fn().mockResolvedValue({ allowed: true, feature: AiFeature.RESEARCH });
     const entitlement = { checkAccess } as unknown as AiEntitlementService;
-    const provider: ResearchProvider = {
-      isConfigured: true,
-      search: jest.fn().mockResolvedValue({}),
-    };
-    const controller = new ResearchController(entitlement, provider);
+    const synthesis = {
+      answer: jest.fn().mockResolvedValue({}),
+    } as unknown as ResearchSynthesisService;
+    const controller = new ResearchController(entitlement, synthesis);
 
     await controller.query(fakeUser(), { query: 'shin splints' });
 
     expect(checkAccess).toHaveBeenCalledWith('user-1', AiFeature.RESEARCH);
   });
 
-  it('delegates to the provider once access is confirmed', async () => {
+  it('delegates to the synthesis pipeline once access is confirmed', async () => {
     const entitlement = {
       checkAccess: jest.fn().mockResolvedValue({ allowed: true, feature: AiFeature.RESEARCH }),
     } as unknown as AiEntitlementService;
-    const search = jest
-      .fn()
-      .mockResolvedValue({ summary: 'Found 1 verified source.', sources: [] });
-    const provider: ResearchProvider = { isConfigured: true, search };
-    const controller = new ResearchController(entitlement, provider);
+    const answer = jest.fn().mockResolvedValue({
+      query: 'shin splints',
+      conciseAnswer: 'Found 1 verified source.',
+      deeperExplanation: '',
+      citations: [],
+      sources: [],
+    });
+    const synthesis = { answer } as unknown as ResearchSynthesisService;
+    const controller = new ResearchController(entitlement, synthesis);
 
     const result = await controller.query(fakeUser(), { query: 'shin splints' });
 
-    expect(search).toHaveBeenCalledWith('shin splints');
-    expect(result).toEqual({ summary: 'Found 1 verified source.', sources: [] });
+    expect(answer).toHaveBeenCalledWith('shin splints');
+    expect(result).toEqual({
+      query: 'shin splints',
+      conciseAnswer: 'Found 1 verified source.',
+      deeperExplanation: '',
+      citations: [],
+      sources: [],
+    });
   });
 });

@@ -89,5 +89,14 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Research mode's "Open source" action (Build Session 12 Part
+             5) — url_launcher's canLaunchUrl/launchUrl need this
+             package-visibility entry on Android 11+ (API 30+), or every
+             https link resolves as "nothing can handle this" even with a
+             browser installed. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

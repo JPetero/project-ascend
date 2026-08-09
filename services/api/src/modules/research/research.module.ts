@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ResearchConfig } from '../../config/configuration';
 import { ResearchController } from './research.controller';
+import { ResearchQueryPlannerService } from './research-query-planner.service';
+import { ResearchSynthesisService } from './research-synthesis.service';
 import { BraveSearchResearchProvider } from './providers/brave-search-research-provider';
 import { NoopResearchProvider } from './providers/noop-research-provider';
 import { RESEARCH_PROVIDER } from './providers/research-provider.interface';
@@ -22,6 +24,8 @@ import { RESEARCH_PROVIDER } from './providers/research-provider.interface';
   providers: [
     NoopResearchProvider,
     BraveSearchResearchProvider,
+    ResearchQueryPlannerService,
+    ResearchSynthesisService,
     {
       provide: RESEARCH_PROVIDER,
       useFactory: (

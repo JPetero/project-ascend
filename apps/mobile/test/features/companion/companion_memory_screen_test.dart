@@ -50,9 +50,7 @@ void main() {
     expect(find.text('Clear all memory'), findsOneWidget);
   });
 
-  testWidgets('deleting a single note removes only that one', (
-    tester,
-  ) async {
+  testWidgets('deleting a single note removes only that one', (tester) async {
     final repository = FakeCompanionMemoryRepository(
       notes: [
         sampleMemoryNote(id: 'note-1', value: 'Training for a half marathon.'),

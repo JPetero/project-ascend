@@ -30,13 +30,18 @@ class _FakeAvailableResearchProvider extends AiProvider {
   Future<ResearchAnswer> researchReply({required String query}) async {
     return ResearchAnswer(
       isAvailable: true,
-      summary: 'Found 1 verified source for "$query".',
+      conciseAnswer: 'A meta-analysis of eccentric loading protocols.',
+      deeperExplanation:
+          'PubMed: A meta-analysis of eccentric loading protocols.',
       sources: const [
         ResearchSource(
-          label: 'Achilles tendinopathy: a systematic review',
+          sourceId: 'https://pubmed.ncbi.nlm.nih.gov/12345678/',
+          title: 'Achilles tendinopathy: a systematic review',
+          publisher: 'PubMed',
           evidenceQuality: EvidenceQuality.high,
+          evidenceCategory: EvidenceCategory.peerReviewed,
           url: 'https://pubmed.ncbi.nlm.nih.gov/12345678/',
-          snippet: 'A meta-analysis of eccentric loading protocols.',
+          excerpt: 'A meta-analysis of eccentric loading protocols.',
           publicationYear: 2022,
         ),
       ],
@@ -87,8 +92,9 @@ void main() {
   });
 
   testWidgets(
-    'a real, source-verified answer renders the summary and each source\'s '
-    'label, evidence tier, snippet, and URL verbatim',
+    'a real, source-verified answer renders the concise answer and each '
+    "source's title, publisher, evidence category/tier, and excerpt "
+    'verbatim, with an "Open source" action',
     (tester) async {
       final container = await createTestContainer(
         aiProvider: const _FakeAvailableResearchProvider(),
@@ -112,23 +118,18 @@ void main() {
 
       expect(find.text('Research mode is on its way'), findsNothing);
       expect(
-        find.text('Found 1 verified source for "achilles tendinopathy".'),
-        findsOneWidget,
-      );
-      expect(
-        find.text(
-          'Achilles tendinopathy: a systematic review · high evidence · 2022',
-        ),
-        findsOneWidget,
-      );
-      expect(
         find.text('A meta-analysis of eccentric loading protocols.'),
+        findsWidgets,
+      );
+      expect(
+        find.text('Achilles tendinopathy: a systematic review'),
         findsOneWidget,
       );
       expect(
-        find.text('https://pubmed.ncbi.nlm.nih.gov/12345678/'),
+        find.text('PubMed · Peer-reviewed research · high evidence · 2022'),
         findsOneWidget,
       );
+      expect(find.text('Open source'), findsOneWidget);
     },
   );
 }

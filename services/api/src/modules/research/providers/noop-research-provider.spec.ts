@@ -6,6 +6,6 @@ describe('NoopResearchProvider', () => {
     const provider = new NoopResearchProvider();
 
     expect(provider.isConfigured).toBe(false);
-    await expect(provider.search()).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(provider.fetchDocuments()).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

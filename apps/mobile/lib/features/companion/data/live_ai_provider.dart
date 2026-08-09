@@ -106,20 +106,13 @@ class LiveAiProvider extends AiProvider {
       final rawSources = body['sources'] as List<dynamic>? ?? const [];
       return ResearchAnswer(
         isAvailable: true,
-        summary: body['summary'] as String?,
+        conciseAnswer: body['conciseAnswer'] as String?,
+        deeperExplanation: body['deeperExplanation'] as String?,
+        uncertaintyNote: body['uncertaintyNote'] as String?,
+        contradictoryEvidenceNote: body['contradictoryEvidenceNote'] as String?,
         sources: rawSources
             .cast<Map<String, dynamic>>()
-            .map(
-              (source) => ResearchSource(
-                label: source['label'] as String,
-                evidenceQuality: EvidenceQuality.values.byName(
-                  (source['evidenceQuality'] as String).toLowerCase(),
-                ),
-                url: source['url'] as String?,
-                snippet: source['snippet'] as String?,
-                publicationYear: source['publicationYear'] as int?,
-              ),
-            )
+            .map(ResearchSource.fromJson)
             .toList(),
       );
     } catch (_) {
