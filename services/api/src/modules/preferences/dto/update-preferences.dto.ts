@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CoachingStyle, Companion, CompanionMode, ThemeMode } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdatePreferencesDto {
   @ApiPropertyOptional({ enum: Companion })
@@ -55,4 +55,13 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   conversationHistoryEnabled?: boolean;
+
+  // Build Session 12 Part 12-14 (Accessibility Center) — see
+  // Preference.textScale's schema comment.
+  @ApiPropertyOptional({ minimum: 0.85, maximum: 1.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.85)
+  @Max(1.5)
+  textScale?: number;
 }

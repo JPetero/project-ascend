@@ -255,6 +255,44 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AscendSpacing.sm),
+              // Build Session 12 Part 12-14 — discoverability hubs over
+              // controls that already existed scattered across the app.
+              AscendCard(
+                onTap: () => context.push(RoutePaths.privacyCenter),
+                child: const Row(
+                  children: [
+                    Icon(Icons.privacy_tip_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Privacy Center')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
+                onTap: () => context.push(RoutePaths.permissionCenter),
+                child: const Row(
+                  children: [
+                    Icon(Icons.security_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Permission Center')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
+              AscendCard(
+                onTap: () => context.push(RoutePaths.accessibilityCenter),
+                child: const Row(
+                  children: [
+                    Icon(Icons.accessibility_new_outlined),
+                    SizedBox(width: AscendSpacing.sm),
+                    Expanded(child: Text('Accessibility Center')),
+                    Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AscendSpacing.sm),
               _ShareAchievementLink(
                 streakDays: computeWorkoutStreak(
                   (historyAsync.value ?? const <WorkoutHistoryEntry>[])

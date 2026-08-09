@@ -492,6 +492,27 @@ export class CommunityService {
       .catch(ignoreNotFound);
   }
 
+  /**
+   * Every account the caller has blocked (Build Session 12 Part 12-14 —
+   * Privacy Center) — the read side that `block`/`unblock` above never
+   * had a way to surface, so a blocked user could previously only be
+   * unblocked by revisiting the exact profile screen used to block
+   * them.
+   */
+  async listBlocked(blockerId: string) {
+    const blocks = await this.prisma.communityBlock.findMany({
+      where: { blockerId },
+      orderBy: { createdAt: 'desc' },
+      include: { blocked: { include: { communityProfile: true } } },
+    });
+    return blocks.map((b) => ({
+      userId: b.blockedId,
+      displayName: b.blocked.communityProfile?.displayName ?? null,
+      avatarUrl: b.blocked.communityProfile?.avatarUrl ?? null,
+      blockedAt: b.createdAt,
+    }));
+  }
+
   // --- Reports --------------------------------------------------------
 
   async report(reporterId: string, dto: CreateCommunityReportDto) {
