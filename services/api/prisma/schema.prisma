@@ -208,6 +208,7 @@ model User {
   visionAnalysisSessions           VisionAnalysisSession[]
   pushDeviceTokens                 PushDeviceToken[]
   companionMemoryNotes             CompanionMemoryNote[]
+  aiUsageEvents                    AiUsageEvent[]
 
   @@index([status])
   @@map("users")
@@ -2949,6 +2950,32 @@ model CompanionMemoryNote {
 
   @@index([userId, createdAt])
   @@map("companion_memory_notes")
+}
+
+// Build Session 12 Part 6 — internal usage tracking for the AI provider
+// resilience/fair-use system (AiProviderCircuitBreaker/AiUsagePolicy).
+// Deliberately does not store `input`/`output` text — only character
+// counts — since this is an operational/cost record, not a copy of the
+// conversation (see companion-memory.service.ts and
+// AssistantService's own doc comment for where conversation content
+// itself is and isn't retained).
+model AiUsageEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  provider    String
+  model       String?
+  feature     String
+  tier        String
+  success     Boolean
+  latencyMs   Int
+  inputChars  Int
+  outputChars Int?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_usage_events")
 }
 
 // Build Session 10 Part 6 — private, user-owned results from a live

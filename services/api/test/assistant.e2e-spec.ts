@@ -81,6 +81,28 @@ describe('Assistant live reply — not configured (e2e)', () => {
       .send({ input: 'plan my workout', companion: 'ZEUS', style: 'BALANCED' })
       .expect(400);
   });
+
+  // Build Session 12 Part 7 — companion context minimization. The global
+  // ValidationPipe's forbidNonWhitelisted rejects any field the DTO
+  // doesn't declare, which is the endpoint-contract half of "the request
+  // body itself has no way to carry DM/gallery/support-ticket/location/
+  // wearable data" — AssistantService.reply also never queries the
+  // database for any of those (see assistant.service.spec.ts's
+  // "context minimization" describe block for that half).
+  it('rejects a request body carrying fields outside the declared DTO shape, instead of silently ignoring them', async () => {
+    await request(app.getHttpServer())
+      .post('/assistant/reply')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        input: 'plan my workout',
+        companion: 'ATLAS',
+        style: 'BALANCED',
+        directMessages: ['secret DM content'],
+        exactGpsRoute: [{ lat: 1, lng: 2 }],
+        healthConditions: ['asthma'],
+      })
+      .expect(400);
+  });
 });
 
 /**
