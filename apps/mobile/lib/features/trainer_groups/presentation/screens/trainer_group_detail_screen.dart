@@ -271,6 +271,7 @@ class _TrainerGroupDetailScreenState
             if (isOwner || isModerator)
               IconButton(
                 icon: const Icon(Icons.person_add_alt_1),
+                tooltip: 'Invite member',
                 onPressed: _inviteMember,
               ),
           ],

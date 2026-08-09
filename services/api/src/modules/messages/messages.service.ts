@@ -86,34 +86,71 @@ export class MessagesService {
       orderBy: { conversation: { lastMessageAt: 'desc' } },
     });
 
-    return Promise.all(
-      participations.map(async (participation) => {
-        const conversation = participation.conversation;
-        const otherParticipant = conversation.participants.find((p) => p.userId !== userId);
-        const unreadCount = await this.prisma.directMessage.count({
-          where: {
-            conversationId: conversation.id,
-            senderId: { not: userId },
-            deletedAt: null,
-            createdAt: { gt: participation.lastReadAt ?? new Date(0) },
-          },
-        });
-        return {
-          id: conversation.id,
-          status: conversation.status,
-          initiatorId: conversation.initiatorId,
-          otherUserId: otherParticipant?.userId ?? null,
-          lastMessage: conversation.messages[0] ?? null,
-          unreadCount,
-          isMuted: participation.mutedAt !== null,
-        };
-      }),
+    const unreadCounts = await this.unreadCountsByConversation(
+      userId,
+      participations.map((p) => ({ conversationId: p.conversationId, lastReadAt: p.lastReadAt })),
     );
+
+    return participations.map((participation) => {
+      const conversation = participation.conversation;
+      const otherParticipant = conversation.participants.find((p) => p.userId !== userId);
+      return {
+        id: conversation.id,
+        status: conversation.status,
+        initiatorId: conversation.initiatorId,
+        otherUserId: otherParticipant?.userId ?? null,
+        lastMessage: conversation.messages[0] ?? null,
+        unreadCount: unreadCounts.get(conversation.id) ?? 0,
+        isMuted: participation.mutedAt !== null,
+      };
+    });
   }
 
   async unreadCount(userId: string): Promise<number> {
-    const conversations = await this.listConversations(userId);
-    return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+    const participations = await this.prisma.directConversationParticipant.findMany({
+      where: { userId, deletedAt: null },
+      select: { conversationId: true, lastReadAt: true },
+    });
+    const unreadCounts = await this.unreadCountsByConversation(userId, participations);
+    let total = 0;
+    for (const count of unreadCounts.values()) total += count;
+    return total;
+  }
+
+  /**
+   * One query for every unread message across all of `userId`'s
+   * conversations, grouped in memory against each conversation's own
+   * `lastReadAt` cutoff — replaces what used to be one
+   * `directMessage.count` round trip per conversation (Build Session 10
+   * Parts 27-29), which made both listConversations and the
+   * unread-count badge endpoint scale linearly with conversation count.
+   */
+  private async unreadCountsByConversation(
+    userId: string,
+    participations: { conversationId: string; lastReadAt: Date | null }[],
+  ): Promise<Map<string, number>> {
+    if (participations.length === 0) return new Map();
+
+    const unreadMessages = await this.prisma.directMessage.findMany({
+      where: {
+        conversationId: { in: participations.map((p) => p.conversationId) },
+        senderId: { not: userId },
+        deletedAt: null,
+      },
+      select: { conversationId: true, createdAt: true },
+    });
+
+    const cutoffByConversation = new Map(
+      participations.map((p) => [p.conversationId, p.lastReadAt ?? new Date(0)]),
+    );
+    const counts = new Map<string, number>();
+    for (const message of unreadMessages) {
+      const cutoff = cutoffByConversation.get(message.conversationId);
+      if (cutoff !== undefined && message.createdAt > cutoff) {
+        counts.set(message.conversationId, (counts.get(message.conversationId) ?? 0) + 1);
+      }
+    }
+    return counts;
   }
 
   async getMessages(userId: string, conversationId: string, page = 1, limit = 30) {

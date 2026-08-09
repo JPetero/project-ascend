@@ -257,6 +257,24 @@ describe('Direct Messaging (e2e)', () => {
     expect(found.isMuted).toBe(true);
   });
 
+  it(
+    'rejects a non-boolean muted value instead of silently treating it as ' +
+      'false (Build Session 10 Parts 27-29)',
+    async () => {
+      const started = await request(app.getHttpServer())
+        .post('/messages/conversations')
+        .set(authA())
+        .send({ recipientId: userIdC })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/messages/conversations/${started.body.data.id}/mute`)
+        .set(authA())
+        .send({ muted: 'yes' })
+        .expect(400);
+    },
+  );
+
   it('a recipient can explicitly decline a pending message request', async () => {
     const started = await request(app.getHttpServer())
       .post('/messages/conversations')
