@@ -66,6 +66,13 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<!-- Remote push notifications (Build Session 11 Part 5) — lets iOS
+		     wake the app to process a background push. Actually receiving
+		     APNs pushes still requires the Push Notifications capability
+		     (an entitlements file) tied to a real Apple Developer Program
+		     team/App ID, which does not exist in this environment — see
+		     build-session-11.md. -->
+		<string>remote-notification</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

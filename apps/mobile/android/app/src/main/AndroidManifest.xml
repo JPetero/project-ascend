@@ -69,6 +69,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Remote push notifications (Build Session 11 Part 5) — tells FCM
+             which notification channel to post background/terminated
+             messages to, matching the "ascend_push" channel
+             FirebasePushNotificationService creates for foreground
+             messages. Harmless with no Firebase project configured: this
+             meta-data is only read once a push actually arrives. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="ascend_push" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

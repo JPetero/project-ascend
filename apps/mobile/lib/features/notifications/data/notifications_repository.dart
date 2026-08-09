@@ -54,4 +54,24 @@ class NotificationsRepository {
   Future<void> markAllRead() async {
     await _apiClient.post('/notifications/events/read-all', (_) => null);
   }
+
+  /// Registers (or refreshes) this device's remote push token (Build
+  /// Session 11 Part 5) against the backend's existing
+  /// `POST /notifications/device-tokens` endpoint.
+  Future<void> registerDeviceToken({
+    required String token,
+    String? platform,
+  }) async {
+    await _apiClient.post(
+      '/notifications/device-tokens',
+      (_) => null,
+      data: {'token': token, 'platform': ?platform},
+    );
+  }
+
+  /// Removes this device's token — called on logout/account switch so a
+  /// signed-out device stops receiving another account's push.
+  Future<void> unregisterDeviceToken(String token) async {
+    await _apiClient.delete('/notifications/device-tokens/$token', (_) => null);
+  }
 }

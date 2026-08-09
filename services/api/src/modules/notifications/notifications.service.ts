@@ -109,7 +109,7 @@ export class NotificationsService {
     const result =
       channel === NotificationChannel.LOCAL
         ? await this.localProvider.schedule(userId, { title, body, data })
-        : await this.pushProvider.send(userId, { title, body, data });
+        : await this.pushProvider.send(userId, { title, body, data, type });
 
     await this.prisma.notificationDelivery.create({
       data: {

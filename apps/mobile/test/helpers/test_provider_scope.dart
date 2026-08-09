@@ -33,6 +33,7 @@ import 'package:mobile/features/joint_workouts/presentation/providers/joint_work
 import 'package:mobile/features/messages/presentation/providers/conversations_controller.dart';
 import 'package:mobile/features/nutrition_library/presentation/providers/nutrition_library_controller.dart';
 import 'package:mobile/features/notifications/presentation/providers/notifications_controller.dart';
+import 'package:mobile/features/notifications/presentation/providers/push_registration_controller.dart';
 import 'package:mobile/features/notifications/presentation/providers/workout_reminder_controller.dart';
 import 'package:mobile/features/data_export/presentation/providers/data_export_controller.dart';
 import 'package:mobile/features/sports/presentation/providers/sports_matches_controller.dart';
@@ -71,6 +72,7 @@ import 'fake_messages_repository.dart';
 import 'fake_data_export_repository.dart';
 import 'fake_local_notification_scheduling_service.dart';
 import 'fake_notifications_repository.dart';
+import 'fake_push_notification_service.dart';
 import 'fake_speech_to_text_service.dart';
 import 'fake_text_to_speech_service.dart';
 import 'fake_nutrition_library_repository.dart';
@@ -141,6 +143,7 @@ Future<ProviderContainer> createTestContainer({
   FakePurchasesRepository? purchasesRepository,
   FakeGoogleAuthProvider? googleAuthProvider,
   FakeAppleAuthProvider? appleAuthProvider,
+  FakePushNotificationService? pushNotificationService,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -317,6 +320,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       purchasesRepositoryProvider.overrideWithValue(
         purchasesRepository ?? FakePurchasesRepository(),
+      ),
+      pushNotificationServiceProvider.overrideWithValue(
+        pushNotificationService ?? FakePushNotificationService(),
       ),
     ],
   );
