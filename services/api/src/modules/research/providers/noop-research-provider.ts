@@ -1,5 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { ResearchAnswerResult } from '../research.types';
+import { ResearchDocumentResult } from '../research.types';
 import { ResearchProvider } from './research-provider.interface';
 
 /**
@@ -14,7 +14,7 @@ export class NoopResearchProvider implements ResearchProvider {
     return false;
   }
 
-  async search(): Promise<ResearchAnswerResult> {
+  async fetchDocuments(): Promise<ResearchDocumentResult[]> {
     throw new ServiceUnavailableException(
       'Research mode is not configured. Set BRAVE_SEARCH_API_KEY to enable it.',
     );
