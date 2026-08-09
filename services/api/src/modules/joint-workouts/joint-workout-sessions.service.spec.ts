@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FriendsService } from '../friends/friends.service';
+import { TrainerGroupsService } from '../trainer-groups/trainer-groups.service';
 import { JointWorkoutSessionsService } from './joint-workout-sessions.service';
 
 function session(overrides: Partial<Record<string, unknown>> = {}) {
@@ -45,6 +46,7 @@ describe('JointWorkoutSessionsService', () => {
     $transaction: jest.Mock;
   };
   let friendsService: { areFriends: jest.Mock };
+  let trainerGroupsService: { resolveGroupSessionInvitees: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -67,12 +69,14 @@ describe('JointWorkoutSessionsService', () => {
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
     friendsService = { areFriends: jest.fn().mockResolvedValue(true) };
+    trainerGroupsService = { resolveGroupSessionInvitees: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         JointWorkoutSessionsService,
         { provide: PrismaService, useValue: prisma },
         { provide: FriendsService, useValue: friendsService },
+        { provide: TrainerGroupsService, useValue: trainerGroupsService },
       ],
     }).compile();
 
@@ -111,6 +115,58 @@ describe('JointWorkoutSessionsService', () => {
           }),
         }),
       );
+    });
+
+    it('rejects passing both inviteeIds and trainerGroupId', async () => {
+      await expect(
+        service.create('host-1', { inviteeIds: ['friend-1'], trainerGroupId: 'group-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(trainerGroupsService.resolveGroupSessionInvitees).not.toHaveBeenCalled();
+      expect(friendsService.areFriends).not.toHaveBeenCalled();
+    });
+
+    it(
+      'resolves invitees from the trainer group instead of the Friend graph when ' +
+        'trainerGroupId is set (Build Session 10 Part 24)',
+      async () => {
+        trainerGroupsService.resolveGroupSessionInvitees.mockResolvedValue([
+          'member-1',
+          'member-2',
+        ]);
+        prisma.jointWorkoutSession.create.mockResolvedValue(session());
+
+        await service.create('host-1', { trainerGroupId: 'group-1' });
+
+        expect(trainerGroupsService.resolveGroupSessionInvitees).toHaveBeenCalledWith(
+          'host-1',
+          'group-1',
+        );
+        expect(friendsService.areFriends).not.toHaveBeenCalled();
+        expect(prisma.jointWorkoutSession.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              participants: {
+                create: [
+                  expect.objectContaining({ userId: 'host-1', status: 'ACCEPTED' }),
+                  expect.objectContaining({ userId: 'member-1', status: 'INVITED' }),
+                  expect.objectContaining({ userId: 'member-2', status: 'INVITED' }),
+                ],
+              },
+            }),
+          }),
+        );
+      },
+    );
+
+    it('propagates a permission error from resolveGroupSessionInvitees', async () => {
+      trainerGroupsService.resolveGroupSessionInvitees.mockRejectedValue(
+        new ForbiddenException('nope'),
+      );
+
+      await expect(
+        service.create('host-1', { trainerGroupId: 'group-1' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.jointWorkoutSession.create).not.toHaveBeenCalled();
     });
   });
 

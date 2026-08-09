@@ -14,4 +14,14 @@ export class CreateJointWorkoutSessionDto {
   @ArrayMaxSize(8)
   @IsUUID('4', { each: true })
   inviteeIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Schedule this session for every member of a Trainer Group instead of hand-picking ' +
+      'friends — mutually exclusive with inviteeIds. Requires the group owner’s expanded ' +
+      '(Premium) tier; see TrainerGroupsService.resolveGroupSessionInvitees.',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  trainerGroupId?: string;
 }

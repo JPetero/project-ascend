@@ -42,6 +42,13 @@ class FakeJointWorkoutSessionsRepository
   final List<JointWorkoutSession> sessions;
   String? lastInvitedUserId;
   String? lastProgressExerciseName;
+  String? lastTrainerGroupId;
+
+  /// Test fixture standing in for the real backend's
+  /// TrainerGroupsService.resolveGroupSessionInvitees — seed a group's
+  /// resolved member ids here before calling [create] with a
+  /// `trainerGroupId`.
+  final Map<String, List<String>> groupMemberIdsByGroupId = {};
 
   @override
   Future<List<JointWorkoutSession>> listMine() async =>
@@ -51,7 +58,12 @@ class FakeJointWorkoutSessionsRepository
   Future<JointWorkoutSession> create({
     String? title,
     List<String>? inviteeIds,
+    String? trainerGroupId,
   }) async {
+    lastTrainerGroupId = trainerGroupId;
+    final resolvedInviteeIds = trainerGroupId != null
+        ? (groupMemberIdsByGroupId[trainerGroupId] ?? const <String>[])
+        : (inviteeIds ?? const <String>[]);
     final session = JointWorkoutSession(
       id: 'session-${sessions.length + 1}',
       hostId: 'user-1',
@@ -60,7 +72,7 @@ class FakeJointWorkoutSessionsRepository
       createdAt: DateTime.utc(2026, 8, 7),
       participants: [
         sampleParticipant(id: 'p-host', userId: 'user-1'),
-        for (final inviteeId in inviteeIds ?? const <String>[])
+        for (final inviteeId in resolvedInviteeIds)
           sampleParticipant(
             id: 'p-$inviteeId',
             userId: inviteeId,

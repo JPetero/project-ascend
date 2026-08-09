@@ -61,11 +61,13 @@ class JointWorkoutSessionsController
   Future<JointWorkoutSession?> create({
     String? title,
     List<String>? inviteeIds,
+    String? trainerGroupId,
   }) async {
     try {
       final session = await _repository.create(
         title: title,
         inviteeIds: inviteeIds,
+        trainerGroupId: trainerGroupId,
       );
       await refresh();
       return session;

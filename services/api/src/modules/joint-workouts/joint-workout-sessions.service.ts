@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FriendsService } from '../friends/friends.service';
+import { TrainerGroupsService } from '../trainer-groups/trainer-groups.service';
 import { CreateJointWorkoutSessionDto } from './dto/create-joint-workout-session.dto';
 import { SubmitJointWorkoutProgressDto } from './dto/submit-joint-workout-progress.dto';
 
@@ -23,21 +24,29 @@ import { SubmitJointWorkoutProgressDto } from './dto/submit-joint-workout-progre
  * Messages already use). Health data (weight, BMI, heart rate,
  * nutrition, wearable metrics) is never read or written here — only the
  * whitelisted fields on JointWorkoutSharedResult.
+ *
+ * [create]'s `trainerGroupId` path (Build Session 10 Part 24) is the one
+ * exception to the Friend requirement: TrainerGroupsService.
+ * resolveGroupSessionInvitees vets the caller's permission and the
+ * group's tier instead, since group membership is itself already an
+ * opt-in, vetted relationship.
  */
 @Injectable()
 export class JointWorkoutSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly friendsService: FriendsService,
+    private readonly trainerGroupsService: TrainerGroupsService,
   ) {}
 
   async create(hostId: string, dto: CreateJointWorkoutSessionDto) {
-    const inviteeIds = [...new Set(dto.inviteeIds ?? [])].filter((id) => id !== hostId);
-
-    for (const inviteeId of inviteeIds) {
-      const isFriend = await this.friendsService.areFriends(hostId, inviteeId);
-      if (!isFriend) throw new NotFoundException('User not found.');
+    if (dto.trainerGroupId && dto.inviteeIds?.length) {
+      throw new BadRequestException('Provide either inviteeIds or trainerGroupId, not both.');
     }
+
+    const inviteeIds = dto.trainerGroupId
+      ? await this.trainerGroupsService.resolveGroupSessionInvitees(hostId, dto.trainerGroupId)
+      : await this.resolveFriendInvitees(hostId, dto.inviteeIds);
 
     const session = await this.prisma.jointWorkoutSession.create({
       data: {
@@ -313,6 +322,15 @@ export class JointWorkoutSessionsService {
       where: { id: sessionId },
       data: { status: JointWorkoutSessionStatus.CANCELED, canceledAt: new Date() },
     });
+  }
+
+  private async resolveFriendInvitees(hostId: string, rawInviteeIds?: string[]): Promise<string[]> {
+    const inviteeIds = [...new Set(rawInviteeIds ?? [])].filter((id) => id !== hostId);
+    for (const inviteeId of inviteeIds) {
+      const isFriend = await this.friendsService.areFriends(hostId, inviteeId);
+      if (!isFriend) throw new NotFoundException('User not found.');
+    }
+    return inviteeIds;
   }
 
   private async requireSession(sessionId: string) {

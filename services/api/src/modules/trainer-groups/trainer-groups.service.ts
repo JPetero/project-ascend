@@ -36,8 +36,10 @@ import { ShareTrainerGroupPlanDto } from './dto/share-trainer-group-plan.dto';
  * group OWNER's AppCapability.TRAINER_GROUPS_EXPANDED — a group's
  * "premium-ness" follows its owner's tier, not the acting member's, so
  * a MODERATOR in a Premium owner's group still gets expanded limits
- * even though they hold no subscription of their own. Still not
- * implemented: scheduled sessions and assignments — see
+ * even though they hold no subscription of their own. Scheduled
+ * sessions (Build Session 10 Part 24) reuse the existing Joint Workout
+ * Sessions system via resolveGroupSessionInvitees below rather than
+ * duplicating it. Still not implemented: assignments — see
  * parking-lot.md.
  */
 @Injectable()
@@ -390,6 +392,41 @@ export class TrainerGroupsService {
       body: a.body,
       createdAt: a.createdAt,
     }));
+  }
+
+  // --- Scheduled sessions (Build Session 10 Part 24 — expanded tier) -----
+
+  /**
+   * Resolves a group into the userIds a scheduled session should invite
+   * — reused by JointWorkoutSessionsService rather than duplicating
+   * group-membership/permission logic there. Only the owner or a
+   * moderator may schedule for the whole group (same permission level
+   * as postAnnouncement), and — like announcements and distinct roles
+   * — this requires the owner's expanded (Premium) tier per Scenario
+   * 24's Premium-future list. Group members are not required to
+   * already be Friends of the caller: joining the group (accepting an
+   * invitation) is itself the vetted, opt-in relationship that
+   * JointWorkoutSessionsService normally gets from FriendsService, so
+   * that check is intentionally skipped for group-sourced invitees.
+   */
+  async resolveGroupSessionInvitees(userId: string, groupId: string): Promise<string[]> {
+    const group = await this.findGroup(groupId);
+    const role = await this.roleOf(userId, groupId);
+    if (role !== TrainerGroupMemberRole.OWNER && role !== TrainerGroupMemberRole.MODERATOR) {
+      throw new ForbiddenException(
+        'Only the group owner or a moderator can schedule a session for this group.',
+      );
+    }
+    if (!(await this.isExpanded(group.ownerId))) {
+      throw new ForbiddenException(
+        'Scheduling a session for the whole group requires the expanded (Premium) tier.',
+      );
+    }
+    const members = await this.prisma.trainerGroupMember.findMany({
+      where: { groupId },
+      select: { userId: true },
+    });
+    return members.map((m) => m.userId).filter((id) => id !== userId);
   }
 
   // --- Shared helpers -----------------------------------------------------

@@ -22,11 +22,16 @@ class JointWorkoutSessionsRepository {
   Future<JointWorkoutSession> create({
     String? title,
     List<String>? inviteeIds,
+    String? trainerGroupId,
   }) async {
     final envelope = await _apiClient.post(
       '/joint-workouts',
       (data) => data as Map<String, dynamic>,
-      data: {'title': ?title, 'inviteeIds': ?inviteeIds},
+      data: {
+        'title': ?title,
+        'inviteeIds': ?inviteeIds,
+        'trainerGroupId': ?trainerGroupId,
+      },
     );
     return JointWorkoutSession.fromJson(envelope.data!);
   }
