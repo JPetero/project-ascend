@@ -41,9 +41,9 @@ describe('validateEnv', () => {
       expect(() => validateEnv(baseConfig({ NODE_ENV: 'production' }))).toThrow(
         /CORS_ORIGIN unset or "\*"/,
       );
-      expect(() =>
-        validateEnv(baseConfig({ NODE_ENV: 'production', CORS_ORIGIN: '*' })),
-      ).toThrow(/CORS_ORIGIN unset or "\*"/);
+      expect(() => validateEnv(baseConfig({ NODE_ENV: 'production', CORS_ORIGIN: '*' }))).toThrow(
+        /CORS_ORIGIN unset or "\*"/,
+      );
     },
   );
 

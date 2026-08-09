@@ -88,10 +88,7 @@ export class AuthController {
   @ApiBearerAuth()
   @Delete('sessions/:familyId')
   @HttpCode(HttpStatus.OK)
-  async revokeSession(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('familyId') familyId: string,
-  ) {
+  async revokeSession(@CurrentUser() user: AuthenticatedUser, @Param('familyId') familyId: string) {
     await this.authService.revokeSession(user.id, familyId);
     return { revoked: true };
   }

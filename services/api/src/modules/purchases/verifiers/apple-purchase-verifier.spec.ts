@@ -50,9 +50,7 @@ describe('ApplePurchaseVerifier', () => {
                   expires_date_ms: '1702592000000',
                 },
               ],
-              pending_renewal_info: [
-                { original_transaction_id: 'txn-1', auto_renew_status: '1' },
-              ],
+              pending_renewal_info: [{ original_transaction_id: 'txn-1', auto_renew_status: '1' }],
             }),
         } as Response);
         const verifier = new ApplePurchaseVerifier(configService);

@@ -56,7 +56,7 @@ describe('BraveSearchResearchProvider', () => {
             {
               title: 'Some running blog post',
               url: 'https://www.example-running-blog.com/shin-splints',
-              description: 'One runner\'s personal experience.',
+              description: "One runner's personal experience.",
             },
           ],
         },
@@ -85,7 +85,9 @@ describe('BraveSearchResearchProvider', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        web: { results: [{ title: 'Random forum post', url: 'https://forum.example.com/thread/1' }] },
+        web: {
+          results: [{ title: 'Random forum post', url: 'https://forum.example.com/thread/1' }],
+        },
       }),
     } as unknown as Response);
 

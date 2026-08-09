@@ -26,7 +26,9 @@ describe('ResearchController', () => {
     const capabilityService = {
       hasCapabilityForUser: jest.fn().mockResolvedValue(true),
     } as unknown as CapabilityService;
-    const search = jest.fn().mockResolvedValue({ summary: 'Found 1 verified source.', sources: [] });
+    const search = jest
+      .fn()
+      .mockResolvedValue({ summary: 'Found 1 verified source.', sources: [] });
     const provider: ResearchProvider = { isConfigured: true, search };
     const controller = new ResearchController(capabilityService, provider);
 

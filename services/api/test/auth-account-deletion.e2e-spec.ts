@@ -140,13 +140,8 @@ describe('Account deletion (e2e)', () => {
     // friendship, the DM thread, and A's post exactly as before — a
     // future hard-delete sweep is a deliberately separate piece of work,
     // and this pins the current contract so that isn't changed silently.
-    const friendsOfB = await request(app.getHttpServer())
-      .get('/friends')
-      .set(authB())
-      .expect(200);
-    expect(
-      friendsOfB.body.data.some((f: { userId: string }) => f.userId === userIdA),
-    ).toBe(true);
+    const friendsOfB = await request(app.getHttpServer()).get('/friends').set(authB()).expect(200);
+    expect(friendsOfB.body.data.some((f: { userId: string }) => f.userId === userIdA)).toBe(true);
 
     const messagesForB = await request(app.getHttpServer())
       .get(`/messages/conversations/${conversation.body.data.id}/messages`)
