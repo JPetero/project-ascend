@@ -33,7 +33,7 @@ export class AnthropicReplyProvider implements AiReplyProvider {
     return Boolean(this.apiKey);
   }
 
-  async generateReply(dto: AssistantReplyDto): Promise<string> {
+  async generateReply(dto: AssistantReplyDto, memoryNotes?: string[]): Promise<string> {
     if (!this.apiKey) {
       throw new ServiceUnavailableException(
         'Live AI is not configured. Set ANTHROPIC_API_KEY to enable it.',
@@ -44,7 +44,7 @@ export class AnthropicReplyProvider implements AiReplyProvider {
     const message = await this.client.messages.create({
       model: this.model,
       max_tokens: MAX_REPLY_TOKENS,
-      system: buildSystemPrompt(dto.companion, dto.style),
+      system: buildSystemPrompt(dto.companion, dto.style, memoryNotes),
       messages: buildMessages(dto.history, dto.input),
     });
 

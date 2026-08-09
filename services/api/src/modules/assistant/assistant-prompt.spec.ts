@@ -25,6 +25,25 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt(CompanionDto.ATLAS, CoachingStyleDto.TOUGH);
     expect(prompt).toContain('Tough: energetic and challenging');
   });
+
+  it('appends memory notes verbatim when present', () => {
+    const prompt = buildSystemPrompt(CompanionDto.ATLAS, CoachingStyleDto.BALANCED, [
+      'Training for a half marathon in the spring.',
+      'Has a history of shin splints.',
+    ]);
+    expect(prompt).toContain('What you remember about this person');
+    expect(prompt).toContain('- Training for a half marathon in the spring.');
+    expect(prompt).toContain('- Has a history of shin splints.');
+  });
+
+  it('omits the memory section entirely when there are no notes', () => {
+    expect(buildSystemPrompt(CompanionDto.ATLAS, CoachingStyleDto.BALANCED)).not.toContain(
+      'What you remember',
+    );
+    expect(buildSystemPrompt(CompanionDto.ATLAS, CoachingStyleDto.BALANCED, [])).not.toContain(
+      'What you remember',
+    );
+  });
 });
 
 describe('buildMessages', () => {

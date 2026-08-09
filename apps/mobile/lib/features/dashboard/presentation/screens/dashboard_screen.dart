@@ -1169,6 +1169,13 @@ class _SettingsCard extends ConsumerWidget {
                 .read(preferencesControllerProvider.notifier)
                 .update({'aiMemoryEnabled': value}),
           ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Manage companion memory'),
+            subtitle: const Text('View or clear what Atlas and Nova remember.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(RoutePaths.companionMemory),
+          ),
         ],
       ),
     );

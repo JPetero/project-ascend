@@ -10,7 +10,9 @@ import { AssistantReplyDto } from '../dto/assistant-reply.dto';
  */
 export interface AiReplyProvider {
   readonly isConfigured: boolean;
-  generateReply(dto: AssistantReplyDto): Promise<string>;
+  // memoryNotes (Build Session 10 Part 15) is optional so every existing
+  // call site/test that omits it keeps working unchanged.
+  generateReply(dto: AssistantReplyDto, memoryNotes?: string[]): Promise<string>;
 }
 
 export const AI_REPLY_PROVIDER = Symbol('AI_REPLY_PROVIDER');

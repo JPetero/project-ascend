@@ -26,6 +26,9 @@ abstract final class RoutePaths {
   static const mealPrep = '/meal-prep';
   static const social = '/social';
   static const assistant = '/assistant';
+  // Companion memory — Build Session 10 Part 15, reachable from the
+  // "AI memory" toggle in dashboard_screen.dart.
+  static const companionMemory = '/assistant/memory';
   static const leaderboards = '/leaderboards';
   static const vision = '/vision';
 
