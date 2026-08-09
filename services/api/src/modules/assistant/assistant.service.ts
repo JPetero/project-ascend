@@ -1,5 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiEntitlementService } from '../../common/entitlements/ai-entitlement.service';
+import { AiFeature } from '../../common/entitlements/ai-entitlement.types';
+import { AssistantSafetyService } from './assistant-safety.service';
+import { AssistantSafetyDecisionType } from './assistant-safety.types';
 import { CompanionMemoryService } from './companion-memory.service';
 import { AssistantReplyDto } from './dto/assistant-reply.dto';
 import { AI_REPLY_PROVIDER, AiReplyProvider } from './providers/ai-reply-provider.interface';
@@ -19,6 +23,18 @@ import { AI_REPLY_PROVIDER, AiReplyProvider } from './providers/ai-reply-provide
  * true, `reply()` reads the user's `CompanionMemory` notes into the
  * system prompt, and — best-effort, never blocking or failing the
  * reply itself — records this turn's input as a new note afterward.
+ *
+ * Build Session 11 Parts 1-2 closed the two biggest gaps found in this
+ * pipeline: nothing server-side ever checked Premium entitlement before
+ * calling a paid provider, and nothing server-side ever classified input
+ * for safety — both were entirely a Flutter-client concern
+ * (`AiProvider.reply()`), which a direct HTTP call bypassed completely.
+ * `reply()` now runs every turn through `AssistantSafetyService` first:
+ * safety-critical content never reaches a provider and is answered
+ * deterministically regardless of subscription tier (essential safety
+ * can never be paywalled or rate-limited away). Only after that gate
+ * passes does `AiEntitlementService` decide whether this user's tier may
+ * actually spend a live-provider call.
  */
 @Injectable()
 export class AssistantService {
@@ -26,6 +42,8 @@ export class AssistantService {
     @Inject(AI_REPLY_PROVIDER) private readonly provider: AiReplyProvider,
     private readonly prisma: PrismaService,
     private readonly memory: CompanionMemoryService,
+    private readonly safety: AssistantSafetyService,
+    private readonly entitlement: AiEntitlementService,
   ) {}
 
   get isConfigured(): boolean {
@@ -33,10 +51,33 @@ export class AssistantService {
   }
 
   async reply(dto: AssistantReplyDto, userId: string): Promise<string> {
+    const safetyDecision = this.safety.classify(dto.input, dto.history);
+
+    // LOCAL_SAFE_RESPONSE / ESCALATE / REFUSE all mean "never reaches a
+    // provider" — available to every tier, never blocked, never costs
+    // provider budget.
+    if (safetyDecision.localResponse) {
+      return safetyDecision.localResponse;
+    }
+
+    const access = await this.entitlement.checkAccess(userId, AiFeature.ADVANCED_CONVERSATION);
+    if (!access.allowed) {
+      // Mirrors ResearchController's existing pattern: the mobile
+      // client's LiveAiProvider already falls back to the free local
+      // deterministic companion on any error, so a Free account gets a
+      // real reply, just not this one — and no provider is ever called.
+      throw new ForbiddenException(access.reason ?? 'This requires Ascend Premium.');
+    }
+
     const memoryEnabled = await this.isMemoryEnabled(userId);
     const notes = memoryEnabled ? await this.memory.getNotes(userId) : [];
 
-    const reply = await this.provider.generateReply(dto, notes);
+    const safetyContext =
+      safetyDecision.decision === AssistantSafetyDecisionType.ALLOW_WITH_SAFETY_CONTEXT
+        ? safetyDecision.safetyContext
+        : undefined;
+    const rawReply = await this.provider.generateReply(dto, notes, safetyContext);
+    const reply = this.safety.normalizeOutput(rawReply);
 
     if (memoryEnabled) {
       // Best-effort — a memory write failing must never take down a

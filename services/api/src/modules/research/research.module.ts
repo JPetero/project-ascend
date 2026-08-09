@@ -12,9 +12,9 @@ import { RESEARCH_PROVIDER } from './providers/research-provider.interface';
  * AssistantModule/NotificationsModule use. Defaults to the Noop adapter,
  * which is also what every test in this repository runs against, since
  * no Brave Search key exists in this environment.
- * `CapabilityService`/`PrismaService` come from the global
- * `EntitlementsModule`/`PrismaModule`, so nothing else needs importing
- * here.
+ * `AiEntitlementService`/`CapabilityService`/`PrismaService` come from
+ * the global `EntitlementsModule`/`PrismaModule`, so nothing else needs
+ * importing here.
  */
 @Module({
   imports: [ConfigModule],
