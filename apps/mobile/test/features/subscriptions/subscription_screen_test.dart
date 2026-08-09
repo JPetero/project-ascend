@@ -134,6 +134,91 @@ void main() {
     expect(find.text('Upgrade to Premium'), findsNothing);
   });
 
+  testWidgets('shows the store-stated renewal date for a Premium plan set to '
+      'auto-renew (Build Session 10 Part 26)', (tester) async {
+    final repository = FakeSubscriptionsRepository(
+      status: SubscriptionStatus(
+        tier: PlanTier.premium,
+        expiresAt: DateTime.utc(2026, 9, 9),
+        willRenew: true,
+      ),
+    );
+    final container = await createTestContainer(
+      signedIn: true,
+      subscriptionsRepository: repository,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SubscriptionScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    expect(find.textContaining('Renews'), findsOneWidget);
+    expect(find.textContaining('Expires'), findsNothing);
+  });
+
+  testWidgets(
+    'honestly shows an expiring, non-renewing Premium plan instead of a '
+    'static badge',
+    (tester) async {
+      final repository = FakeSubscriptionsRepository(
+        status: SubscriptionStatus(
+          tier: PlanTier.premium,
+          expiresAt: DateTime.utc(2026, 9, 9),
+          willRenew: false,
+        ),
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        subscriptionsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SubscriptionScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.textContaining('Expires'), findsOneWidget);
+      expect(find.textContaining('auto-renew is off'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'shows a neutral period-end date when willRenew is unknown, without '
+    'guessing either way',
+    (tester) async {
+      final repository = FakeSubscriptionsRepository(
+        status: SubscriptionStatus(
+          tier: PlanTier.premium,
+          expiresAt: DateTime.utc(2026, 9, 9),
+        ),
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        subscriptionsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SubscriptionScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.textContaining('Current period ends'), findsOneWidget);
+    },
+  );
+
   testWidgets('shows a pending eligibility application instead of the form', (
     tester,
   ) async {

@@ -29,12 +29,20 @@ export class SubscriptionsService {
   }
 
   async getMyStatus(userId: string) {
-    const [tier, eligibility] = await Promise.all([
+    const [tier, subscription, eligibility] = await Promise.all([
       this.capabilityService.getPlanTier(userId),
+      this.prisma.userSubscription.findUnique({ where: { userId } }),
       this.prisma.affordabilityEligibility.findUnique({ where: { userId } }),
     ]);
     return {
       tier,
+      // The store's own stated current-period expiration/auto-renew
+      // intent (Build Session 10 Part 26) — null for a FREE user, or
+      // for a PREMIUM row predating this field. No automatic downgrade
+      // happens when expiresAt passes; see UserSubscription's schema
+      // comment.
+      expiresAt: subscription?.expiresAt ?? null,
+      willRenew: subscription?.willRenew ?? null,
       eligibility: eligibility
         ? { program: eligibility.program, status: eligibility.status }
         : null,

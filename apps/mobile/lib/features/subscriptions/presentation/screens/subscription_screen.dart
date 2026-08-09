@@ -41,19 +41,32 @@ class SubscriptionScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(AscendSpacing.md),
                   children: [
                     AscendCard(
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.workspace_premium_outlined,
-                            color: Theme.of(context).colorScheme.primary,
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.workspace_premium_outlined,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: AscendSpacing.sm),
+                              Text(
+                                state.status?.tier == PlanTier.premium
+                                    ? 'Premium plan'
+                                    : 'Free plan',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: AscendSpacing.sm),
-                          Text(
-                            state.status?.tier == PlanTier.premium
-                                ? 'Premium plan'
-                                : 'Free plan',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          if (state.status?.tier == PlanTier.premium &&
+                              state.status?.expiresAt != null) ...[
+                            const SizedBox(height: AscendSpacing.xs),
+                            Text(
+                              _renewalLabel(state.status!),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -212,6 +225,41 @@ class _UpgradeSection extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The store's own stated renewal/expiration for the current period
+/// (Build Session 10 Part 26) — honest about what `willRenew` actually
+/// tells us: `true` means the store confirmed auto-renew is on,
+/// `false` means it's explicitly off (the plan will lapse), and `null`
+/// (an older row, or a store response that omitted it) gets a neutral
+/// "current period ends" phrasing rather than guessing either way.
+String _renewalLabel(SubscriptionStatus status) {
+  final date = _formatDate(status.expiresAt!);
+  return switch (status.willRenew) {
+    true => 'Renews $date',
+    false => 'Expires $date — auto-renew is off',
+    null => 'Current period ends $date',
+  };
+}
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+String _formatDate(DateTime date) {
+  final local = date.toLocal();
+  return '${_months[local.month - 1]} ${local.day}, ${local.year}';
 }
 
 String _programLabel(AffordabilityProgram program) {
