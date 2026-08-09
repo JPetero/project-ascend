@@ -1,6 +1,7 @@
 import '../../../core/networking/api_client.dart';
 import '../domain/community_post.dart';
 import '../domain/community_profile.dart';
+import '../domain/content_analytics.dart';
 
 /// Community profiles/posts/Reels/likes/comments/saves/follows/blocks/
 /// reports — thin client for services/api/src/modules/community. Every
@@ -105,6 +106,16 @@ class CommunityRepository {
     return items
         .map((p) => CommunityPost.fromJson(p as Map<String, dynamic>))
         .toList();
+  }
+
+  // --- Analytics ------------------------------------------------------
+
+  Future<ContentAnalytics> getMyContentAnalytics() async {
+    final envelope = await _apiClient.get(
+      '/community/analytics/me',
+      (data) => data as Map<String, dynamic>,
+    );
+    return ContentAnalytics.fromJson(envelope.data!);
   }
 
   Future<CommunityPost> getPost(String id) async {

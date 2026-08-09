@@ -285,6 +285,65 @@ export class CommunityService {
     return { data: hydrated, meta: paginationMeta(query, total) };
   }
 
+  // --- Analytics ----------------------------------------------------------
+
+  /**
+   * A creator's own content performance — real, already-persisted
+   * counts only (likes/comments/saves), aggregated across every post
+   * they've ever made regardless of its current visibility or
+   * moderation status, since it's for the author's own eyes. There is
+   * no view/impression/reach tracking anywhere in the schema for
+   * organic posts, so none is fabricated here — Ascend Promote's paid
+   * impressions/clicks (PromoteService.getMetrics) are a deliberately
+   * separate, per-campaign metric and are not blended in.
+   */
+  async getMyContentAnalytics(userId: string) {
+    const posts = await this.prisma.communityPost.findMany({
+      where: { authorId: userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (posts.length === 0) {
+      return { totalPosts: 0, totalLikes: 0, totalComments: 0, totalSaves: 0, posts: [] };
+    }
+
+    const postIds = posts.map((p) => p.id);
+    const [likeCounts, commentCounts, saveCounts] = await Promise.all([
+      this.prisma.communityLike.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
+      this.prisma.communityComment.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
+      this.prisma.communitySave.groupBy({ by: ['postId'], where: { postId: { in: postIds } }, _count: true }),
+    ]);
+    const likeCountByPost = new Map(likeCounts.map((c) => [c.postId, c._count]));
+    const commentCountByPost = new Map(commentCounts.map((c) => [c.postId, c._count]));
+    const saveCountByPost = new Map(saveCounts.map((c) => [c.postId, c._count]));
+
+    const breakdown = posts
+      .map((post) => {
+        const likeCount = likeCountByPost.get(post.id) ?? 0;
+        const commentCount = commentCountByPost.get(post.id) ?? 0;
+        const saveCount = saveCountByPost.get(post.id) ?? 0;
+        return {
+          id: post.id,
+          mediaType: post.mediaType,
+          caption: post.caption,
+          createdAt: post.createdAt,
+          likeCount,
+          commentCount,
+          saveCount,
+          engagementTotal: likeCount + commentCount + saveCount,
+        };
+      })
+      .sort((a, b) => b.engagementTotal - a.engagementTotal);
+
+    return {
+      totalPosts: posts.length,
+      totalLikes: breakdown.reduce((sum, p) => sum + p.likeCount, 0),
+      totalComments: breakdown.reduce((sum, p) => sum + p.commentCount, 0),
+      totalSaves: breakdown.reduce((sum, p) => sum + p.saveCount, 0),
+      posts: breakdown,
+    };
+  }
+
   // --- Comments ---------------------------------------------------------
 
   async addComment(userId: string, postId: string, dto: CreateCommunityCommentDto) {

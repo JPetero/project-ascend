@@ -35,7 +35,13 @@ class CommunityProfileScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Community profile'),
         actions: [
-          if (isOwnProfile)
+          if (isOwnProfile) ...[
+            IconButton(
+              icon: const Icon(Icons.insights_outlined),
+              tooltip: 'My content performance',
+              onPressed: () =>
+                  context.push(RoutePaths.communityContentAnalytics),
+            ),
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Edit profile',
@@ -43,8 +49,8 @@ class CommunityProfileScreen extends ConsumerWidget {
                 await context.push(RoutePaths.communityEditProfile);
                 profileController.load();
               },
-            )
-          else if (profileState.profile != null)
+            ),
+          ] else if (profileState.profile != null)
             PopupMenuButton<String>(
               onSelected: (action) => _handleAction(context, ref, action),
               itemBuilder: (context) => const [

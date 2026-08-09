@@ -1,6 +1,7 @@
 import 'package:mobile/features/community/data/community_repository.dart';
 import 'package:mobile/features/community/domain/community_post.dart';
 import 'package:mobile/features/community/domain/community_profile.dart';
+import 'package:mobile/features/community/domain/content_analytics.dart';
 
 CommunityPost samplePost({
   String id = 'post-1',
@@ -139,6 +140,35 @@ class FakeCommunityRepository implements CommunityRepository {
   @override
   Future<List<CommunityPost>> listSaved({int page = 1, int limit = 20}) async {
     return posts.where((p) => savedPostIds.contains(p.id)).toList();
+  }
+
+  @override
+  Future<ContentAnalytics> getMyContentAnalytics() async {
+    _maybeThrow();
+    final mine = posts.where((p) => p.isOwnPost).toList();
+    final breakdown =
+        mine
+            .map(
+              (p) => PostEngagement(
+                id: p.id,
+                mediaType: p.mediaType,
+                caption: p.caption,
+                createdAt: p.createdAt,
+                likeCount: p.likeCount,
+                commentCount: p.commentCount,
+                saveCount: p.saveCount,
+                engagementTotal: p.likeCount + p.commentCount + p.saveCount,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.engagementTotal.compareTo(a.engagementTotal));
+    return ContentAnalytics(
+      totalPosts: mine.length,
+      totalLikes: breakdown.fold(0, (sum, p) => sum + p.likeCount),
+      totalComments: breakdown.fold(0, (sum, p) => sum + p.commentCount),
+      totalSaves: breakdown.fold(0, (sum, p) => sum + p.saveCount),
+      posts: breakdown,
+    );
   }
 
   @override
