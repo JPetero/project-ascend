@@ -8,6 +8,7 @@ import { Test } from '@nestjs/testing';
 import {
   TrainerGroupInvitationStatus,
   TrainerGroupMemberRole,
+  TrainerGroupScheduledSessionRsvpStatus,
   WorkoutAssignmentStatus,
 } from '@prisma/client';
 import { CapabilityService } from '../../common/entitlements/capability.service';
@@ -83,6 +84,14 @@ describe('TrainerGroupsService', () => {
       findMany: jest.Mock;
       update: jest.Mock;
     };
+    trainerGroupScheduledSessionParticipant: {
+      findUnique: jest.Mock;
+      count: jest.Mock;
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+      groupBy: jest.Mock;
+      findMany: jest.Mock;
+    };
     communityBlock: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -131,6 +140,14 @@ describe('TrainerGroupsService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+      },
+      trainerGroupScheduledSessionParticipant: {
+        findUnique: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       communityBlock: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((arg: unknown) => {
@@ -1004,6 +1021,191 @@ describe('TrainerGroupsService', () => {
       await expect(service.cancelScheduledSession('owner-1', 'session-1')).rejects.toBeInstanceOf(
         ConflictException,
       );
+    });
+
+    it('notifies every other member that the session was canceled', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        id: 'session-1',
+        groupId: 'group-1',
+        createdById: 'owner-1',
+        canceledAt: null,
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findMany.mockResolvedValue([
+        { userId: 'member-a' },
+        { userId: 'member-b' },
+      ]);
+
+      await service.cancelScheduledSession('owner-1', 'session-1');
+
+      expect(prisma.trainerGroupScheduledSession.update).toHaveBeenCalledWith({
+        where: { id: 'session-1' },
+        data: { canceledAt: expect.any(Date) },
+      });
+      expect(notifications.notify).toHaveBeenCalledTimes(2);
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'member-a',
+        'GROUP_SESSION_CANCELED',
+        expect.any(String),
+        expect.any(String),
+        'session-1',
+      );
+    });
+  });
+
+  function scheduledSession(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: 'session-1',
+      groupId: 'group-1',
+      createdById: 'owner-1',
+      title: 'Squad session',
+      scheduledAt: new Date(Date.now() + 86_400_000),
+      durationMinutes: 45,
+      location: null,
+      videoLink: null,
+      description: null,
+      workoutPlanId: null,
+      canceledAt: null,
+      createdAt: new Date(),
+      workoutPlan: null,
+      ...overrides,
+    };
+  }
+
+  describe('rsvpToScheduledSession (Build Session 13 Part 3)', () => {
+    it('404s a session that does not exist', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.rsvpToScheduledSession(
+          'member-a',
+          'missing',
+          TrainerGroupScheduledSessionRsvpStatus.GOING,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects RSVPing to a canceled session', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({ canceledAt: new Date() }),
+      );
+
+      await expect(
+        service.rsvpToScheduledSession(
+          'member-a',
+          'session-1',
+          TrainerGroupScheduledSessionRsvpStatus.GOING,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects a non-member', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.rsvpToScheduledSession(
+          'stranger',
+          'session-1',
+          TrainerGroupScheduledSessionRsvpStatus.MAYBE,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.trainerGroupScheduledSessionParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('upserts the RSVP and returns updated counts', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+      prisma.trainerGroupScheduledSessionParticipant.groupBy.mockResolvedValue([
+        { sessionId: 'session-1', status: 'GOING', _count: { _all: 1 } },
+      ]);
+      prisma.trainerGroupScheduledSessionParticipant.findMany.mockResolvedValue([
+        { sessionId: 'session-1', status: 'GOING' },
+      ]);
+
+      const result = await service.rsvpToScheduledSession(
+        'member-a',
+        'session-1',
+        TrainerGroupScheduledSessionRsvpStatus.GOING,
+      );
+
+      expect(prisma.trainerGroupScheduledSessionParticipant.upsert).toHaveBeenCalledWith({
+        where: { sessionId_userId: { sessionId: 'session-1', userId: 'member-a' } },
+        create: { sessionId: 'session-1', userId: 'member-a', status: 'GOING' },
+        update: { status: 'GOING', respondedAt: expect.any(Date) },
+      });
+      expect(result.goingCount).toBe(1);
+      expect(result.viewerRsvpStatus).toBe('GOING');
+    });
+
+    it('rejects a new GOING RSVP once the session is at its participant limit', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+      prisma.trainerGroupScheduledSessionParticipant.findUnique.mockResolvedValue(null);
+      capabilityService.hasCapabilityForUser.mockResolvedValue(false);
+      prisma.trainerGroupScheduledSessionParticipant.count.mockResolvedValue(5); // TRAINER_GROUP_SESSION_GOING_LIMIT_FREE
+
+      await expect(
+        service.rsvpToScheduledSession(
+          'member-f',
+          'session-1',
+          TrainerGroupScheduledSessionRsvpStatus.GOING,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.trainerGroupScheduledSessionParticipant.upsert).not.toHaveBeenCalled();
+    });
+
+    it('allows re-confirming an existing GOING RSVP even at the limit', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+      prisma.trainerGroupScheduledSessionParticipant.findUnique.mockResolvedValue({
+        status: 'GOING',
+      });
+      capabilityService.hasCapabilityForUser.mockResolvedValue(false);
+      prisma.trainerGroupScheduledSessionParticipant.count.mockResolvedValue(5);
+
+      await service.rsvpToScheduledSession(
+        'member-a',
+        'session-1',
+        TrainerGroupScheduledSessionRsvpStatus.GOING,
+      );
+
+      expect(prisma.trainerGroupScheduledSessionParticipant.upsert).toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelMyRsvp', () => {
+    it('404s a session that does not exist', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(null);
+
+      await expect(service.cancelMyRsvp('member-a', 'missing')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('deletes the RSVP row and is idempotent when none exists', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+
+      const result = await service.cancelMyRsvp('member-a', 'session-1');
+
+      expect(prisma.trainerGroupScheduledSessionParticipant.deleteMany).toHaveBeenCalledWith({
+        where: { sessionId: 'session-1', userId: 'member-a' },
+      });
+      expect(result.viewerRsvpStatus).toBeNull();
     });
   });
 

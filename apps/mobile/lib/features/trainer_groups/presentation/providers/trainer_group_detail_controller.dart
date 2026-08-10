@@ -289,6 +289,45 @@ class TrainerGroupDetailController
       return false;
     }
   }
+
+  /// RSVP Going/Maybe/Decline (Build Session 13 Part 3) — replaces the one
+  /// session in place with the server's updated counts rather than
+  /// re-fetching the whole list.
+  Future<bool> rsvpToScheduledSession(
+    String sessionId,
+    ScheduledSessionRsvpStatus status,
+  ) async {
+    try {
+      final updated = await _repository.rsvpToScheduledSession(
+        sessionId,
+        status,
+      );
+      state = state.copyWith(scheduledSessions: _replaceSession(updated));
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> cancelMyRsvp(String sessionId) async {
+    try {
+      final updated = await _repository.cancelMyRsvp(sessionId);
+      state = state.copyWith(scheduledSessions: _replaceSession(updated));
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
+
+  List<TrainerGroupScheduledSession> _replaceSession(
+    TrainerGroupScheduledSession updated,
+  ) {
+    return state.scheduledSessions
+        .map((s) => s.id == updated.id ? updated : s)
+        .toList();
+  }
 }
 
 final trainerGroupDetailControllerProvider = StateNotifierProvider.family

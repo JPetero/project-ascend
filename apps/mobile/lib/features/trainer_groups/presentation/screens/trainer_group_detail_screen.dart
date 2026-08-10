@@ -469,6 +469,8 @@ class _TrainerGroupDetailScreenState
         viewerId: viewerId,
         onSchedule: _scheduleDatedSession,
         onCancel: controller.cancelScheduledSession,
+        onRsvp: controller.rsvpToScheduledSession,
+        onCancelRsvp: controller.cancelMyRsvp,
       ),
       if (canManage)
         _AssignmentsTab(
@@ -874,6 +876,8 @@ class _ScheduledSessionsTab extends StatelessWidget {
     required this.viewerId,
     required this.onSchedule,
     required this.onCancel,
+    required this.onRsvp,
+    required this.onCancelRsvp,
   });
 
   final List<TrainerGroupScheduledSession> sessions;
@@ -882,6 +886,12 @@ class _ScheduledSessionsTab extends StatelessWidget {
   final String? viewerId;
   final Future<void> Function() onSchedule;
   final Future<bool> Function(String sessionId) onCancel;
+  final Future<bool> Function(
+    String sessionId,
+    ScheduledSessionRsvpStatus status,
+  )
+  onRsvp;
+  final Future<bool> Function(String sessionId) onCancelRsvp;
 
   @override
   Widget build(BuildContext context) {
@@ -899,39 +909,102 @@ class _ScheduledSessionsTab extends StatelessWidget {
                   children: [
                     for (final session in sessions)
                       AscendCard(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    session.title ?? 'Group session',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleSmall,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        session.title ?? 'Group session',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleSmall,
+                                      ),
+                                      Text(
+                                        session.scheduledAt
+                                            .toLocal()
+                                            .toString(),
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                      if (session.workoutPlanName != null)
+                                        Text(
+                                          'Plan: ${session.workoutPlanName}',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      if (session.videoLink != null)
+                                        Text(
+                                          session.videoLink!,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      Text(
+                                        'Going ${session.goingCount} · '
+                                        'Maybe ${session.maybeCount} · '
+                                        'Can\'t go ${session.declinedCount}',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    session.scheduledAt.toLocal().toString(),
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                ),
+                                if (canManage ||
+                                    session.createdById == viewerId)
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 18),
+                                    tooltip: 'Cancel',
+                                    onPressed: () => onCancel(session.id),
                                   ),
-                                  if (session.videoLink != null)
-                                    Text(
-                                      session.videoLink!,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                ],
-                              ),
+                              ],
                             ),
-                            if (canManage || session.createdById == viewerId)
-                              IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: 'Cancel',
-                                onPressed: () => onCancel(session.id),
+                            if (session.status ==
+                                ScheduledSessionStatus.upcoming)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AscendSpacing.sm,
+                                ),
+                                child: Wrap(
+                                  spacing: AscendSpacing.sm,
+                                  children: [
+                                    for (final option in const [
+                                      (
+                                        ScheduledSessionRsvpStatus.going,
+                                        'Going',
+                                      ),
+                                      (
+                                        ScheduledSessionRsvpStatus.maybe,
+                                        'Maybe',
+                                      ),
+                                      (
+                                        ScheduledSessionRsvpStatus.declined,
+                                        "Can't go",
+                                      ),
+                                    ])
+                                      ChoiceChip(
+                                        label: Text(option.$2),
+                                        selected:
+                                            session.viewerRsvpStatus ==
+                                            option.$1,
+                                        onSelected: (selected) {
+                                          if (selected) {
+                                            onRsvp(session.id, option.$1);
+                                          } else {
+                                            onCancelRsvp(session.id);
+                                          }
+                                        },
+                                      ),
+                                  ],
+                                ),
                               ),
                           ],
                         ),

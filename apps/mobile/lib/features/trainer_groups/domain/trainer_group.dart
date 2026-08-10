@@ -273,10 +273,56 @@ class WorkoutAssignment {
   }
 }
 
+/// Building Session 13 Part 3's three real RSVP responses. Deliberately no
+/// "invited"/"joined"/"completed" values — every group member is an
+/// implicit invitee, and the server represents "hasn't responded" as no
+/// row at all rather than a fourth status; see the backend schema comment
+/// on TrainerGroupScheduledSessionParticipant.
+enum ScheduledSessionRsvpStatus { going, maybe, declined }
+
+extension ScheduledSessionRsvpStatusWire on ScheduledSessionRsvpStatus {
+  String get wireValue => switch (this) {
+    ScheduledSessionRsvpStatus.going => 'GOING',
+    ScheduledSessionRsvpStatus.maybe => 'MAYBE',
+    ScheduledSessionRsvpStatus.declined => 'DECLINED',
+  };
+}
+
+ScheduledSessionRsvpStatus? scheduledSessionRsvpStatusFromJson(String? value) {
+  switch (value) {
+    case 'GOING':
+      return ScheduledSessionRsvpStatus.going;
+    case 'MAYBE':
+      return ScheduledSessionRsvpStatus.maybe;
+    case 'DECLINED':
+      return ScheduledSessionRsvpStatus.declined;
+    default:
+      return null;
+  }
+}
+
+/// UPCOMING/COMPLETED/CANCELED — always server-derived, never a status the
+/// client sets; see the backend's deriveScheduledSessionStatus.
+enum ScheduledSessionStatus { upcoming, completed, canceled }
+
+ScheduledSessionStatus _scheduledSessionStatusFromJson(String? value) {
+  switch (value) {
+    case 'COMPLETED':
+      return ScheduledSessionStatus.completed;
+    case 'CANCELED':
+      return ScheduledSessionStatus.canceled;
+    default:
+      return ScheduledSessionStatus.upcoming;
+  }
+}
+
 /// A date/time-based booking for a group (Build Session 12 Part 10) —
 /// distinct from a Joint Workout Session's invite-now/start-now flow.
 /// Creating one requires the group owner's expanded (Premium) tier; any
-/// member can view the upcoming list.
+/// member can view the upcoming list. Build Session 13 Part 3 added RSVP
+/// counts/[viewerRsvpStatus] and an optional [workoutPlanId] preview —
+/// starting the real-time session at meeting time reuses the existing
+/// Joint Workout Session flow (`trainerGroupId`), not a new implementation.
 class TrainerGroupScheduledSession {
   const TrainerGroupScheduledSession({
     required this.id,
@@ -288,8 +334,15 @@ class TrainerGroupScheduledSession {
     this.location,
     this.videoLink,
     this.description,
+    this.workoutPlanId,
+    this.workoutPlanName,
     this.canceledAt,
     required this.createdAt,
+    this.status = ScheduledSessionStatus.upcoming,
+    this.goingCount = 0,
+    this.maybeCount = 0,
+    this.declinedCount = 0,
+    this.viewerRsvpStatus,
   });
 
   final String id;
@@ -301,8 +354,15 @@ class TrainerGroupScheduledSession {
   final String? location;
   final String? videoLink;
   final String? description;
+  final String? workoutPlanId;
+  final String? workoutPlanName;
   final DateTime? canceledAt;
   final DateTime createdAt;
+  final ScheduledSessionStatus status;
+  final int goingCount;
+  final int maybeCount;
+  final int declinedCount;
+  final ScheduledSessionRsvpStatus? viewerRsvpStatus;
 
   factory TrainerGroupScheduledSession.fromJson(Map<String, dynamic> json) {
     return TrainerGroupScheduledSession(
@@ -315,10 +375,19 @@ class TrainerGroupScheduledSession {
       location: json['location'] as String?,
       videoLink: json['videoLink'] as String?,
       description: json['description'] as String?,
+      workoutPlanId: json['workoutPlanId'] as String?,
+      workoutPlanName: json['workoutPlanName'] as String?,
       canceledAt: json['canceledAt'] != null
           ? DateTime.parse(json['canceledAt'] as String)
           : null,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      status: _scheduledSessionStatusFromJson(json['status'] as String?),
+      goingCount: json['goingCount'] as int? ?? 0,
+      maybeCount: json['maybeCount'] as int? ?? 0,
+      declinedCount: json['declinedCount'] as int? ?? 0,
+      viewerRsvpStatus: scheduledSessionRsvpStatusFromJson(
+        json['viewerRsvpStatus'] as String?,
+      ),
     );
   }
 }

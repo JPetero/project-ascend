@@ -17,3 +17,15 @@ export const TRAINER_GROUP_MEMBER_LIMIT_FREE = 5;
  */
 export const TRAINER_GROUP_OWNED_LIMIT_PREMIUM = 5;
 export const TRAINER_GROUP_MEMBER_LIMIT_PREMIUM = 25;
+
+/**
+ * Build Session 13 Part 3 — the cap on confirmed "Going" RSVPs for one
+ * scheduled session. Currently set equal to the group's own member
+ * limit (a session's audience can never exceed its group's roster
+ * anyway) rather than a separate, smaller number — if a session ever
+ * needs a tighter cap than "the whole group can attend" (e.g. a
+ * capacity-limited in-person slot), that becomes a per-session field on
+ * top of this default, not a change to these constants.
+ */
+export const TRAINER_GROUP_SESSION_GOING_LIMIT_FREE = TRAINER_GROUP_MEMBER_LIMIT_FREE;
+export const TRAINER_GROUP_SESSION_GOING_LIMIT_PREMIUM = TRAINER_GROUP_MEMBER_LIMIT_PREMIUM;
