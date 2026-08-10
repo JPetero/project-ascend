@@ -42,6 +42,13 @@ describe('AdminService', () => {
       upsert: jest.Mock;
       deleteMany: jest.Mock;
     };
+    trainerVerificationApplication: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    communityProfile: { updateMany: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -79,6 +86,13 @@ describe('AdminService', () => {
         upsert: jest.fn(),
         deleteMany: jest.fn(),
       },
+      trainerVerificationApplication: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      communityProfile: { updateMany: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
     auditService = { record: jest.fn() };
@@ -192,6 +206,81 @@ describe('AdminService', () => {
         expect.any(String),
         expect.any(String),
       );
+    });
+  });
+
+  describe('decideTrainerVerification', () => {
+    it('rejects a decision of PENDING', async () => {
+      await expect(
+        service.decideTrainerVerification('user-1', { status: 'PENDING' as never }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('404s when the user never applied', async () => {
+      prisma.trainerVerificationApplication.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.decideTrainerVerification('user-1', { status: 'APPROVED' as never }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('sets CommunityProfile.verifiedTrainer true on APPROVED', async () => {
+      prisma.trainerVerificationApplication.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.trainerVerificationApplication.update.mockResolvedValue({ userId: 'user-1' });
+      prisma.communityProfile.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.decideTrainerVerification('user-1', { status: 'APPROVED' as never });
+
+      expect(prisma.communityProfile.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: { verifiedTrainer: true },
+      });
+    });
+
+    it('sets CommunityProfile.verifiedTrainer false on REJECTED', async () => {
+      prisma.trainerVerificationApplication.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.trainerVerificationApplication.update.mockResolvedValue({ userId: 'user-1' });
+      prisma.communityProfile.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.decideTrainerVerification('user-1', { status: 'REJECTED' as never });
+
+      expect(prisma.communityProfile.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+        data: { verifiedTrainer: false },
+      });
+    });
+
+    it('notifies the applicant of the decision', async () => {
+      prisma.trainerVerificationApplication.findUnique.mockResolvedValue({ userId: 'user-1' });
+      prisma.trainerVerificationApplication.update.mockResolvedValue({ userId: 'user-1' });
+      prisma.communityProfile.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.decideTrainerVerification('user-1', { status: 'APPROVED' as never });
+
+      expect(notifications.notify).toHaveBeenCalledWith(
+        'user-1',
+        'TRAINER_VERIFICATION_UPDATE',
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+  });
+
+  describe('listTrainerVerificationApplications', () => {
+    it('filters by status and paginates', async () => {
+      prisma.trainerVerificationApplication.findMany.mockResolvedValue([{ userId: 'user-1' }]);
+      prisma.trainerVerificationApplication.count.mockResolvedValue(1);
+
+      const result = await service.listTrainerVerificationApplications({
+        status: 'PENDING' as never,
+        page: 1,
+        limit: 20,
+      } as never);
+
+      expect(prisma.trainerVerificationApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { status: 'PENDING' } }),
+      );
+      expect(result.data).toEqual([{ userId: 'user-1' }]);
     });
   });
 

@@ -57,11 +57,16 @@ export class CompanionConversationsService {
         })
       ).id;
 
-    await this.prisma.companionChatMessage.createMany({
-      data: [
-        { conversationId, isFromUser: true, text: params.userText },
-        { conversationId, isFromUser: false, text: params.assistantText },
-      ],
+    // Sequential creates, not createMany — a single createMany issues one
+    // INSERT whose default createdAt (CURRENT_TIMESTAMP) is evaluated
+    // once for every row, so the user/assistant messages would tie and
+    // `list()`'s "most recent message" ordering below would become
+    // nondeterministic between them.
+    await this.prisma.companionChatMessage.create({
+      data: { conversationId, isFromUser: true, text: params.userText },
+    });
+    await this.prisma.companionChatMessage.create({
+      data: { conversationId, isFromUser: false, text: params.assistantText },
     });
     await this.prisma.companionConversation.update({
       where: { id: conversationId },

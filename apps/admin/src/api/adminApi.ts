@@ -70,7 +70,9 @@ export type AdminPermission =
   | 'REVIEW_ELIGIBILITY'
   | 'MANAGE_SUPPORT'
   | 'REVIEW_PROMOTIONS'
-  | 'MANAGE_ADMINS';
+  | 'MANAGE_ADMINS'
+  | 'MANAGE_PLATFORM'
+  | 'REVIEW_TRAINER_VERIFICATION';
 
 export const ADMIN_PERMISSIONS: AdminPermission[] = [
   'MODERATE_COMMUNITY',
@@ -78,7 +80,68 @@ export const ADMIN_PERMISSIONS: AdminPermission[] = [
   'MANAGE_SUPPORT',
   'REVIEW_PROMOTIONS',
   'MANAGE_ADMINS',
+  'MANAGE_PLATFORM',
+  'REVIEW_TRAINER_VERIFICATION',
 ];
+
+// Feature Flags platform — Build Session 12 Part 15-17. Had no admin UI
+// until Build Session 12 Part 25-26 wired this up.
+export interface FeatureFlag {
+  id: string;
+  key: string;
+  description: string | null;
+  enabled: boolean;
+  rolloutPercentage: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertFeatureFlagInput {
+  description?: string;
+  enabled?: boolean;
+  rolloutPercentage?: number;
+}
+
+// Release Readiness diagnostic — Build Session 12 Part 15-17. Never
+// includes a raw secret/key value — only configured/not-configured
+// booleans; see services/api's ReleaseReadinessService doc comment.
+export interface ReleaseReadiness {
+  environment: string;
+  security: {
+    usingDevJwtSecrets: boolean;
+    corsWildcard: boolean;
+    productionSafe: boolean;
+  };
+  integrations: {
+    mediaStorage: boolean;
+    email: boolean;
+    googleSignIn: boolean;
+    appleSignIn: boolean;
+    aiProvider: boolean;
+    research: boolean;
+    remotePush: boolean;
+    appleIap: boolean;
+    googleIap: boolean;
+  };
+  featureFlags: {
+    total: number;
+    enabled: number;
+  };
+}
+
+// Trainer verification — Build Session 12 Part 25-26. Distinct from
+// CommunityProfile.isTrainer (self-declared badge, no review); this is
+// the actual application + admin review flow that never existed before.
+export type TrainerVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface TrainerVerificationApplication {
+  id: string;
+  userId: string;
+  credentials: string;
+  status: TrainerVerificationStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+}
 
 export interface AdminAccount {
   id: string;
@@ -136,5 +199,24 @@ export const adminApi = {
   revokePermission: (userId: string, permission: AdminPermission) =>
     apiClient.delete<{ userId: string; permissions: AdminPermission[] }>(
       `/admin/admins/${userId}/permissions/${permission}`,
+    ),
+
+  listFeatureFlags: () => apiClient.get<FeatureFlag[]>('/admin/feature-flags'),
+  upsertFeatureFlag: (key: string, input: UpsertFeatureFlagInput) =>
+    apiClient.post<FeatureFlag>(`/admin/feature-flags/${key}`, input),
+  deleteFeatureFlag: (key: string) =>
+    apiClient.delete<void>(`/admin/feature-flags/${key}`),
+
+  getReleaseReadiness: () => apiClient.get<ReleaseReadiness>('/admin/release-readiness'),
+
+  listTrainerVerificationApplications: (status?: TrainerVerificationStatus) =>
+    apiClient.get<Page<TrainerVerificationApplication>>(
+      '/admin/trainer-verification-applications',
+      { status },
+    ),
+  decideTrainerVerification: (userId: string, status: TrainerVerificationStatus) =>
+    apiClient.patch<TrainerVerificationApplication>(
+      `/admin/trainer-verification-applications/${userId}`,
+      { status },
     ),
 };

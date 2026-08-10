@@ -125,13 +125,13 @@ void main() {
       );
     });
 
-    test('trainerVerificationUpdate has no deep link yet', () {
+    test('trainerVerificationUpdate opens the trainer verification screen', () {
       expect(
         deepLinkPathFor(
           NotificationEventType.trainerVerificationUpdate,
           'anything',
         ),
-        isNull,
+        '/social/trainer-verification',
       );
     });
 

@@ -42,6 +42,7 @@ class CommunityProfile {
     this.avatarUrl,
     this.coverUrl,
     this.isTrainer = false,
+    this.verifiedTrainer = false,
     this.visibility = CommunityProfileVisibility.public_,
     this.postCount,
     this.followerCount,
@@ -55,6 +56,10 @@ class CommunityProfile {
   final String? avatarUrl;
   final String? coverUrl;
   final bool isTrainer;
+  // Set only by an admin approving a TrainerVerificationApplication (Build
+  // Session 12 Part 25-26) — never self-service, never derived from
+  // [isTrainer]. See services/api's CommunityProfile.verifiedTrainer.
+  final bool verifiedTrainer;
   final CommunityProfileVisibility visibility;
   final int? postCount;
   final int? followerCount;
@@ -69,6 +74,7 @@ class CommunityProfile {
       avatarUrl: json['avatarUrl'] as String?,
       coverUrl: json['coverUrl'] as String?,
       isTrainer: json['isTrainer'] as bool? ?? false,
+      verifiedTrainer: json['verifiedTrainer'] as bool? ?? false,
       visibility: json['visibility'] != null
           ? communityProfileVisibilityFromJson(json['visibility'] as String)
           : CommunityProfileVisibility.public_,

@@ -12,6 +12,13 @@ const NAV_ITEMS: { to: string; label: string; permission: AdminPermission }[] = 
   { to: '/eligibility', label: 'Affordability eligibility', permission: 'REVIEW_ELIGIBILITY' },
   { to: '/promoted-campaigns', label: 'Promoted campaigns', permission: 'REVIEW_PROMOTIONS' },
   { to: '/admins', label: 'Admins', permission: 'MANAGE_ADMINS' },
+  {
+    to: '/trainer-verification',
+    label: 'Trainer verification',
+    permission: 'REVIEW_TRAINER_VERIFICATION',
+  },
+  { to: '/feature-flags', label: 'Feature flags', permission: 'MANAGE_PLATFORM' },
+  { to: '/release-readiness', label: 'Release readiness', permission: 'MANAGE_PLATFORM' },
 ];
 
 export function Layout() {

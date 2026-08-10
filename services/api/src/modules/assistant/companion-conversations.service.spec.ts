@@ -14,7 +14,7 @@ function buildService() {
       findMany: jest.fn(),
     },
     companionChatMessage: {
-      createMany: jest.fn().mockResolvedValue(undefined),
+      create: jest.fn().mockResolvedValue(undefined),
     },
   } as unknown as PrismaService;
   return { service: new CompanionConversationsService(prisma), prisma };
@@ -36,11 +36,11 @@ describe('CompanionConversationsService', () => {
       expect(prisma.companionConversation.create).toHaveBeenCalledWith({
         data: { userId: 'user-1', companion: CompanionDto.ATLAS },
       });
-      expect(prisma.companionChatMessage.createMany).toHaveBeenCalledWith({
-        data: [
-          { conversationId: 'convo-1', isFromUser: true, text: 'hello' },
-          { conversationId: 'convo-1', isFromUser: false, text: 'hi there' },
-        ],
+      expect(prisma.companionChatMessage.create).toHaveBeenNthCalledWith(1, {
+        data: { conversationId: 'convo-1', isFromUser: true, text: 'hello' },
+      });
+      expect(prisma.companionChatMessage.create).toHaveBeenNthCalledWith(2, {
+        data: { conversationId: 'convo-1', isFromUser: false, text: 'hi there' },
       });
     });
 

@@ -473,11 +473,15 @@ describe('Assistant conversation history (e2e)', () => {
     const conversation = await prisma.companionConversation.create({
       data: { userId, companion: 'ATLAS' },
     });
-    await prisma.companionChatMessage.createMany({
-      data: [
-        { conversationId: conversation.id, isFromUser: true, text: 'Plan my week' },
-        { conversationId: conversation.id, isFromUser: false, text: 'Sure — how many days?' },
-      ],
+    // Sequential creates, not createMany — see companion-conversations
+    // .service.ts's appendTurn comment: createMany ties createdAt across
+    // rows in one INSERT, which made this seed's "last message" order
+    // nondeterministic.
+    await prisma.companionChatMessage.create({
+      data: { conversationId: conversation.id, isFromUser: true, text: 'Plan my week' },
+    });
+    await prisma.companionChatMessage.create({
+      data: { conversationId: conversation.id, isFromUser: false, text: 'Sure — how many days?' },
     });
 
     const listed = await request(app.getHttpServer())

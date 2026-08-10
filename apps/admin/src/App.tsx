@@ -6,10 +6,13 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AdminsPage } from './pages/AdminsPage';
 import { CommunityReportsPage } from './pages/CommunityReportsPage';
 import { EligibilityPage } from './pages/EligibilityPage';
+import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
 import { LoginPage } from './pages/LoginPage';
 import { NotAuthorizedPage } from './pages/NotAuthorizedPage';
 import { PromotedCampaignsPage } from './pages/PromotedCampaignsPage';
+import { ReleaseReadinessPage } from './pages/ReleaseReadinessPage';
 import { SupportTicketsPage } from './pages/SupportTicketsPage';
+import { TrainerVerificationPage } from './pages/TrainerVerificationPage';
 
 function RequireAdmin({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
@@ -82,6 +85,30 @@ function AppRoutes() {
           element={
             <RequirePermission permission="MANAGE_ADMINS">
               <AdminsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/trainer-verification"
+          element={
+            <RequirePermission permission="REVIEW_TRAINER_VERIFICATION">
+              <TrainerVerificationPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/feature-flags"
+          element={
+            <RequirePermission permission="MANAGE_PLATFORM">
+              <FeatureFlagsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/release-readiness"
+          element={
+            <RequirePermission permission="MANAGE_PLATFORM">
+              <ReleaseReadinessPage />
             </RequirePermission>
           }
         />

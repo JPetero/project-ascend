@@ -52,6 +52,10 @@ abstract final class RoutePaths {
   static const communityEditProfile = '/social/profile/edit';
   // Creator's own content performance — Build Session 10 Part 23.
   static const communityContentAnalytics = '/social/analytics';
+  // Real trainer verification application/status — Build Session 12
+  // Part 25-26. Distinct from communityEditProfile's self-declared
+  // Trainer badge toggle.
+  static const trainerVerification = '/social/trainer-verification';
 
   // Trainer Groups — Founder Scenario 24, reachable from the Community
   // tab. Free tier only (see TRAINER_GROUP_* limits in the backend's

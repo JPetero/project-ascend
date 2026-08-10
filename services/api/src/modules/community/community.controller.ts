@@ -13,21 +13,44 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { CommunityService } from './community.service';
+import { ApplyTrainerVerificationDto } from './dto/apply-trainer-verification.dto';
 import { CreateCommunityCommentDto } from './dto/create-community-comment.dto';
 import { CreateCommunityPostDto } from './dto/create-community-post.dto';
 import { CreateCommunityReportDto } from './dto/create-community-report.dto';
 import { QueryCommunityPostsDto } from './dto/query-community-posts.dto';
 import { UpsertCommunityProfileDto } from './dto/upsert-community-profile.dto';
+import { TrainerVerificationService } from './trainer-verification.service';
 
 @ApiBearerAuth()
 @ApiTags('community')
 @Controller('community')
 export class CommunityController {
-  constructor(private readonly communityService: CommunityService) {}
+  constructor(
+    private readonly communityService: CommunityService,
+    private readonly trainerVerificationService: TrainerVerificationService,
+  ) {}
 
   @Post('profile')
   upsertOwnProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpsertCommunityProfileDto) {
     return this.communityService.upsertOwnProfile(user.id, dto);
+  }
+
+  // --- Trainer verification (Build Session 12 Part 25-26) ----------------
+  // Registered before profile/:userId-style wildcard routes below aren't
+  // an issue here (these live under their own literal segment), but kept
+  // together for readability.
+
+  @Post('trainer-verification')
+  applyForTrainerVerification(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ApplyTrainerVerificationDto,
+  ) {
+    return this.trainerVerificationService.apply(user.id, dto);
+  }
+
+  @Get('trainer-verification/me')
+  getMyTrainerVerification(@CurrentUser() user: AuthenticatedUser) {
+    return this.trainerVerificationService.getMine(user.id);
   }
 
   @Get('profile/:userId')
