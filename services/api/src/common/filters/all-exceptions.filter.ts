@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ResponseEnvelope } from '../dto/response-envelope';
+import { RequestWithId } from '../middleware/request-logging.middleware';
 
 interface HttpExceptionBody {
   message?: string | string[];
@@ -36,8 +37,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const { code, message, details } = this.resolveErrorShape(exception, status);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const requestId = (request as RequestWithId).id;
       this.logger.error(
-        `${request.method} ${request.url} -> ${status}`,
+        `${request.method} ${request.url} -> ${status}${requestId ? ` [${requestId}]` : ''}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     }
