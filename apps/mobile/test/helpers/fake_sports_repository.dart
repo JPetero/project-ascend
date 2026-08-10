@@ -14,6 +14,8 @@ SportMatch sampleSportMatch({
   String createdById = 'user-1',
   SportMatchStatus status = SportMatchStatus.invited,
   bool flagged = false,
+  String sportCode = SportsRepository.badmintonCode,
+  String sportName = 'Badminton',
   List<SportMatchParticipant> participants = const [],
   List<SportScoreProposal> scoreProposals = const [],
 }) {
@@ -23,6 +25,8 @@ SportMatch sampleSportMatch({
     status: status,
     flagged: flagged,
     createdAt: DateTime.utc(2026, 8, 7),
+    sportCode: sportCode,
+    sportName: sportName,
     participants: participants,
     scoreProposals: scoreProposals,
   );
@@ -49,6 +53,12 @@ class FakeSportsRepository implements SportsRepository {
   Future<List<SportMatch>> listMine() async => List.unmodifiable(matches);
 
   @override
+  Future<List<SportSummary>> listSports() async => const [
+    SportSummary(code: SportsRepository.badmintonCode, name: 'Badminton'),
+    SportSummary(code: SportsRepository.tableTennisCode, name: 'Table Tennis'),
+  ];
+
+  @override
   Future<SportMatch> createMatch({
     required String opponentId,
     String sportCode = SportsRepository.badmintonCode,
@@ -57,6 +67,10 @@ class FakeSportsRepository implements SportsRepository {
       id: 'match-${matches.length + 1}',
       createdById: 'user-1',
       status: SportMatchStatus.invited,
+      sportCode: sportCode,
+      sportName: sportCode == SportsRepository.tableTennisCode
+          ? 'Table Tennis'
+          : 'Badminton',
       participants: [
         sampleSportParticipant(id: 'p-host', userId: 'user-1'),
         sampleSportParticipant(
@@ -111,6 +125,8 @@ class FakeSportsRepository implements SportsRepository {
       createdById: match.createdById,
       status: SportMatchStatus.scorePending,
       flagged: match.flagged,
+      sportCode: match.sportCode ?? SportsRepository.badmintonCode,
+      sportName: match.sportName ?? 'Badminton',
       participants: match.participants,
       scoreProposals: [
         SportScoreProposal(
@@ -166,6 +182,8 @@ class FakeSportsRepository implements SportsRepository {
       createdById: match.createdById,
       status: status,
       flagged: match.flagged,
+      sportCode: match.sportCode ?? SportsRepository.badmintonCode,
+      sportName: match.sportName ?? 'Badminton',
       participants: match.participants,
       scoreProposals: match.scoreProposals,
     );
@@ -183,6 +201,8 @@ class FakeSportsRepository implements SportsRepository {
       createdById: match.createdById,
       status: match.status,
       flagged: match.flagged,
+      sportCode: match.sportCode ?? SportsRepository.badmintonCode,
+      sportName: match.sportName ?? 'Badminton',
       participants: [
         for (final p in match.participants)
           if (p.userId == 'user-1')

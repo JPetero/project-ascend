@@ -11,6 +11,7 @@ import { ProposeScoreDto } from './dto/propose-score.dto';
 
 const SPORT_NAMES: Record<SportCode, string> = {
   [SportCode.BADMINTON]: 'Badminton',
+  [SportCode.TABLE_TENNIS]: 'Table Tennis',
 };
 
 /** Cancelable states — before play has actually started. */
@@ -40,7 +41,10 @@ export class SportsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listSports() {
-    await this.getOrCreateSport(SportCode.BADMINTON);
+    // Build Session 12 Part 23-24 — self-seeds every known SportCode
+    // (not just badminton anymore) the first time anyone asks, same
+    // lazy-create pattern this already used for badminton alone.
+    await Promise.all(Object.values(SportCode).map((code) => this.getOrCreateSport(code)));
     return this.prisma.sport.findMany({ orderBy: { name: 'asc' } });
   }
 

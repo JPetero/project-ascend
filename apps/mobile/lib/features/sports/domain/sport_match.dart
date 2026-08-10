@@ -1,3 +1,20 @@
+/// One entry from `GET /sports` — Build Session 12 Part 23-24's
+/// sport-selector needs the real, current list rather than a hardcoded
+/// single option.
+class SportSummary {
+  const SportSummary({required this.code, required this.name});
+
+  final String code;
+  final String name;
+
+  factory SportSummary.fromJson(Map<String, dynamic> json) {
+    return SportSummary(
+      code: json['code'] as String,
+      name: json['name'] as String,
+    );
+  }
+}
+
 enum SportMatchStatus {
   created,
   invited,
@@ -135,6 +152,8 @@ class SportMatch {
     required this.status,
     this.flagged = false,
     required this.createdAt,
+    this.sportCode,
+    this.sportName,
     this.participants = const [],
     this.scoreProposals = const [],
     this.disputes = const [],
@@ -145,6 +164,11 @@ class SportMatch {
   final SportMatchStatus status;
   final bool flagged;
   final DateTime createdAt;
+  // Build Session 12 Part 23-24 — a second sport (Table Tennis) exists
+  // now, so the match's own sport can no longer be assumed; parsed from
+  // the `sport` object every list/detail response already includes.
+  final String? sportCode;
+  final String? sportName;
   final List<SportMatchParticipant> participants;
   final List<SportScoreProposal> scoreProposals;
   final List<SportMatchDispute> disputes;
@@ -153,12 +177,15 @@ class SportMatch {
     final participantsJson = json['participants'] as List<dynamic>?;
     final proposalsJson = json['scoreProposals'] as List<dynamic>?;
     final disputesJson = json['disputes'] as List<dynamic>?;
+    final sportJson = json['sport'] as Map<String, dynamic>?;
     return SportMatch(
       id: json['id'] as String,
       createdById: json['createdById'] as String,
       status: sportMatchStatusFromJson(json['status'] as String),
       flagged: json['flagged'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      sportCode: sportJson?['code'] as String?,
+      sportName: sportJson?['name'] as String?,
       participants:
           participantsJson
               ?.map(

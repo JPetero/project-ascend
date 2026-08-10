@@ -2640,6 +2640,12 @@ model JointWorkoutEvent {
 
 enum SportCode {
   BADMINTON
+  // Build Session 12 Part 23-24 — reuses the exact same generic
+  // point/set SportRuleSet model as badminton (games to 11/21,
+  // best-of-N sets); no table-tennis-specific match-state logic exists
+  // anywhere in this system, by design — see this section's own doc
+  // comment above.
+  TABLE_TENNIS
 }
 
 model Sport {

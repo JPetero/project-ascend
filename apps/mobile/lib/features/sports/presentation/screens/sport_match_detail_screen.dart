@@ -27,9 +27,11 @@ class SportMatchDetailScreen extends ConsumerWidget {
     );
     final match = state.match;
 
+    final sportName = match?.sportName ?? 'Sports';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Badminton match'),
+        title: Text('$sportName match'),
         actions: [
           if (match != null &&
               match.status == SportMatchStatus.confirmed &&
@@ -45,7 +47,7 @@ class SportMatchDetailScreen extends ConsumerWidget {
                       content: ShareContent(
                         type: ShareContentType.sportsMatchResult,
                         title: 'Match confirmed!',
-                        subtitle: 'Badminton',
+                        subtitle: sportName,
                         statLines: [
                           ShareStatLine(
                             label: 'Final score',

@@ -2,14 +2,26 @@ import '../../../core/networking/api_client.dart';
 import '../domain/sport_match.dart';
 
 /// Thin client for services/api/src/modules/sports — Build Session 8
-/// Part 10's confirmed sports matches and Elo-like ratings. Only
-/// Badminton exists this session (see [badmintonCode]).
+/// Part 10's confirmed sports matches and Elo-like ratings. Badminton and
+/// Table Tennis (Build Session 12 Part 23-24) both exist and share this
+/// exact same generic point/set engine — see [listSports].
 class SportsRepository {
   SportsRepository({required ApiClient apiClient}) : _apiClient = apiClient;
 
   final ApiClient _apiClient;
 
   static const badmintonCode = 'BADMINTON';
+  static const tableTennisCode = 'TABLE_TENNIS';
+
+  Future<List<SportSummary>> listSports() async {
+    final envelope = await _apiClient.get(
+      '/sports',
+      (data) => data as List<dynamic>,
+    );
+    return envelope.data!
+        .map((s) => SportSummary.fromJson(s as Map<String, dynamic>))
+        .toList();
+  }
 
   Future<List<SportMatch>> listMine() async {
     final envelope = await _apiClient.get(

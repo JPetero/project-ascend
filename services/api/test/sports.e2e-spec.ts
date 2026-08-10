@@ -73,10 +73,11 @@ describe('Sports Matches (e2e)', () => {
   const authB = () => authFor(tokenB);
   const authC = () => authFor(tokenC);
 
-  it('lists the seeded Badminton sport', async () => {
+  it('lists the seeded Badminton and Table Tennis sports (Build Session 12 Part 23-24)', async () => {
     const res = await request(app.getHttpServer()).get('/sports').set(authA()).expect(200);
     const codes = (res.body.data as Array<{ code: string }>).map((s) => s.code);
     expect(codes).toContain('BADMINTON');
+    expect(codes).toContain('TABLE_TENNIS');
   });
 
   it('rejects challenging yourself', async () => {
@@ -159,6 +160,61 @@ describe('Sports Matches (e2e)', () => {
       .set(authA())
       .expect(200);
     expect((leaderboard.body.data as unknown[]).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('runs a full Table Tennis lifecycle with a rating tracked independently of Badminton (Build Session 12 Part 23-24)', async () => {
+    // A already won a BADMINTON match against B in the previous test, so
+    // A's BADMINTON rating is above 1500 — this proves TABLE_TENNIS
+    // starts fresh at 1500 rather than sharing that rating.
+    const created = await request(app.getHttpServer())
+      .post('/sports/matches')
+      .set(authA())
+      .send({ sportCode: 'TABLE_TENNIS', opponentId: userIdC })
+      .expect(201);
+    const matchId = created.body.data.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/accept`)
+      .set(authC())
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/ready`)
+      .set(authA())
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/ready`)
+      .set(authC())
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/start`)
+      .set(authA())
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/score`)
+      .set(authA())
+      .send({ proposerScore: 11, opponentScore: 7 })
+      .expect(201);
+    const confirmed = await request(app.getHttpServer())
+      .post(`/sports/matches/${matchId}/score/confirm`)
+      .set(authC())
+      .expect(201);
+    expect(confirmed.body.data.status).toBe('CONFIRMED');
+    expect(confirmed.body.data.sport.code).toBe('TABLE_TENNIS');
+
+    const tableTennisRating = await request(app.getHttpServer())
+      .get('/sports/TABLE_TENNIS/rating')
+      .set(authA())
+      .expect(200);
+    expect(tableTennisRating.body.data.matchesPlayed).toBe(1);
+    expect(tableTennisRating.body.data.rating).toBeGreaterThan(1500);
+
+    const badmintonRating = await request(app.getHttpServer())
+      .get('/sports/BADMINTON/rating')
+      .set(authA())
+      .expect(200);
+    // Unaffected by the Table Tennis match — still exactly the single
+    // Badminton match's worth of rating movement from the earlier test.
+    expect(badmintonRating.body.data.matchesPlayed).toBe(1);
   });
 
   it('raises a dispute on disagreement and allows voiding it', async () => {

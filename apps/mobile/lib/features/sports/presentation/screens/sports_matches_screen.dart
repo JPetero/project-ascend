@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../friends/presentation/providers/friends_controller.dart';
+import '../../data/sports_repository.dart';
 import '../../domain/sport_match.dart';
 import '../providers/sports_matches_controller.dart';
 
-/// Confirmed sports matches home — Build Session 8 Part 10. Only
-/// Badminton exists this session. Reachable from the Community tab.
+/// Confirmed sports matches home — Build Session 8 Part 10. Badminton
+/// and Table Tennis (Build Session 12 Part 23-24) share this same
+/// generic point/set match engine. Reachable from the Community tab.
 class SportsMatchesScreen extends ConsumerWidget {
   const SportsMatchesScreen({super.key});
 
@@ -19,6 +21,8 @@ class SportsMatchesScreen extends ConsumerWidget {
     final controller = ref.read(sportsMatchesControllerProvider.notifier);
     // Loaded eagerly so the opponent picker isn't racing the fetch.
     ref.watch(friendsControllerProvider);
+
+    final selectedSportName = _sportName(state.sports, state.selectedSportCode);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sports')),
@@ -35,6 +39,24 @@ class SportsMatchesScreen extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(AscendSpacing.md),
                   children: [
+                    if (state.sports.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: AscendSpacing.md,
+                        ),
+                        child: SegmentedButton<String>(
+                          segments: [
+                            for (final sport in state.sports)
+                              ButtonSegment(
+                                value: sport.code,
+                                label: Text(sport.name),
+                              ),
+                          ],
+                          selected: {state.selectedSportCode},
+                          onSelectionChanged: (selection) =>
+                              controller.selectSport(selection.first),
+                        ),
+                      ),
                     if (state.rating != null)
                       AscendCard(
                         child: Row(
@@ -46,7 +68,7 @@ class SportsMatchesScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Badminton rating: ${state.rating!.rating.round()}',
+                                    '$selectedSportName rating: ${state.rating!.rating.round()}',
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleSmall,
@@ -70,8 +92,7 @@ class SportsMatchesScreen extends ConsumerWidget {
                       const AscendEmptyState(
                         icon: Icons.sports_tennis_outlined,
                         title: 'No matches yet',
-                        message:
-                            'Challenge a friend to a confirmed Badminton match.',
+                        message: 'Challenge a friend to a confirmed match.',
                       )
                     else
                       for (final match in state.matches)
@@ -86,7 +107,20 @@ class SportsMatchesScreen extends ConsumerWidget {
                             child: Row(
                               children: [
                                 Expanded(
-                                  child: Text(_statusLabel(match.status)),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (match.sportName != null)
+                                        Text(
+                                          match.sportName!,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      Text(_statusLabel(match.status)),
+                                    ],
+                                  ),
                                 ),
                                 if (match.flagged)
                                   const Padding(
@@ -105,6 +139,15 @@ class SportsMatchesScreen extends ConsumerWidget {
               ),
       ),
     );
+  }
+
+  String _sportName(List<SportSummary> sports, String code) {
+    for (final sport in sports) {
+      if (sport.code == code) return sport.name;
+    }
+    return code == SportsRepository.tableTennisCode
+        ? 'Table Tennis'
+        : 'Badminton';
   }
 
   Future<void> _showChallengeDialog(BuildContext context, WidgetRef ref) async {
@@ -129,36 +172,78 @@ class SportsMatchesScreen extends ConsumerWidget {
       return;
     }
 
+    final state = ref.read(sportsMatchesControllerProvider);
+    final sports = state.sports.isNotEmpty
+        ? state.sports
+        : const [
+            SportSummary(
+              code: SportsRepository.badmintonCode,
+              name: 'Badminton',
+            ),
+          ];
+    var chosenSportCode = state.selectedSportCode;
+
     final chosen = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Challenge a friend to Badminton'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              for (final friend in friends)
-                ListTile(
-                  title: Text(friend.displayName),
-                  onTap: () => Navigator.of(dialogContext).pop(friend.userId),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: const Text('Challenge a friend'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (sports.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AscendSpacing.sm),
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: chosenSportCode,
+                      items: [
+                        for (final sport in sports)
+                          DropdownMenuItem(
+                            value: sport.code,
+                            child: Text(sport.name),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => chosenSportCode = value);
+                        }
+                      },
+                    ),
+                  ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final friend in friends)
+                        ListTile(
+                          title: Text(friend.displayName),
+                          onTap: () =>
+                              Navigator.of(dialogContext).pop(friend.userId),
+                        ),
+                    ],
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
       ),
     );
 
     if (chosen == null) return;
     final match = await ref
         .read(sportsMatchesControllerProvider.notifier)
-        .createMatch(chosen);
+        .createMatch(chosen, sportCode: chosenSportCode);
     if (match != null && context.mounted) {
       context.push(RoutePaths.sportMatchDetailPath(match.id));
     }

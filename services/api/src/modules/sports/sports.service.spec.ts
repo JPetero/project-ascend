@@ -104,6 +104,25 @@ describe('SportsService', () => {
     prisma.sportMatchParticipant.findUnique.mockResolvedValue(participant());
   });
 
+  describe('listSports', () => {
+    it('self-seeds every known SportCode, not just badminton (Build Session 12 Part 23-24)', async () => {
+      prisma.sport.findMany.mockResolvedValue([
+        { id: 'sport-1', code: 'BADMINTON', name: 'Badminton' },
+        { id: 'sport-2', code: 'TABLE_TENNIS', name: 'Table Tennis' },
+      ]);
+
+      const sports = await service.listSports();
+
+      const seededCodes = prisma.sport.findUnique.mock.calls.map(
+        ([arg]: [{ where: { code: string } }]) => arg.where.code,
+      );
+      expect(seededCodes).toEqual(expect.arrayContaining(['BADMINTON', 'TABLE_TENNIS']));
+      expect(sports.map((s) => s.code)).toEqual(
+        expect.arrayContaining(['BADMINTON', 'TABLE_TENNIS']),
+      );
+    });
+  });
+
   describe('createMatch', () => {
     it('rejects challenging yourself', async () => {
       await expect(
