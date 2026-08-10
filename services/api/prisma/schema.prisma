@@ -172,20 +172,21 @@ model User {
   communityComments                CommunityComment[]
   communitySaves                   CommunitySave[]
   communityReports                 CommunityReport[]
-  communityFollowing               CommunityFollow[]               @relation("CommunityFollower")
-  communityFollowers               CommunityFollow[]               @relation("CommunityFollowing")
-  communityBlocksMade              CommunityBlock[]                @relation("CommunityBlocker")
-  communityBlocksAgainst           CommunityBlock[]                @relation("CommunityBlocked")
+  communityFollowing               CommunityFollow[]                         @relation("CommunityFollower")
+  communityFollowers               CommunityFollow[]                         @relation("CommunityFollowing")
+  communityBlocksMade              CommunityBlock[]                          @relation("CommunityBlocker")
+  communityBlocksAgainst           CommunityBlock[]                          @relation("CommunityBlocked")
   ownedTrainerGroups               TrainerGroup[]
   trainerGroupMembers              TrainerGroupMember[]
   trainerGroupMessages             TrainerGroupMessage[]
-  trainerGroupInvitesSent          TrainerGroupInvitation[]        @relation("TrainerGroupInviter")
-  trainerGroupInvitesReceived      TrainerGroupInvitation[]        @relation("TrainerGroupInvitee")
+  trainerGroupInvitesSent          TrainerGroupInvitation[]                  @relation("TrainerGroupInviter")
+  trainerGroupInvitesReceived      TrainerGroupInvitation[]                  @relation("TrainerGroupInvitee")
   trainerGroupSharedPlans          TrainerGroupSharedPlan[]
   trainerGroupAnnouncements        TrainerGroupAnnouncement[]
-  workoutAssignmentsCreated        WorkoutAssignment[]             @relation("WorkoutAssignmentAssignedBy")
-  workoutAssignmentsReceived       WorkoutAssignment[]             @relation("WorkoutAssignmentAssignee")
+  workoutAssignmentsCreated        WorkoutAssignment[]                       @relation("WorkoutAssignmentAssignedBy")
+  workoutAssignmentsReceived       WorkoutAssignment[]                       @relation("WorkoutAssignmentAssignee")
   trainerGroupScheduledSessions    TrainerGroupScheduledSession[]
+  trainerGroupSessionRsvps         TrainerGroupScheduledSessionParticipant[]
   rankingOptIn                     RankingOptIn?
   createdChallenges                Challenge[]
   challengeParticipations          ChallengeParticipant[]
@@ -196,11 +197,11 @@ model User {
   supportTicketReplies             SupportTicketReply[]
   promotedCampaigns                PromotedCampaign[]
   mediaAssets                      MediaAsset[]
-  friendRequestsSent               FriendRequest[]                 @relation("FriendRequestSender")
-  friendRequestsReceived           FriendRequest[]                 @relation("FriendRequestRecipient")
-  friendshipsAsUserA               Friendship[]                    @relation("FriendshipUserA")
-  friendshipsAsUserB               Friendship[]                    @relation("FriendshipUserB")
-  directConversationsStarted       DirectConversation[]            @relation("DirectConversationInitiator")
+  friendRequestsSent               FriendRequest[]                           @relation("FriendRequestSender")
+  friendRequestsReceived           FriendRequest[]                           @relation("FriendRequestRecipient")
+  friendshipsAsUserA               Friendship[]                              @relation("FriendshipUserA")
+  friendshipsAsUserB               Friendship[]                              @relation("FriendshipUserB")
+  directConversationsStarted       DirectConversation[]                      @relation("DirectConversationInitiator")
   directConversationParticipations DirectConversationParticipant[]
   directMessagesSent               DirectMessage[]
   messageReceipts                  MessageReceipt[]
@@ -752,13 +753,14 @@ model WorkoutPlan {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workout          Workout?                 @relation(fields: [workoutId], references: [id], onDelete: SetNull)
-  exercises        WorkoutPlanExercise[]
-  sessions         WorkoutSession[]
-  sharedInGroups   TrainerGroupSharedPlan[]
-  assignedAsSource WorkoutAssignment[]      @relation("WorkoutAssignmentSourcePlan")
-  assignedAsClone  WorkoutAssignment[]      @relation("WorkoutAssignmentClonedPlan")
+  user              User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workout           Workout?                       @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  exercises         WorkoutPlanExercise[]
+  sessions          WorkoutSession[]
+  sharedInGroups    TrainerGroupSharedPlan[]
+  assignedAsSource  WorkoutAssignment[]            @relation("WorkoutAssignmentSourcePlan")
+  assignedAsClone   WorkoutAssignment[]            @relation("WorkoutAssignmentClonedPlan")
+  scheduledSessions TrainerGroupScheduledSession[]
 
   @@index([userId])
   @@map("workout_plans")
@@ -1753,6 +1755,17 @@ model WorkoutAssignment {
 // any group member; creating one is owner/moderator + expanded-tier
 // gated, the same bar as postAnnouncement and
 // resolveGroupSessionInvitees, since it notifies the whole group.
+//
+// Build Session 13 Part 3 added `participants` (RSVP) and
+// `workoutPlanId`. There's still no stored "completed" flag — like
+// WorkoutAssignment's overdue state, "upcoming" vs "completed" is
+// derived from `scheduledAt` (+ `durationMinutes`) vs now rather than a
+// mutable field the host has to remember to set; `canceledAt` stays the
+// one explicit, host-driven state transition. `workoutPlanId` is purely
+// a preview/reference — starting the actual real-time session at
+// meeting time reuses JointWorkoutSessionsService.create's existing
+// `trainerGroupId` path (see its doc comment) rather than a new
+// real-time implementation living here.
 model TrainerGroupScheduledSession {
   id              String    @id @default(uuid())
   groupId         String
@@ -1763,15 +1776,48 @@ model TrainerGroupScheduledSession {
   location        String?
   videoLink       String?
   description     String?
+  workoutPlanId   String?
   canceledAt      DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  group     TrainerGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  group        TrainerGroup                              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy    User                                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  workoutPlan  WorkoutPlan?                              @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
+  participants TrainerGroupScheduledSessionParticipant[]
 
   @@index([groupId, scheduledAt])
   @@map("trainer_group_scheduled_sessions")
+}
+
+enum TrainerGroupScheduledSessionRsvpStatus {
+  GOING
+  MAYBE
+  DECLINED
+}
+
+// A group member's RSVP to a scheduled session (Build Session 13 Part
+// 3). Deliberately has no INVITED/JOINED/COMPLETED rows — every group
+// member is an implicit invitee (there's no separate invite step to
+// track), and "no row" already means "hasn't responded," so a status
+// enum with only the three real response values keeps one row per
+// (session, member) who has actually RSVP'd instead of writing a row
+// for every member the moment a session is created. Canceling an RSVP
+// deletes the row rather than adding a fourth status, returning the
+// member to the same "hasn't responded" state as never having RSVP'd.
+model TrainerGroupScheduledSessionParticipant {
+  id          String                                 @id @default(uuid())
+  sessionId   String
+  userId      String
+  status      TrainerGroupScheduledSessionRsvpStatus
+  respondedAt DateTime                               @default(now())
+
+  session TrainerGroupScheduledSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, status])
+  @@map("trainer_group_scheduled_session_participants")
 }
 
 // --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by
@@ -2997,6 +3043,10 @@ enum NotificationType {
   // Build Session 12 Part 25-26 — TrainerVerificationService now exists
   // (see its own doc comment), so this finally has a real trigger.
   TRAINER_VERIFICATION_UPDATE
+  // Build Session 13 Part 3 — cancelScheduledSession previously deleted
+  // the booking without telling anyone who had RSVP'd or been counting
+  // on it.
+  GROUP_SESSION_CANCELED
 }
 
 model NotificationPreference {

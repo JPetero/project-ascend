@@ -313,6 +313,7 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
     String? location,
     String? videoLink,
     String? description,
+    String? workoutPlanId,
   }) async {
     final session = TrainerGroupScheduledSession(
       id: 'session-${scheduledSessions.length}',
@@ -324,6 +325,7 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
       location: location,
       videoLink: videoLink,
       description: description,
+      workoutPlanId: workoutPlanId,
       createdAt: DateTime.now(),
     );
     scheduledSessions.add(session);
@@ -344,6 +346,61 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
   @override
   Future<void> cancelScheduledSession(String sessionId) async {
     scheduledSessions.removeWhere((s) => s.id == sessionId);
+  }
+
+  @override
+  Future<TrainerGroupScheduledSession> rsvpToScheduledSession(
+    String sessionId,
+    ScheduledSessionRsvpStatus status,
+  ) async {
+    final index = scheduledSessions.indexWhere((s) => s.id == sessionId);
+    final current = scheduledSessions[index];
+    final updated = TrainerGroupScheduledSession(
+      id: current.id,
+      groupId: current.groupId,
+      createdById: current.createdById,
+      title: current.title,
+      scheduledAt: current.scheduledAt,
+      durationMinutes: current.durationMinutes,
+      location: current.location,
+      videoLink: current.videoLink,
+      description: current.description,
+      workoutPlanId: current.workoutPlanId,
+      workoutPlanName: current.workoutPlanName,
+      canceledAt: current.canceledAt,
+      createdAt: current.createdAt,
+      status: current.status,
+      goingCount: status == ScheduledSessionRsvpStatus.going ? 1 : 0,
+      maybeCount: status == ScheduledSessionRsvpStatus.maybe ? 1 : 0,
+      declinedCount: status == ScheduledSessionRsvpStatus.declined ? 1 : 0,
+      viewerRsvpStatus: status,
+    );
+    scheduledSessions[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TrainerGroupScheduledSession> cancelMyRsvp(String sessionId) async {
+    final index = scheduledSessions.indexWhere((s) => s.id == sessionId);
+    final current = scheduledSessions[index];
+    final updated = TrainerGroupScheduledSession(
+      id: current.id,
+      groupId: current.groupId,
+      createdById: current.createdById,
+      title: current.title,
+      scheduledAt: current.scheduledAt,
+      durationMinutes: current.durationMinutes,
+      location: current.location,
+      videoLink: current.videoLink,
+      description: current.description,
+      workoutPlanId: current.workoutPlanId,
+      workoutPlanName: current.workoutPlanName,
+      canceledAt: current.canceledAt,
+      createdAt: current.createdAt,
+      status: current.status,
+    );
+    scheduledSessions[index] = updated;
+    return updated;
   }
 
   @override

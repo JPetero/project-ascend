@@ -224,4 +224,49 @@ void main() {
       expect(controller.state.scheduledSessions, isEmpty);
     },
   );
+
+  test(
+    'rsvpToScheduledSession replaces the one session in place with updated counts (Build Session 13 Part 3)',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      await controller.createScheduledSession(
+        scheduledAt: DateTime.now().add(const Duration(days: 1)),
+      );
+      final sessionId = controller.state.scheduledSessions.single.id;
+
+      final ok = await controller.rsvpToScheduledSession(
+        sessionId,
+        ScheduledSessionRsvpStatus.going,
+      );
+
+      expect(ok, isTrue);
+      expect(controller.state.scheduledSessions, hasLength(1));
+      expect(
+        controller.state.scheduledSessions.single.viewerRsvpStatus,
+        ScheduledSessionRsvpStatus.going,
+      );
+      expect(controller.state.scheduledSessions.single.goingCount, 1);
+    },
+  );
+
+  test('cancelMyRsvp returns the session to the unresponded state', () async {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+    await controller.createScheduledSession(
+      scheduledAt: DateTime.now().add(const Duration(days: 1)),
+    );
+    final sessionId = controller.state.scheduledSessions.single.id;
+    await controller.rsvpToScheduledSession(
+      sessionId,
+      ScheduledSessionRsvpStatus.maybe,
+    );
+
+    final ok = await controller.cancelMyRsvp(sessionId);
+
+    expect(ok, isTrue);
+    expect(controller.state.scheduledSessions.single.viewerRsvpStatus, isNull);
+  });
 }

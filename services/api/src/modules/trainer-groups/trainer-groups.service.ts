@@ -10,6 +10,7 @@ import {
   Prisma,
   TrainerGroupInvitationStatus,
   TrainerGroupMemberRole,
+  TrainerGroupScheduledSessionRsvpStatus,
   WorkoutAssignmentStatus,
 } from '@prisma/client';
 import {
@@ -17,6 +18,8 @@ import {
   TRAINER_GROUP_MEMBER_LIMIT_PREMIUM,
   TRAINER_GROUP_OWNED_LIMIT_FREE,
   TRAINER_GROUP_OWNED_LIMIT_PREMIUM,
+  TRAINER_GROUP_SESSION_GOING_LIMIT_FREE,
+  TRAINER_GROUP_SESSION_GOING_LIMIT_PREMIUM,
 } from '../../common/policy/trainer-group-policy';
 import {
   PaginationQueryDto,
@@ -49,6 +52,34 @@ const trainerGroupWithMembersInclude = {
 type TrainerGroupWithMembers = Prisma.TrainerGroupGetPayload<{
   include: typeof trainerGroupWithMembersInclude;
 }>;
+
+/** RSVP counts + the viewer's own status for one scheduled session — see summarizeParticipants. */
+interface ScheduledSessionParticipantSummary {
+  goingCount: number;
+  maybeCount: number;
+  declinedCount: number;
+  viewerStatus: TrainerGroupScheduledSessionRsvpStatus | null;
+}
+
+function emptyParticipantSummary(): ScheduledSessionParticipantSummary {
+  return { goingCount: 0, maybeCount: 0, declinedCount: 0, viewerStatus: null };
+}
+
+/**
+ * UPCOMING/COMPLETED/CANCELED is always derived, never a stored field —
+ * see the schema comment on TrainerGroupScheduledSession. Assumes a
+ * 60-minute session when no `durationMinutes` was given, matching the
+ * DTO's own default expectation of a short booking.
+ */
+function deriveScheduledSessionStatus(s: {
+  scheduledAt: Date;
+  durationMinutes: number | null;
+  canceledAt: Date | null;
+}): 'UPCOMING' | 'COMPLETED' | 'CANCELED' {
+  if (s.canceledAt) return 'CANCELED';
+  const endsAt = s.scheduledAt.getTime() + (s.durationMinutes ?? 60) * 60_000;
+  return endsAt < Date.now() ? 'COMPLETED' : 'UPCOMING';
+}
 
 /**
  * Trainer groups — see schema.prisma's Trainer group comment and
@@ -676,6 +707,15 @@ export class TrainerGroupsService {
       throw new BadRequestException('scheduledAt must be a valid time in the future.');
     }
 
+    let workoutPlanName: string | null = null;
+    if (dto.workoutPlanId) {
+      const plan = await this.prisma.workoutPlan.findUnique({ where: { id: dto.workoutPlanId } });
+      if (!plan || plan.userId !== userId) {
+        throw new NotFoundException('Workout plan not found.');
+      }
+      workoutPlanName = plan.name;
+    }
+
     const session = await this.prisma.trainerGroupScheduledSession.create({
       data: {
         groupId,
@@ -686,6 +726,7 @@ export class TrainerGroupsService {
         location: dto.location,
         videoLink: dto.videoLink,
         description: dto.description,
+        workoutPlanId: dto.workoutPlanId,
       },
     });
 
@@ -705,7 +746,7 @@ export class TrainerGroupsService {
       ),
     );
 
-    return this.serializeScheduledSession(session);
+    return this.serializeScheduledSession(session, workoutPlanName, emptyParticipantSummary());
   }
 
   async listScheduledSessions(userId: string, groupId: string) {
@@ -713,8 +754,19 @@ export class TrainerGroupsService {
     const sessions = await this.prisma.trainerGroupScheduledSession.findMany({
       where: { groupId, canceledAt: null },
       orderBy: { scheduledAt: 'asc' },
+      include: { workoutPlan: { select: { name: true } } },
     });
-    return sessions.map((s) => this.serializeScheduledSession(s));
+    const summaries = await this.summarizeParticipants(
+      sessions.map((s) => s.id),
+      userId,
+    );
+    return sessions.map((s) =>
+      this.serializeScheduledSession(
+        s,
+        s.workoutPlan?.name ?? null,
+        summaries.get(s.id) ?? emptyParticipantSummary(),
+      ),
+    );
   }
 
   async cancelScheduledSession(userId: string, sessionId: string): Promise<void> {
@@ -734,6 +786,147 @@ export class TrainerGroupsService {
       where: { id: sessionId },
       data: { canceledAt: new Date() },
     });
+
+    const members = await this.prisma.trainerGroupMember.findMany({
+      where: { groupId: session.groupId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    await Promise.all(
+      members.map((m) =>
+        this.notifications.notify(
+          m.userId,
+          NotificationType.GROUP_SESSION_CANCELED,
+          'Session canceled',
+          `${group.name}'s scheduled session was canceled.`,
+          session.id,
+        ),
+      ),
+    );
+  }
+
+  /**
+   * RSVP Going/Maybe/Decline (Build Session 13 Part 3). Any group member
+   * may RSVP to any non-canceled session in their group — there's no
+   * separate "invited" gate to pass first, since group membership is
+   * itself the invitation (see the module doc comment). Upserts so
+   * changing your mind (Going → Maybe) is the same call as RSVPing for
+   * the first time. `GOING` is capped by
+   * TRAINER_GROUP_SESSION_GOING_LIMIT_FREE/PREMIUM (mirrors the group's
+   * own member-limit tier) so a session can't silently overbook past
+   * what its own group could ever hold; re-confirming an existing GOING
+   * row is exempt from the check.
+   */
+  async rsvpToScheduledSession(
+    userId: string,
+    sessionId: string,
+    status: TrainerGroupScheduledSessionRsvpStatus,
+  ) {
+    const session = await this.prisma.trainerGroupScheduledSession.findUnique({
+      where: { id: sessionId },
+      include: { workoutPlan: { select: { name: true } } },
+    });
+    if (!session) throw new NotFoundException('Scheduled session not found.');
+    if (session.canceledAt) {
+      throw new ConflictException('This session has been canceled.');
+    }
+    await this.assertMember(userId, session.groupId);
+
+    if (status === TrainerGroupScheduledSessionRsvpStatus.GOING) {
+      const [existing, goingLimit, currentGoing] = await Promise.all([
+        this.prisma.trainerGroupScheduledSessionParticipant.findUnique({
+          where: { sessionId_userId: { sessionId, userId } },
+        }),
+        this.goingLimitFor(session.groupId),
+        this.prisma.trainerGroupScheduledSessionParticipant.count({
+          where: {
+            sessionId,
+            status: TrainerGroupScheduledSessionRsvpStatus.GOING,
+            userId: { not: userId },
+          },
+        }),
+      ]);
+      const alreadyGoing = existing?.status === TrainerGroupScheduledSessionRsvpStatus.GOING;
+      if (!alreadyGoing && currentGoing >= goingLimit) {
+        throw new ForbiddenException('This session has reached its participant limit.');
+      }
+    }
+
+    await this.prisma.trainerGroupScheduledSessionParticipant.upsert({
+      where: { sessionId_userId: { sessionId, userId } },
+      create: { sessionId, userId, status },
+      update: { status, respondedAt: new Date() },
+    });
+
+    const summary = (await this.summarizeParticipants([sessionId], userId)).get(sessionId)!;
+    return this.serializeScheduledSession(session, session.workoutPlan?.name ?? null, summary);
+  }
+
+  /** Returns to the same "hasn't responded" state as never having RSVP'd — see the schema comment on why this deletes rather than adding a fourth status. Idempotent: no error if the caller never RSVP'd. */
+  async cancelMyRsvp(userId: string, sessionId: string) {
+    const session = await this.prisma.trainerGroupScheduledSession.findUnique({
+      where: { id: sessionId },
+      include: { workoutPlan: { select: { name: true } } },
+    });
+    if (!session) throw new NotFoundException('Scheduled session not found.');
+    await this.assertMember(userId, session.groupId);
+
+    await this.prisma.trainerGroupScheduledSessionParticipant.deleteMany({
+      where: { sessionId, userId },
+    });
+
+    const summary = (await this.summarizeParticipants([sessionId], userId)).get(sessionId)!;
+    return this.serializeScheduledSession(session, session.workoutPlan?.name ?? null, summary);
+  }
+
+  private async goingLimitFor(groupId: string): Promise<number> {
+    const group = await this.findGroup(groupId);
+    return (await this.isExpanded(group.ownerId))
+      ? TRAINER_GROUP_SESSION_GOING_LIMIT_PREMIUM
+      : TRAINER_GROUP_SESSION_GOING_LIMIT_FREE;
+  }
+
+  /**
+   * Batched RSVP summary for one or more sessions — a single groupBy for
+   * counts-by-status plus a single findMany for the caller's own rows,
+   * regardless of how many sessions are being serialized (Build Session
+   * 13 Part 2/28 set the standard: never one query per row).
+   */
+  private async summarizeParticipants(
+    sessionIds: string[],
+    viewerId: string,
+  ): Promise<Map<string, ScheduledSessionParticipantSummary>> {
+    const summaries = new Map<string, ScheduledSessionParticipantSummary>(
+      sessionIds.map((id) => [id, emptyParticipantSummary()]),
+    );
+    if (sessionIds.length === 0) return summaries;
+
+    const [counts, viewerRows] = await Promise.all([
+      this.prisma.trainerGroupScheduledSessionParticipant.groupBy({
+        by: ['sessionId', 'status'],
+        where: { sessionId: { in: sessionIds } },
+        _count: { _all: true },
+      }),
+      this.prisma.trainerGroupScheduledSessionParticipant.findMany({
+        where: { sessionId: { in: sessionIds }, userId: viewerId },
+        select: { sessionId: true, status: true },
+      }),
+    ]);
+
+    for (const c of counts) {
+      const summary = summaries.get(c.sessionId);
+      if (!summary) continue;
+      if (c.status === TrainerGroupScheduledSessionRsvpStatus.GOING)
+        summary.goingCount = c._count._all;
+      else if (c.status === TrainerGroupScheduledSessionRsvpStatus.MAYBE)
+        summary.maybeCount = c._count._all;
+      else if (c.status === TrainerGroupScheduledSessionRsvpStatus.DECLINED)
+        summary.declinedCount = c._count._all;
+    }
+    for (const row of viewerRows) {
+      const summary = summaries.get(row.sessionId);
+      if (summary) summary.viewerStatus = row.status;
+    }
+    return summaries;
   }
 
   // --- Trainer dashboard (Build Session 12 Part 11) ------------------------
@@ -767,6 +960,7 @@ export class TrainerGroupsService {
         where: { groupId: { in: groupIds }, canceledAt: null, scheduledAt: { gte: new Date() } },
         orderBy: { scheduledAt: 'asc' },
         take: 10,
+        include: { workoutPlan: { select: { name: true } } },
       }),
       this.prisma.workoutAssignment.findMany({
         where: { groupId: { in: groupIds } },
@@ -782,6 +976,10 @@ export class TrainerGroupsService {
     ]);
 
     const pendingByGroup = new Map(pendingCounts.map((p) => [p.groupId, p._count._all]));
+    const sessionSummaries = await this.summarizeParticipants(
+      upcomingSessions.map((s) => s.id),
+      userId,
+    );
 
     return {
       groups: groups.map((g) => ({
@@ -790,7 +988,13 @@ export class TrainerGroupsService {
         memberCount: g._count.members,
         pendingAssignmentCount: pendingByGroup.get(g.id) ?? 0,
       })),
-      upcomingSessions: upcomingSessions.map((s) => this.serializeScheduledSession(s)),
+      upcomingSessions: upcomingSessions.map((s) =>
+        this.serializeScheduledSession(
+          s,
+          s.workoutPlan?.name ?? null,
+          sessionSummaries.get(s.id) ?? emptyParticipantSummary(),
+        ),
+      ),
       recentAssignments: recentAssignments.map((a) =>
         this.serializeAssignment(a, a.sourcePlan.name),
       ),
@@ -911,19 +1115,24 @@ export class TrainerGroupsService {
     };
   }
 
-  private serializeScheduledSession(s: {
-    id: string;
-    groupId: string;
-    createdById: string;
-    title: string | null;
-    scheduledAt: Date;
-    durationMinutes: number | null;
-    location: string | null;
-    videoLink: string | null;
-    description: string | null;
-    canceledAt: Date | null;
-    createdAt: Date;
-  }) {
+  private serializeScheduledSession(
+    s: {
+      id: string;
+      groupId: string;
+      createdById: string;
+      title: string | null;
+      scheduledAt: Date;
+      durationMinutes: number | null;
+      location: string | null;
+      videoLink: string | null;
+      description: string | null;
+      workoutPlanId: string | null;
+      canceledAt: Date | null;
+      createdAt: Date;
+    },
+    workoutPlanName: string | null,
+    participants: ScheduledSessionParticipantSummary,
+  ) {
     return {
       id: s.id,
       groupId: s.groupId,
@@ -934,8 +1143,15 @@ export class TrainerGroupsService {
       location: s.location,
       videoLink: s.videoLink,
       description: s.description,
+      workoutPlanId: s.workoutPlanId,
+      workoutPlanName,
       canceledAt: s.canceledAt,
       createdAt: s.createdAt,
+      status: deriveScheduledSessionStatus(s),
+      goingCount: participants.goingCount,
+      maybeCount: participants.maybeCount,
+      declinedCount: participants.declinedCount,
+      viewerRsvpStatus: participants.viewerStatus,
     };
   }
 

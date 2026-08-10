@@ -258,6 +258,7 @@ class TrainerGroupsRepository {
     String? location,
     String? videoLink,
     String? description,
+    String? workoutPlanId,
   }) async {
     final envelope = await _apiClient.post(
       '/trainer-groups/$groupId/scheduled-sessions',
@@ -269,6 +270,7 @@ class TrainerGroupsRepository {
         'location': ?location,
         'videoLink': ?videoLink,
         'description': ?description,
+        'workoutPlanId': ?workoutPlanId,
       },
     );
     return TrainerGroupScheduledSession.fromJson(envelope.data!);
@@ -294,6 +296,31 @@ class TrainerGroupsRepository {
       '/trainer-groups/scheduled-sessions/$sessionId',
       (_) => null,
     );
+  }
+
+  /// RSVP Going/Maybe/Decline (Build Session 13 Part 3). Returns the full
+  /// session with updated counts, so the caller can replace its local copy
+  /// directly instead of re-fetching the whole list.
+  Future<TrainerGroupScheduledSession> rsvpToScheduledSession(
+    String sessionId,
+    ScheduledSessionRsvpStatus status,
+  ) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/scheduled-sessions/$sessionId/rsvp',
+      (data) => data as Map<String, dynamic>,
+      data: {'status': status.wireValue},
+    );
+    return TrainerGroupScheduledSession.fromJson(envelope.data!);
+  }
+
+  /// Returns to the "hasn't responded" state — idempotent even if the
+  /// caller never RSVP'd.
+  Future<TrainerGroupScheduledSession> cancelMyRsvp(String sessionId) async {
+    final envelope = await _apiClient.delete(
+      '/trainer-groups/scheduled-sessions/$sessionId/rsvp',
+      (data) => data as Map<String, dynamic>,
+    );
+    return TrainerGroupScheduledSession.fromJson(envelope.data!);
   }
 
   // --- Trainer dashboard (Build Session 12 Part 11) -------------------------

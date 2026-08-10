@@ -19,6 +19,7 @@ import { CreateTrainerGroupDto } from './dto/create-trainer-group.dto';
 import { CreateTrainerGroupScheduledSessionDto } from './dto/create-trainer-group-scheduled-session.dto';
 import { CreateWorkoutAssignmentDto } from './dto/create-workout-assignment.dto';
 import { InviteTrainerGroupMemberDto } from './dto/invite-trainer-group-member.dto';
+import { RsvpScheduledSessionDto } from './dto/rsvp-scheduled-session.dto';
 import { SendTrainerGroupMessageDto } from './dto/send-trainer-group-message.dto';
 import { SetTrainerGroupMemberRoleDto } from './dto/set-trainer-group-member-role.dto';
 import { ShareTrainerGroupPlanDto } from './dto/share-trainer-group-plan.dto';
@@ -109,6 +110,20 @@ export class TrainerGroupsController {
     @Param('sessionId') sessionId: string,
   ) {
     return this.trainerGroupsService.cancelScheduledSession(user.id, sessionId);
+  }
+
+  @Post('scheduled-sessions/:sessionId/rsvp')
+  rsvpToScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: RsvpScheduledSessionDto,
+  ) {
+    return this.trainerGroupsService.rsvpToScheduledSession(user.id, sessionId, dto.status);
+  }
+
+  @Delete('scheduled-sessions/:sessionId/rsvp')
+  cancelMyRsvp(@CurrentUser() user: AuthenticatedUser, @Param('sessionId') sessionId: string) {
+    return this.trainerGroupsService.cancelMyRsvp(user.id, sessionId);
   }
 
   @Get(':id')

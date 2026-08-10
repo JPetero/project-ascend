@@ -245,4 +245,108 @@ describe('Trainer groups — expanded tier (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('scheduled session RSVP (Build Session 13 Part 3)', () => {
+    let sessionId: string;
+    let workoutPlanId: string;
+
+    beforeAll(async () => {
+      const plan = await request(app.getHttpServer())
+        .post('/workout-plans')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ name: "Owen's Squad Plan" })
+        .expect(201);
+      workoutPlanId = plan.body.data.id as string;
+
+      const created = await request(app.getHttpServer())
+        .post(`/trainer-groups/${groupId}/scheduled-sessions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          title: 'Saturday session',
+          scheduledAt: new Date(Date.now() + 86_400_000).toISOString(),
+          workoutPlanId,
+        })
+        .expect(201);
+      sessionId = created.body.data.id as string;
+      expect(created.body.data.workoutPlanName).toBe("Owen's Squad Plan");
+      expect(created.body.data.status).toBe('UPCOMING');
+      expect(created.body.data.goingCount).toBe(0);
+    });
+
+    it('a member RSVPs Going and the count is reflected for both viewers', async () => {
+      const rsvp = await request(app.getHttpServer())
+        .post(`/trainer-groups/scheduled-sessions/${sessionId}/rsvp`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ status: 'GOING' })
+        .expect(201);
+      expect(rsvp.body.data.goingCount).toBe(1);
+      expect(rsvp.body.data.viewerRsvpStatus).toBe('GOING');
+
+      const listedForOwner = await request(app.getHttpServer())
+        .get(`/trainer-groups/${groupId}/scheduled-sessions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      const seenByOwner = (
+        listedForOwner.body.data as { id: string; goingCount: number; viewerRsvpStatus: null }[]
+      ).find((s) => s.id === sessionId)!;
+      expect(seenByOwner.goingCount).toBe(1);
+      expect(seenByOwner.viewerRsvpStatus).toBeNull();
+    });
+
+    it('changes the RSVP to Maybe and moves the count between buckets', async () => {
+      const rsvp = await request(app.getHttpServer())
+        .post(`/trainer-groups/scheduled-sessions/${sessionId}/rsvp`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ status: 'MAYBE' })
+        .expect(201);
+      expect(rsvp.body.data.goingCount).toBe(0);
+      expect(rsvp.body.data.maybeCount).toBe(1);
+      expect(rsvp.body.data.viewerRsvpStatus).toBe('MAYBE');
+    });
+
+    it('canceling the RSVP returns to the unresponded state', async () => {
+      const canceled = await request(app.getHttpServer())
+        .delete(`/trainer-groups/scheduled-sessions/${sessionId}/rsvp`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      expect(canceled.body.data.maybeCount).toBe(0);
+      expect(canceled.body.data.viewerRsvpStatus).toBeNull();
+    });
+
+    it('rejects a non-member RSVPing', async () => {
+      const outsider = await register('rsvp-outsider@example.com', 'Ola');
+      await request(app.getHttpServer())
+        .post(`/trainer-groups/scheduled-sessions/${sessionId}/rsvp`)
+        .set('Authorization', `Bearer ${outsider.token}`)
+        .send({ status: 'GOING' })
+        .expect(404);
+    });
+
+    it('canceling the session notifies members and further RSVPs are rejected', async () => {
+      const secondSession = await request(app.getHttpServer())
+        .post(`/trainer-groups/${groupId}/scheduled-sessions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ scheduledAt: new Date(Date.now() + 172_800_000).toISOString() })
+        .expect(201);
+      const secondSessionId = secondSession.body.data.id as string;
+
+      await request(app.getHttpServer())
+        .delete(`/trainer-groups/scheduled-sessions/${secondSessionId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(204);
+
+      await request(app.getHttpServer())
+        .post(`/trainer-groups/scheduled-sessions/${secondSessionId}/rsvp`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ status: 'GOING' })
+        .expect(409);
+
+      const notifications = await request(app.getHttpServer())
+        .get('/notifications/events')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      const types = (notifications.body.data as { type: string }[]).map((n) => n.type);
+      expect(types).toContain('GROUP_SESSION_CANCELED');
+    });
+  });
 });
