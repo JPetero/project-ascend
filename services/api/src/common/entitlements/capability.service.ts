@@ -19,7 +19,26 @@ export class CapabilityService {
 
   async getPlanTier(userId: string): Promise<PlanTier> {
     const subscription = await this.prisma.userSubscription.findUnique({ where: { userId } });
-    return subscription?.tier === 'PREMIUM' ? PlanTier.PREMIUM : PlanTier.FREE;
+    if (!subscription || subscription.tier !== 'PREMIUM') return PlanTier.FREE;
+
+    if (subscription.expiresAt && subscription.expiresAt < new Date()) {
+      // Build Session 12 Part 22 — purchase reconciliation. There's no
+      // cron or store webhook re-verifying subscriptions (that would
+      // need real App Store Server Notifications / Google Play RTDN
+      // infrastructure this session has nothing to test against); this
+      // lazy check is what actually closes the gap instead — every
+      // capability check funnels through this one method, so a store
+      // subscription whose stated period has lapsed downgrades to FREE
+      // (and is persisted, so the DB row stops silently lying) the
+      // moment anyone reads it, not just at some future poll interval.
+      await this.prisma.userSubscription.update({
+        where: { userId },
+        data: { tier: 'FREE' },
+      });
+      return PlanTier.FREE;
+    }
+
+    return PlanTier.PREMIUM;
   }
 
   hasCapability(tier: PlanTier, capability: AppCapability): boolean {

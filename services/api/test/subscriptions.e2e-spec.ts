@@ -113,6 +113,44 @@ describe('Subscriptions and affordability foundation (e2e)', () => {
     },
   );
 
+  it('purchase reconciliation (Build Session 12 Part 22) — a PREMIUM row past its store expiresAt reads and persists as FREE', async () => {
+    const lapsed = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        firstName: 'Lex',
+        email: 'subscriptions-lapsed@example.com',
+        password: 'Str0ngPass!',
+        confirmPassword: 'Str0ngPass!',
+        acceptedTerms: true,
+      })
+      .expect(201);
+    const lapsedToken = lapsed.body.data.tokens.accessToken as string;
+    const lapsedUserId = lapsed.body.data.user.id as string;
+    const pastExpiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    await prisma.userSubscription.upsert({
+      where: { userId: lapsedUserId },
+      update: { tier: 'PREMIUM', expiresAt: pastExpiresAt, willRenew: false },
+      create: {
+        userId: lapsedUserId,
+        tier: 'PREMIUM',
+        expiresAt: pastExpiresAt,
+        willRenew: false,
+      },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get('/subscriptions/me')
+      .set({ Authorization: `Bearer ${lapsedToken}` })
+      .expect(200);
+    expect(res.body.data.tier).toBe('FREE');
+
+    // Not just the derived read — the row itself was downgraded, so a
+    // raw DB read agrees too (no cron needed; see CapabilityService.getPlanTier).
+    const row = await prisma.userSubscription.findUnique({ where: { userId: lapsedUserId } });
+    expect(row?.tier).toBe('FREE');
+  });
+
   it('records an affordability application and reflects it on /me', async () => {
     const applied = await request(app.getHttpServer())
       .post('/subscriptions/eligibility')

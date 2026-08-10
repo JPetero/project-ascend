@@ -1859,9 +1859,14 @@ model UserSubscription {
   // intent (Build Session 10 Part 26) — parsed straight out of the
   // Apple/Google verification response PurchasesService already
   // receives on every purchase, previously discarded. Nullable because
-  // older rows (and any future non-store grant) may not have it. No
-  // cron/webhook re-verifies or auto-downgrades on expiry yet — this
-  // only surfaces what the store told the client at verification time.
+  // older rows (and any future non-store grant) may not have it. There's
+  // still no cron/webhook proactively re-verifying with the store, but
+  // Build Session 12 Part 22 closed the actual practical gap: every
+  // CapabilityService.getPlanTier read (i.e. every entitlement check in
+  // the app) lazily downgrades `tier` to FREE — and persists it — the
+  // moment `expiresAt` is found to be in the past, so a lapsed store
+  // subscription can't silently stay PREMIUM forever just because no one
+  // repurchased.
   expiresAt DateTime?
   willRenew Boolean?
   createdAt DateTime         @default(now())
