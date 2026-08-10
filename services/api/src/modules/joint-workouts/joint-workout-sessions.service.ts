@@ -8,6 +8,7 @@ import {
   JointWorkoutEventType,
   JointWorkoutParticipantStatus,
   JointWorkoutSessionStatus,
+  TrainerGroupScheduledSessionRsvpStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FriendsService } from '../friends/friends.service';
@@ -73,6 +74,78 @@ export class JointWorkoutSessionsService {
     );
 
     return this.getById(hostId, session.id);
+  }
+
+  /**
+   * Turns a `TrainerGroupScheduledSession` booking into a real live
+   * session at meeting time (Build Session 13 continuation Part B) —
+   * reuses [create]'s existing `trainerGroupId` path exactly as the
+   * schema's own doc comment describes, rather than a second real-time
+   * implementation. Idempotent: a second "Start" tap (e.g. a slow
+   * network retry) returns the same already-created session instead of
+   * spawning a duplicate one.
+   */
+  async startFromScheduledSession(hostId: string, scheduledSessionId: string) {
+    const scheduled = await this.prisma.trainerGroupScheduledSession.findUnique({
+      where: { id: scheduledSessionId },
+    });
+    if (!scheduled) throw new NotFoundException('Scheduled session not found.');
+    if (scheduled.canceledAt) {
+      throw new BadRequestException('This session was canceled.');
+    }
+    if (scheduled.jointWorkoutSessionId) {
+      return this.getById(hostId, scheduled.jointWorkoutSessionId);
+    }
+
+    // resolveGroupSessionInvitees enforces the owner/moderator + expanded-
+    // tier bar, the same one `cancelScheduledSession` and
+    // `createScheduledSession` already apply to this booking.
+    const session = await this.create(hostId, {
+      trainerGroupId: scheduled.groupId,
+      title: scheduled.title ?? undefined,
+    });
+    if (!session) throw new NotFoundException('Session not found.');
+
+    await this.prisma.trainerGroupScheduledSession.update({
+      where: { id: scheduledSessionId },
+      data: { jointWorkoutSessionId: session.id },
+    });
+
+    return session;
+  }
+
+  /**
+   * "Join session" for a scheduled booking (Build Session 13
+   * continuation Part B) — restricted to members who actually RSVP'd
+   * GOING (or the booking's own creator), not every group member who
+   * happened to get auto-invited when [startFromScheduledSession]
+   * reused the whole-group `trainerGroupId` invite path. Auto-accepts a
+   * still-pending invite so tapping "Join" is one action instead of a
+   * separate invite/accept/ready sequence.
+   */
+  async joinFromScheduledSession(userId: string, scheduledSessionId: string) {
+    const scheduled = await this.prisma.trainerGroupScheduledSession.findUnique({
+      where: { id: scheduledSessionId },
+      include: { participants: { where: { userId } } },
+    });
+    if (!scheduled) throw new NotFoundException('Scheduled session not found.');
+    if (!scheduled.jointWorkoutSessionId) {
+      throw new BadRequestException('This session has not started yet.');
+    }
+    const isEligible =
+      scheduled.createdById === userId ||
+      scheduled.participants.some((p) => p.status === TrainerGroupScheduledSessionRsvpStatus.GOING);
+    if (!isEligible) {
+      throw new ForbiddenException('Only members who RSVP’d Going can join this session.');
+    }
+
+    const session = await this.getById(userId, scheduled.jointWorkoutSessionId);
+    const participant = session?.participants.find((p) => p.userId === userId);
+    if (participant?.status === JointWorkoutParticipantStatus.INVITED) {
+      await this.acceptInvite(userId, scheduled.jointWorkoutSessionId);
+      return this.getById(userId, scheduled.jointWorkoutSessionId);
+    }
+    return session;
   }
 
   async invite(hostId: string, sessionId: string, inviteeId: string) {

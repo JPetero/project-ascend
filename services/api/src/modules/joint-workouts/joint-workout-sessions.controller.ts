@@ -28,6 +28,22 @@ export class JointWorkoutSessionsController {
     return this.sessions.getById(user.id, id);
   }
 
+  @Post('scheduled-sessions/:scheduledSessionId/start')
+  startFromScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('scheduledSessionId') scheduledSessionId: string,
+  ) {
+    return this.sessions.startFromScheduledSession(user.id, scheduledSessionId);
+  }
+
+  @Post('scheduled-sessions/:scheduledSessionId/join')
+  joinFromScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('scheduledSessionId') scheduledSessionId: string,
+  ) {
+    return this.sessions.joinFromScheduledSession(user.id, scheduledSessionId);
+  }
+
   @Post(':id/invite')
   invite(
     @CurrentUser() user: AuthenticatedUser,

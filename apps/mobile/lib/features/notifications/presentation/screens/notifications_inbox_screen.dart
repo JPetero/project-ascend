@@ -48,6 +48,8 @@ IconData _iconFor(NotificationEventType type) {
       return Icons.assignment_ind_outlined;
     case NotificationEventType.groupSessionScheduled:
       return Icons.event_available_outlined;
+    case NotificationEventType.groupSessionCanceled:
+      return Icons.event_busy_outlined;
     case NotificationEventType.unknown:
       return Icons.notifications_outlined;
   }

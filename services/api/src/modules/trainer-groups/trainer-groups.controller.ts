@@ -111,6 +111,14 @@ export class TrainerGroupsController {
     return this.trainerGroupsService.cancelAssignment(user.id, assignmentId);
   }
 
+  @Get('scheduled-sessions/:sessionId')
+  getScheduledSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.trainerGroupsService.getScheduledSession(user.id, sessionId);
+  }
+
   @Delete('scheduled-sessions/:sessionId')
   @HttpCode(HttpStatus.NO_CONTENT)
   cancelScheduledSession(

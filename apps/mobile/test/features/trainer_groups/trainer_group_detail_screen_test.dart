@@ -205,6 +205,63 @@ void main() {
     expect(find.textContaining('Session detail session-1'), findsOneWidget);
   });
 
+  testWidgets('tapping a scheduled session card opens its full detail screen '
+      '(Build Session 13 continuation Part B)', (tester) async {
+    final trainerGroupsRepository = FakeTrainerGroupsRepository(
+      groups: [sampleGroup(id: 'group-1', ownerId: 'user-1', isOwnGroup: true)],
+    );
+    trainerGroupsRepository.scheduledSessions.add(
+      TrainerGroupScheduledSession(
+        id: 'session-1',
+        groupId: 'group-1',
+        createdById: 'user-1',
+        title: 'Saturday squad session',
+        scheduledAt: DateTime.now().add(const Duration(days: 1)),
+        createdAt: DateTime.now(),
+      ),
+    );
+    final container = await createTestContainer(
+      signedIn: true,
+      trainerGroupsRepository: trainerGroupsRepository,
+    );
+    addTearDown(container.dispose);
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) =>
+              const TrainerGroupDetailScreen(groupId: 'group-1'),
+        ),
+        GoRoute(
+          path: RoutePaths.trainerGroupScheduledSessionDetail,
+          builder: (context, state) => Scaffold(
+            body: Text(
+              'Scheduled session detail ${state.pathParameters['sessionId']}',
+            ),
+          ),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    await tester.tap(find.text('Scheduled'));
+    await pumpForAsyncSettle(tester);
+    expect(find.text('Saturday squad session'), findsOneWidget);
+
+    await tester.tap(find.text('Saturday squad session'));
+    await pumpForAsyncSettle(tester);
+
+    expect(find.text('Scheduled session detail session-1'), findsOneWidget);
+  });
+
   testWidgets(
     'the schedule-a-session action does not appear on a free-tier group',
     (tester) async {

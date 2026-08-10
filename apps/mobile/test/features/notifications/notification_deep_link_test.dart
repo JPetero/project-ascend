@@ -138,6 +138,42 @@ void main() {
     test('an unknown type never navigates, regardless of data', () {
       expect(deepLinkPathFor(NotificationEventType.unknown, 'some-id'), isNull);
     });
+
+    test(
+      'groupSessionScheduled opens the specific session (Build Session 13 continuation Part B)',
+      () {
+        expect(
+          deepLinkPathFor(
+            NotificationEventType.groupSessionScheduled,
+            'session-1',
+          ),
+          '/social/groups/sessions/session-1',
+        );
+      },
+    );
+
+    test(
+      'groupSessionScheduled falls back to the groups list with no data',
+      () {
+        expect(
+          deepLinkPathFor(NotificationEventType.groupSessionScheduled, null),
+          '/social/groups',
+        );
+      },
+    );
+
+    test(
+      'groupSessionCanceled opens the same session detail — the canceled state is honest, not a 404',
+      () {
+        expect(
+          deepLinkPathFor(
+            NotificationEventType.groupSessionCanceled,
+            'session-2',
+          ),
+          '/social/groups/sessions/session-2',
+        );
+      },
+    );
   });
 
   group('notificationEventTypeFromJson fails closed', () {
@@ -173,5 +209,15 @@ void main() {
         NotificationEventType.supportReply,
       );
     });
+
+    test(
+      'GROUP_SESSION_CANCELED parses to the real groupSessionCanceled type',
+      () {
+        expect(
+          notificationEventTypeFromJson('GROUP_SESSION_CANCELED'),
+          NotificationEventType.groupSessionCanceled,
+        );
+      },
+    );
   });
 }

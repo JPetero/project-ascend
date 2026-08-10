@@ -349,4 +349,101 @@ describe('Trainer groups — expanded tier (e2e)', () => {
       expect(types).toContain('GROUP_SESSION_CANCELED');
     });
   });
+
+  describe('scheduled session detail + Joint Workout integration (Build Session 13 continuation Part B)', () => {
+    let sessionId: string;
+
+    beforeAll(async () => {
+      const created = await request(app.getHttpServer())
+        .post(`/trainer-groups/${groupId}/scheduled-sessions`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({
+          title: 'Live meetup',
+          scheduledAt: new Date(Date.now() + 86_400_000).toISOString(),
+        })
+        .expect(201);
+      sessionId = created.body.data.id as string;
+
+      await request(app.getHttpServer())
+        .post(`/trainer-groups/scheduled-sessions/${sessionId}/rsvp`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ status: 'GOING' })
+        .expect(201);
+    });
+
+    it('fetches the single-session detail with jointWorkoutSessionId unset before it starts', async () => {
+      const detail = await request(app.getHttpServer())
+        .get(`/trainer-groups/scheduled-sessions/${sessionId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      expect(detail.body.data.id).toBe(sessionId);
+      expect(detail.body.data.jointWorkoutSessionId).toBeNull();
+    });
+
+    it('rejects joining before the host has started the session', async () => {
+      await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/join`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(400);
+    });
+
+    it('the host starts the session, reusing the trainerGroupId Joint Workout path', async () => {
+      const started = await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/start`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(201);
+      expect(started.body.data.hostId).toBe(ownerId);
+      const memberParticipant = (
+        started.body.data.participants as { userId: string; status: string }[]
+      ).find((p) => p.userId === memberId);
+      expect(memberParticipant?.status).toBe('INVITED');
+
+      const detail = await request(app.getHttpServer())
+        .get(`/trainer-groups/scheduled-sessions/${sessionId}`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(200);
+      expect(detail.body.data.jointWorkoutSessionId).toBe(started.body.data.id);
+    });
+
+    it('starting a second time is idempotent and returns the same live session', async () => {
+      const first = await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/start`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(201);
+      const second = await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/start`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .expect(201);
+      expect(second.body.data.id).toBe(first.body.data.id);
+    });
+
+    it('a member who RSVP’d Going can join and is auto-accepted', async () => {
+      const joined = await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/join`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(201);
+      const self = (joined.body.data.participants as { userId: string; status: string }[]).find(
+        (p) => p.userId === memberId,
+      );
+      expect(self?.status).toBe('ACCEPTED');
+    });
+
+    it('a member who never RSVP’d Going is rejected from joining', async () => {
+      const bystander = await register('rsvp-bystander@example.com', 'Bea');
+      const invite = await request(app.getHttpServer())
+        .post(`/trainer-groups/${groupId}/invitations`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ inviteeUserId: bystander.id })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/trainer-groups/invitations/${invite.body.data.id}/accept`)
+        .set('Authorization', `Bearer ${bystander.token}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/joint-workouts/scheduled-sessions/${sessionId}/join`)
+        .set('Authorization', `Bearer ${bystander.token}`)
+        .expect(403);
+    });
+  });
 });

@@ -357,6 +357,13 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
   }
 
   @override
+  Future<TrainerGroupScheduledSession> getScheduledSession(
+    String sessionId,
+  ) async {
+    return scheduledSessions.firstWhere((s) => s.id == sessionId);
+  }
+
+  @override
   Future<List<TrainerGroupScheduledSession>> listScheduledSessions(
     String groupId,
   ) async {
@@ -369,7 +376,30 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
 
   @override
   Future<void> cancelScheduledSession(String sessionId) async {
-    scheduledSessions.removeWhere((s) => s.id == sessionId);
+    final index = scheduledSessions.indexWhere((s) => s.id == sessionId);
+    if (index == -1) return;
+    final session = scheduledSessions[index];
+    scheduledSessions[index] = TrainerGroupScheduledSession(
+      id: session.id,
+      groupId: session.groupId,
+      createdById: session.createdById,
+      title: session.title,
+      scheduledAt: session.scheduledAt,
+      durationMinutes: session.durationMinutes,
+      location: session.location,
+      videoLink: session.videoLink,
+      description: session.description,
+      workoutPlanId: session.workoutPlanId,
+      workoutPlanName: session.workoutPlanName,
+      jointWorkoutSessionId: session.jointWorkoutSessionId,
+      canceledAt: DateTime.now(),
+      createdAt: session.createdAt,
+      status: ScheduledSessionStatus.canceled,
+      goingCount: session.goingCount,
+      maybeCount: session.maybeCount,
+      declinedCount: session.declinedCount,
+      viewerRsvpStatus: session.viewerRsvpStatus,
+    );
   }
 
   @override
@@ -391,6 +421,7 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
       description: current.description,
       workoutPlanId: current.workoutPlanId,
       workoutPlanName: current.workoutPlanName,
+      jointWorkoutSessionId: current.jointWorkoutSessionId,
       canceledAt: current.canceledAt,
       createdAt: current.createdAt,
       status: current.status,
@@ -419,6 +450,7 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
       description: current.description,
       workoutPlanId: current.workoutPlanId,
       workoutPlanName: current.workoutPlanName,
+      jointWorkoutSessionId: current.jointWorkoutSessionId,
       canceledAt: current.canceledAt,
       createdAt: current.createdAt,
       status: current.status,

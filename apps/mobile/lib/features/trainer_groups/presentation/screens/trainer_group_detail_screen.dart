@@ -943,6 +943,11 @@ class _ScheduledSessionsTab extends StatelessWidget {
                   children: [
                     for (final session in sessions)
                       AscendCard(
+                        onTap: () => context.push(
+                          RoutePaths.trainerGroupScheduledSessionDetailPath(
+                            session.id,
+                          ),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [

@@ -44,6 +44,36 @@ class JointWorkoutSessionsRepository {
     return JointWorkoutSession.fromJson(envelope.data!);
   }
 
+  /// Turns a trainer-group scheduled booking into a real live session
+  /// (Build Session 13 continuation Part B) — reuses this same module's
+  /// existing `trainerGroupId` [create] path server-side rather than a
+  /// second real-time implementation. Idempotent: calling this again
+  /// after the session already started returns the same live session.
+  Future<JointWorkoutSession> startFromScheduledSession(
+    String scheduledSessionId,
+  ) async {
+    final envelope = await _apiClient.post(
+      '/joint-workouts/scheduled-sessions/$scheduledSessionId/start',
+      (data) => data as Map<String, dynamic>,
+    );
+    return JointWorkoutSession.fromJson(envelope.data!);
+  }
+
+  /// "Join session" for a scheduled booking, restricted server-side to
+  /// members who RSVP'd Going (or the booking's own creator) — see
+  /// JointWorkoutSessionsService.joinFromScheduledSession. Auto-accepts a
+  /// still-pending invite, so this is the one call a Going participant
+  /// needs to reach the live session.
+  Future<JointWorkoutSession> joinFromScheduledSession(
+    String scheduledSessionId,
+  ) async {
+    final envelope = await _apiClient.post(
+      '/joint-workouts/scheduled-sessions/$scheduledSessionId/join',
+      (data) => data as Map<String, dynamic>,
+    );
+    return JointWorkoutSession.fromJson(envelope.data!);
+  }
+
   Future<void> invite(String sessionId, String inviteeId) async {
     await _apiClient.post(
       '/joint-workouts/$sessionId/invite',

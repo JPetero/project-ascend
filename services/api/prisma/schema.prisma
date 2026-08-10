@@ -1768,29 +1768,37 @@ model WorkoutAssignment {
 // derived from `scheduledAt` (+ `durationMinutes`) vs now rather than a
 // mutable field the host has to remember to set; `canceledAt` stays the
 // one explicit, host-driven state transition. `workoutPlanId` is purely
-// a preview/reference — starting the actual real-time session at
-// meeting time reuses JointWorkoutSessionsService.create's existing
-// `trainerGroupId` path (see its doc comment) rather than a new
-// real-time implementation living here.
+// a preview/reference.
+//
+// Build Session 13 continuation Part B added `jointWorkoutSessionId` —
+// starting the actual real-time session at meeting time reuses
+// JointWorkoutSessionsService.create's existing `trainerGroupId` path
+// (see its doc comment) rather than a new real-time implementation
+// living here; this column just remembers which JointWorkoutSession a
+// given booking's "Start" turned into, so a second tap (or another
+// eligible Going member's "Join") converges on the same live session
+// instead of creating a new one every time.
 model TrainerGroupScheduledSession {
-  id              String    @id @default(uuid())
-  groupId         String
-  createdById     String
-  title           String?
-  scheduledAt     DateTime
-  durationMinutes Int?
-  location        String?
-  videoLink       String?
-  description     String?
-  workoutPlanId   String?
-  canceledAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  groupId             String
+  createdById         String
+  title               String?
+  scheduledAt         DateTime
+  durationMinutes     Int?
+  location            String?
+  videoLink           String?
+  description         String?
+  workoutPlanId       String?
+  jointWorkoutSessionId String? @unique
+  canceledAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  group        TrainerGroup                              @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy    User                                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  workoutPlan  WorkoutPlan?                              @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
-  participants TrainerGroupScheduledSessionParticipant[]
+  group              TrainerGroup                              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy          User                                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  workoutPlan        WorkoutPlan?                              @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
+  jointWorkoutSession JointWorkoutSession?                     @relation(fields: [jointWorkoutSessionId], references: [id], onDelete: SetNull)
+  participants       TrainerGroupScheduledSessionParticipant[]
 
   @@index([groupId, scheduledAt])
   @@map("trainer_group_scheduled_sessions")
@@ -2654,9 +2662,10 @@ model JointWorkoutSession {
   finishedAt DateTime?
   canceledAt DateTime?
 
-  host         User                      @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  participants JointWorkoutParticipant[]
-  events       JointWorkoutEvent[]
+  host             User                          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  participants     JointWorkoutParticipant[]
+  events           JointWorkoutEvent[]
+  scheduledSession TrainerGroupScheduledSession?
 
   @@index([hostId])
   @@map("joint_workout_sessions")

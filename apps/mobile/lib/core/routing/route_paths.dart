@@ -63,6 +63,11 @@ abstract final class RoutePaths {
   static const trainerGroups = '/social/groups';
   static const trainerGroupCreate = '/social/groups/new';
   static const trainerGroupDetail = '/social/groups/:id';
+  // Scheduled session detail (Build Session 13 continuation Part B) —
+  // previously only ever rendered inline as a tab within group detail;
+  // notifications and "view full detail" now deep-link here directly.
+  static const trainerGroupScheduledSessionDetail =
+      '/social/groups/sessions/:sessionId';
   // Trainer Dashboard (Build Session 12 Part 11) — read-only aggregate
   // across every group the caller owns or moderates.
   static const trainerDashboard = '/social/groups/dashboard';
@@ -185,6 +190,8 @@ abstract final class RoutePaths {
   static String communityProfilePath(String userId) =>
       '/social/profile/$userId';
   static String trainerGroupDetailPath(String id) => '/social/groups/$id';
+  static String trainerGroupScheduledSessionDetailPath(String sessionId) =>
+      '/social/groups/sessions/$sessionId';
   static String challengeDetailPath(String id) =>
       '/leaderboards/challenges/$id';
 

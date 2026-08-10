@@ -830,6 +830,27 @@ export class TrainerGroupsService {
     );
   }
 
+  /**
+   * Single-session detail fetch (Build Session 13 continuation Part B) —
+   * `listScheduledSessions` only ever returns a whole group's upcoming
+   * bookings, so the mobile session-detail screen needs its own fetch
+   * rather than asking the caller to keep the list screen's state around.
+   * Any group member may view a canceled session's detail too (unlike
+   * `listScheduledSessions`, which filters canceled ones out), so
+   * following a stale link or notification still shows the honest
+   * canceled state instead of a 404.
+   */
+  async getScheduledSession(userId: string, sessionId: string) {
+    const session = await this.prisma.trainerGroupScheduledSession.findUnique({
+      where: { id: sessionId },
+      include: { workoutPlan: { select: { name: true } } },
+    });
+    if (!session) throw new NotFoundException('Scheduled session not found.');
+    await this.assertMember(userId, session.groupId);
+    const summary = (await this.summarizeParticipants([sessionId], userId)).get(sessionId)!;
+    return this.serializeScheduledSession(session, session.workoutPlan?.name ?? null, summary);
+  }
+
   async cancelScheduledSession(userId: string, sessionId: string): Promise<void> {
     const session = await this.prisma.trainerGroupScheduledSession.findUnique({
       where: { id: sessionId },
@@ -1237,6 +1258,7 @@ export class TrainerGroupsService {
       videoLink: string | null;
       description: string | null;
       workoutPlanId: string | null;
+      jointWorkoutSessionId: string | null;
       canceledAt: Date | null;
       createdAt: Date;
     },
@@ -1255,6 +1277,12 @@ export class TrainerGroupsService {
       description: s.description,
       workoutPlanId: s.workoutPlanId,
       workoutPlanName,
+      // Set once the host taps "Start" (Build Session 13 continuation
+      // Part B) — see JointWorkoutSessionsService.startFromScheduledSession.
+      // Non-null means the live session already exists, so the mobile
+      // detail screen shows "Join session" instead of "Start" for
+      // eligible Going participants.
+      jointWorkoutSessionId: s.jointWorkoutSessionId,
       canceledAt: s.canceledAt,
       createdAt: s.createdAt,
       status: deriveScheduledSessionStatus(s),
