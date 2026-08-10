@@ -51,6 +51,11 @@ enum AdminPermission {
   // and neither is sensitive enough (no user data, no moderation power)
   // to warrant its own grant.
   MANAGE_PLATFORM
+  // Build Session 12 Part 25-26 — reviewing TrainerVerificationApplication
+  // rows. Its own permission rather than reusing REVIEW_ELIGIBILITY:
+  // affordability and trainer credentials are unrelated review queues
+  // that shouldn't be bundled onto the same grant.
+  REVIEW_TRAINER_VERIFICATION
 }
 
 model AdminPermissionGrant {
@@ -186,6 +191,7 @@ model User {
   challengeParticipations          ChallengeParticipant[]
   subscription                     UserSubscription?
   affordabilityEligibility         AffordabilityEligibility?
+  trainerVerificationApplication   TrainerVerificationApplication?
   supportTickets                   SupportTicket[]
   supportTicketReplies             SupportTicketReply[]
   promotedCampaigns                PromotedCampaign[]
@@ -1403,7 +1409,16 @@ model CommunityProfile {
   // A trainer/creator's own posts can be flagged as trainer content per
   // post (CommunityPost.isTrainerContent); this flag controls whether a
   // "Trainer" badge shows next to their name/profile at all.
+  // Self-declared, not verified — see `verifiedTrainer` below for the
+  // real reviewed credential.
   isTrainer          Boolean                    @default(false)
+  // Build Session 12 Part 25-26 — set only by an admin approving this
+  // user's TrainerVerificationApplication, never self-service like
+  // `isTrainer` above. Deliberately a separate field rather than
+  // reusing/upgrading `isTrainer`: an existing self-declared badge must
+  // never silently start claiming "verified", and a rejected/revoked
+  // verification must never blank out a user's own honest self-badge.
+  verifiedTrainer    Boolean                    @default(false)
   // Free from day one — per parking-lot.md's "Profile customization and
   // safe media (14)" note, privacy controls ship free, not as a later
   // premium layer. PUBLIC matches the pre-existing default visibility a
@@ -1944,6 +1959,35 @@ model AffordabilityEligibility {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("affordability_eligibilities")
+}
+
+enum TrainerVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Build Session 12 Part 25-26 — the real trainer verification flow that
+// never existed before (CommunityProfile.isTrainer was, and remains,
+// purely self-declared). Same one-row-per-user, re-appliable-after-
+// rejection shape as AffordabilityEligibility above. An APPROVED
+// decision is what actually sets CommunityProfile.verifiedTrainer —
+// see TrainerVerificationService.decide.
+model TrainerVerificationApplication {
+  id          String                    @id @default(uuid())
+  userId      String                    @unique
+  // Free-text credentials/certifications the applicant provides for an
+  // admin to review — e.g. certification body, license number, years of
+  // experience. Never machine-verified this session; a human admin
+  // decides.
+  credentials String
+  status      TrainerVerificationStatus @default(PENDING)
+  submittedAt DateTime                  @default(now())
+  reviewedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trainer_verification_applications")
 }
 
 // Support — Founder Scenario 27. Every category here is free on every
@@ -2931,9 +2975,7 @@ enum NotificationType {
   // Build Session 12 Part 2 — each has a real trigger (admin.service.ts)
   // and a real mobile destination (the same Support ticket detail
   // screen for the first three; the Promote campaign detail screen for
-  // the last). TRAINER_VERIFICATION_UPDATE is deliberately NOT added
-  // here — no trainer-verification backend exists yet to ever emit it;
-  // see build-session-12.md.
+  // the last).
   SUPPORT_REPLY
   SUPPORT_STATUS_CHANGED
   MODERATION_DECISION
@@ -2944,6 +2986,9 @@ enum NotificationType {
   // group member, or scheduling a session for the group.
   WORKOUT_ASSIGNED
   GROUP_SESSION_SCHEDULED
+  // Build Session 12 Part 25-26 — TrainerVerificationService now exists
+  // (see its own doc comment), so this finally has a real trigger.
+  TRAINER_VERIFICATION_UPDATE
 }
 
 model NotificationPreference {

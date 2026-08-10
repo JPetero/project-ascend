@@ -155,6 +155,11 @@ class _EditCommunityProfileScreenState
                   value: _isTrainer,
                   onChanged: (value) => setState(() => _isTrainer = value),
                 ),
+                OutlinedButton.icon(
+                  onPressed: () => context.push(RoutePaths.trainerVerification),
+                  icon: const Icon(Icons.verified_outlined),
+                  label: const Text('Apply for real trainer verification'),
+                ),
                 if (_error != null) ...[
                   const SizedBox(height: AscendSpacing.sm),
                   Text(

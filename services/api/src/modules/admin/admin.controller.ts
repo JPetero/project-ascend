@@ -22,11 +22,13 @@ import { AdminService } from './admin.service';
 import { ActionReportDto } from './dto/action-report.dto';
 import { DecideCampaignDto } from './dto/decide-campaign.dto';
 import { DecideEligibilityDto } from './dto/decide-eligibility.dto';
+import { DecideTrainerVerificationDto } from './dto/decide-trainer-verification.dto';
 import { GrantAdminPermissionDto } from './dto/grant-admin-permission.dto';
 import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { ListTicketsDto } from './dto/list-tickets.dto';
+import { ListTrainerVerificationDto } from './dto/list-trainer-verification.dto';
 import { AdminReplyTicketDto } from './dto/reply-ticket.dto';
 import { ReleaseReadinessService } from './release-readiness.service';
 
@@ -164,5 +166,22 @@ export class AdminController {
   @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
   releaseReadiness() {
     return this.releaseReadinessService.check();
+  }
+
+  // --- Trainer verification review (Build Session 12 Part 25-26) --------
+
+  @Get('trainer-verification-applications')
+  @RequireAdminPermission(AdminPermission.REVIEW_TRAINER_VERIFICATION)
+  listTrainerVerificationApplications(@Query() query: ListTrainerVerificationDto) {
+    return this.adminService.listTrainerVerificationApplications(query);
+  }
+
+  @Patch('trainer-verification-applications/:userId')
+  @RequireAdminPermission(AdminPermission.REVIEW_TRAINER_VERIFICATION)
+  decideTrainerVerification(
+    @Param('userId') userId: string,
+    @Body() dto: DecideTrainerVerificationDto,
+  ) {
+    return this.adminService.decideTrainerVerification(userId, dto);
   }
 }

@@ -52,9 +52,10 @@ String? deepLinkPathFor(NotificationEventType type, String? data) {
       // subscription screen — there's no separate eligibility route.
       return RoutePaths.subscription;
     case NotificationEventType.trainerVerificationUpdate:
-      // No trainer-verification UI exists yet (deferred — see
-      // build-session-12.md) — nothing to navigate to.
-      return null;
+      // Application status is shown inline on the Trainer Verification
+      // screen (Build Session 12 Part 25-26) — there's no per-decision
+      // detail route.
+      return RoutePaths.trainerVerification;
     case NotificationEventType.workoutAssigned:
       // [data] is the assignment id, but there's no per-assignment
       // detail route — the to-do list is the most specific place there

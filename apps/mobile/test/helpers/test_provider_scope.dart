@@ -46,6 +46,7 @@ import 'package:mobile/features/profile/presentation/providers/profile_controlle
 import 'package:mobile/features/promote/presentation/providers/promote_controller.dart';
 import 'package:mobile/features/purchases/presentation/providers/purchase_controller.dart';
 import 'package:mobile/features/trainer_groups/presentation/providers/trainer_groups_controller.dart';
+import 'package:mobile/features/trainer_verification/presentation/providers/trainer_verification_controller.dart';
 import 'package:mobile/features/wearables/presentation/providers/device_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/deload_controller.dart';
 import 'package:mobile/features/workout/presentation/providers/exercise_controller.dart';
@@ -91,6 +92,7 @@ import 'fake_subscription_status_repository.dart';
 import 'fake_subscriptions_repository.dart';
 import 'fake_support_repository.dart';
 import 'fake_trainer_groups_repository.dart';
+import 'fake_trainer_verification_repository.dart';
 import 'fake_workout_repositories.dart';
 import 'in_memory_token_store.dart';
 
@@ -121,6 +123,7 @@ Future<ProviderContainer> createTestContainer({
   FakeHealthMetricsRepository? healthMetricsRepository,
   FakeCommunityRepository? communityRepository,
   FakeTrainerGroupsRepository? trainerGroupsRepository,
+  FakeTrainerVerificationRepository? trainerVerificationRepository,
   FakeRankingsRepository? rankingsRepository,
   FakeChallengesRepository? challengesRepository,
   FakeSubscriptionStatusRepository? subscriptionStatusRepository,
@@ -252,6 +255,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       trainerGroupsRepositoryProvider.overrideWithValue(
         trainerGroupsRepository ?? FakeTrainerGroupsRepository(),
+      ),
+      trainerVerificationRepositoryProvider.overrideWithValue(
+        trainerVerificationRepository ?? FakeTrainerVerificationRepository(),
       ),
       rankingsRepositoryProvider.overrideWithValue(
         rankingsRepository ?? FakeRankingsRepository(),

@@ -46,6 +46,7 @@ import '../../features/trainer_groups/presentation/screens/my_assignments_screen
 import '../../features/trainer_groups/presentation/screens/trainer_dashboard_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
+import '../../features/trainer_verification/presentation/screens/trainer_verification_screen.dart';
 import '../../features/rankings/presentation/screens/rankings_screen.dart';
 import '../../features/nutrition/domain/meal_type.dart';
 import '../../features/nutrition/presentation/screens/custom_food_editor_screen.dart';
@@ -363,6 +364,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.communityContentAnalytics,
         builder: (context, state) => const ContentAnalyticsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerVerification,
+        builder: (context, state) => const TrainerVerificationScreen(),
       ),
       GoRoute(
         path: RoutePaths.friends,

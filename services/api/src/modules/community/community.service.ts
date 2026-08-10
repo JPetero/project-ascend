@@ -28,6 +28,7 @@ const PROFILE_SELECT = {
   bio: true,
   avatarUrl: true,
   isTrainer: true,
+  verifiedTrainer: true,
   visibility: true,
   avatarMediaAsset: { select: { storageKey: true } },
   coverMediaAsset: { select: { storageKey: true } },

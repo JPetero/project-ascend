@@ -265,7 +265,14 @@ class _ProfileHeader extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (profile.isTrainer) ...[
+                        if (profile.verifiedTrainer) ...[
+                          const SizedBox(width: AscendSpacing.xs),
+                          Icon(
+                            Icons.verified,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ] else if (profile.isTrainer) ...[
                           const SizedBox(width: AscendSpacing.xs),
                           Icon(
                             Icons.verified_outlined,

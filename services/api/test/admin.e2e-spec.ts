@@ -65,6 +65,7 @@ describe('Admin foundation (e2e)', () => {
         { userId: admin.id, permission: 'MODERATE_COMMUNITY' },
         { userId: admin.id, permission: 'REVIEW_ELIGIBILITY' },
         { userId: admin.id, permission: 'MANAGE_SUPPORT' },
+        { userId: admin.id, permission: 'REVIEW_TRAINER_VERIFICATION' },
       ],
     });
   });
@@ -180,6 +181,78 @@ describe('Admin foundation (e2e)', () => {
     it('404s a user who never applied', async () => {
       await request(app.getHttpServer())
         .patch('/admin/eligibility-applications/00000000-0000-0000-0000-000000000000')
+        .set(authAdmin())
+        .send({ status: 'APPROVED' })
+        .expect(404);
+    });
+  });
+
+  describe('Trainer verification review (Build Session 12 Part 25-26)', () => {
+    it('rejects an admin lacking REVIEW_TRAINER_VERIFICATION', async () => {
+      await request(app.getHttpServer())
+        .get('/admin/trainer-verification-applications')
+        .set(authA())
+        .expect(403);
+    });
+
+    it('applies, lists as PENDING, approves, and flips CommunityProfile.verifiedTrainer', async () => {
+      await request(app.getHttpServer())
+        .post('/community/trainer-verification')
+        .set(authA())
+        .send({ credentials: 'NASM-certified personal trainer, 5 years experience.' })
+        .expect(201);
+
+      const mine = await request(app.getHttpServer())
+        .get('/community/trainer-verification/me')
+        .set(authA())
+        .expect(200);
+      expect(mine.body.data.status).toBe('PENDING');
+
+      const queue = await request(app.getHttpServer())
+        .get('/admin/trainer-verification-applications')
+        .query({ status: 'PENDING' })
+        .set(authAdmin())
+        .expect(200);
+      expect(queue.body.data.data.some((a: { userId: string }) => a.userId === userIdA)).toBe(true);
+
+      await request(app.getHttpServer())
+        .post('/community/profile')
+        .set(authA())
+        .send({ displayName: 'Ada', isTrainer: true })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/admin/trainer-verification-applications/${userIdA}`)
+        .set(authAdmin())
+        .send({ status: 'APPROVED' })
+        .expect(200);
+
+      const profile = await request(app.getHttpServer())
+        .get(`/community/profile/${userIdA}`)
+        .set(authAdmin())
+        .expect(200);
+      expect(profile.body.data.verifiedTrainer).toBe(true);
+
+      const events = await request(app.getHttpServer())
+        .get('/notifications/events')
+        .set(authA())
+        .expect(200);
+      expect(
+        events.body.data.some((e: { type: string }) => e.type === 'TRAINER_VERIFICATION_UPDATE'),
+      ).toBe(true);
+    });
+
+    it('rejects a decision of PENDING', async () => {
+      await request(app.getHttpServer())
+        .patch(`/admin/trainer-verification-applications/${userIdA}`)
+        .set(authAdmin())
+        .send({ status: 'PENDING' })
+        .expect(400);
+    });
+
+    it('404s a user who never applied', async () => {
+      await request(app.getHttpServer())
+        .patch('/admin/trainer-verification-applications/00000000-0000-0000-0000-000000000000')
         .set(authAdmin())
         .send({ status: 'APPROVED' })
         .expect(404);

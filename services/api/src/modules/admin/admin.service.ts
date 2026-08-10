@@ -7,6 +7,7 @@ import {
   PromotedCampaignStatus,
   SupportTicketCategory,
   SupportTicketStatus,
+  TrainerVerificationStatus,
   UserRole,
 } from '@prisma/client';
 import { AuditService } from '../../common/audit/audit.service';
@@ -16,11 +17,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ActionReportDto } from './dto/action-report.dto';
 import { DecideCampaignDto } from './dto/decide-campaign.dto';
 import { DecideEligibilityDto } from './dto/decide-eligibility.dto';
+import { DecideTrainerVerificationDto } from './dto/decide-trainer-verification.dto';
 import { GrantAdminPermissionDto } from './dto/grant-admin-permission.dto';
 import { ListCampaignsDto } from './dto/list-campaigns.dto';
 import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { ListTicketsDto } from './dto/list-tickets.dto';
+import { ListTrainerVerificationDto } from './dto/list-trainer-verification.dto';
 import { AdminReplyTicketDto } from './dto/reply-ticket.dto';
 
 /**
@@ -146,6 +149,56 @@ export class AdminService {
       NotificationType.ELIGIBILITY_VERIFICATION_UPDATE,
       'Eligibility application update',
       'Your Ascend affordability program application has an update.',
+    );
+
+    return updated;
+  }
+
+  // --- Trainer verification review (Build Session 12 Part 25-26) --------
+
+  async listTrainerVerificationApplications(query: ListTrainerVerificationDto) {
+    const where = { status: query.status };
+    const [applications, total] = await Promise.all([
+      this.prisma.trainerVerificationApplication.findMany({
+        where,
+        orderBy: { submittedAt: 'asc' },
+        ...paginationArgs(query),
+      }),
+      this.prisma.trainerVerificationApplication.count({ where }),
+    ]);
+    return { data: applications, meta: paginationMeta(query, total) };
+  }
+
+  async decideTrainerVerification(userId: string, dto: DecideTrainerVerificationDto) {
+    if (dto.status === TrainerVerificationStatus.PENDING) {
+      throw new BadRequestException('A decision must be APPROVED or REJECTED.');
+    }
+    const existing = await this.prisma.trainerVerificationApplication.findUnique({
+      where: { userId },
+    });
+    if (!existing) {
+      throw new NotFoundException('No trainer verification application for this user.');
+    }
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.trainerVerificationApplication.update({
+        where: { userId },
+        data: { status: dto.status, reviewedAt: new Date() },
+      }),
+      // A CommunityProfile might not exist yet (the user never set one
+      // up) — updateMany is a safe no-op rather than a 404 in that edge
+      // case; the application's own status is still recorded either way.
+      this.prisma.communityProfile.updateMany({
+        where: { userId },
+        data: { verifiedTrainer: dto.status === TrainerVerificationStatus.APPROVED },
+      }),
+    ]);
+
+    await this.notifications.notify(
+      userId,
+      NotificationType.TRAINER_VERIFICATION_UPDATE,
+      'Trainer verification update',
+      'Your Ascend trainer verification application has an update.',
     );
 
     return updated;
