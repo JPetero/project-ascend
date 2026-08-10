@@ -6,6 +6,8 @@ import '../../../../core/design_system/design_system.dart';
 import '../../../../core/entitlements/capability.dart';
 import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../domain/campaign.dart';
 import '../providers/promote_controller.dart';
 
@@ -13,7 +15,11 @@ import '../providers/promote_controller.dart';
 /// Premium; viewing/interacting with promoted content elsewhere in the
 /// app stays free for everyone. Every campaign starts PENDING_REVIEW
 /// and only an admin can move it to ACTIVE — nothing here can ever
-/// serve paid reach without moderation review first.
+/// serve paid reach without moderation review first. The ASCEND_PROMOTE
+/// feature flag (Build Session 13 continuation Part A, default closed)
+/// additionally gates only the "new campaign" action, not this screen's
+/// existing-campaign list — organic Community browsing/interaction is
+/// never affected by this flag either way.
 class PromoteScreen extends ConsumerWidget {
   const PromoteScreen({super.key});
 
@@ -22,10 +28,13 @@ class PromoteScreen extends ConsumerWidget {
     final hasAccess = ref.watch(
       capabilityProvider(AppCapability.ascendPromote),
     );
+    final canCreate =
+        hasAccess &&
+        ref.watch(featureEnabledProvider(AscendFeature.ascendPromote));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ascend Promote')),
-      floatingActionButton: hasAccess
+      floatingActionButton: canCreate
           ? FloatingActionButton(
               onPressed: () => context.push(RoutePaths.promoteCampaignCreate),
               tooltip: 'New campaign',

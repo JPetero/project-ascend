@@ -7,6 +7,7 @@ import 'package:mobile/core/storage/secure_token_storage.dart';
 import 'package:mobile/features/companion/data/live_ai_provider.dart';
 import 'package:mobile/features/companion/data/local_deterministic_ai_provider.dart';
 import 'package:mobile/features/companion/presentation/providers/companion_chat_controller.dart';
+import 'package:mobile/features/feature_flags/presentation/providers/feature_flags_provider.dart';
 
 import '../../helpers/fake_subscription_status_repository.dart';
 import '../../helpers/in_memory_token_store.dart';
@@ -23,7 +24,7 @@ import '../../helpers/in_memory_token_store.dart';
 /// codebase (see e.g. GalleryRepository), that's not unit-tested against
 /// a mocked transport — only the fake/interface boundary is. What's
 /// tested here is purely which concrete provider gets selected.
-ProviderContainer _buildContainer(PlanTier tier) {
+ProviderContainer _buildContainer(PlanTier tier, {bool liveAiEnabled = true}) {
   return ProviderContainer(
     overrides: [
       secureTokenStorageProvider.overrideWithValue(
@@ -31,6 +32,14 @@ ProviderContainer _buildContainer(PlanTier tier) {
       ),
       subscriptionStatusRepositoryProvider.overrideWithValue(
         FakeSubscriptionStatusRepository(tier: tier),
+      ),
+      // LIVE_AI defaults closed (Build Session 13 continuation Part A) —
+      // these tests are about entitlement routing, not the flag itself,
+      // so it's explicitly enabled here (see
+      // feature_enabled_provider_test.dart for the flag's own outage/
+      // missing/false behavior).
+      featureFlagsProvider.overrideWith(
+        (ref) async => {'LIVE_AI': liveAiEnabled},
       ),
     ],
   );
@@ -41,6 +50,7 @@ void main() {
     final container = _buildContainer(PlanTier.free);
     addTearDown(container.dispose);
     await container.read(fetchedPlanTierProvider.future);
+    await container.read(featureFlagsProvider.future);
 
     expect(
       container.read(aiProviderProvider),
@@ -58,8 +68,27 @@ void main() {
       // aiProviderProvider, which depends on it) resolve to Free while
       // this is still pending.
       await container.read(fetchedPlanTierProvider.future);
+      await container.read(featureFlagsProvider.future);
 
       expect(container.read(aiProviderProvider), isA<LiveAiProvider>());
+    },
+  );
+
+  test(
+    'a Premium account still gets a LiveAiProvider when LIVE_AI is disabled, but with chat replies turned off',
+    () async {
+      // LIVE_AI disabled must not also silence Research Mode (see
+      // companion_chat_controller.dart's aiProviderProvider doc comment),
+      // so the provider selection itself is unaffected — only
+      // LiveAiProvider.chatEnabled changes.
+      final container = _buildContainer(PlanTier.premium, liveAiEnabled: false);
+      addTearDown(container.dispose);
+      await container.read(fetchedPlanTierProvider.future);
+      await container.read(featureFlagsProvider.future);
+
+      final provider = container.read(aiProviderProvider);
+      expect(provider, isA<LiveAiProvider>());
+      expect((provider as LiveAiProvider).chatEnabled, isFalse);
     },
   );
 }

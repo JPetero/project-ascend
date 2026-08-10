@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/entitlements/capability.dart';
 import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../data/ai_provider.dart';
@@ -23,6 +25,14 @@ import 'companion_memory_controller.dart';
 /// stays free" — LiveAiProvider's own fallback would land on the same
 /// local provider anyway if it were reached, so this is a genuine
 /// short-circuit, not a behavior difference.
+///
+/// The LIVE_AI feature flag (Build Session 13 continuation Part A) is
+/// threaded into [LiveAiProvider.chatEnabled] rather than gating which
+/// concrete provider gets constructed here — [LiveAiProvider] is the
+/// same instance ResearchModeScreen calls `researchReply` on, and that
+/// path is independently gated by its own RESEARCH_MODE flag server-side
+/// and client-side; LIVE_AI disabled must silence live *chat* replies
+/// without also silencing Research Mode.
 final aiProviderProvider = Provider<AiProvider>((ref) {
   const local = LocalDeterministicAiProvider();
   final hasLiveAccess = ref.watch(
@@ -32,6 +42,7 @@ final aiProviderProvider = Provider<AiProvider>((ref) {
   return LiveAiProvider(
     apiClient: ref.watch(apiClientProvider),
     fallback: local,
+    chatEnabled: ref.watch(featureEnabledProvider(AscendFeature.liveAi)),
   );
 });
 
