@@ -6,6 +6,7 @@ import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
 import { CreateSportMatchDto } from './dto/create-sport-match.dto';
 import { DisputeScoreDto } from './dto/dispute-score.dto';
 import { ProposeScoreDto } from './dto/propose-score.dto';
+import { QuerySportLeaderboardDto } from './dto/query-sport-leaderboard.dto';
 import { SportsService } from './sports.service';
 
 @ApiBearerAuth()
@@ -93,7 +94,11 @@ export class SportsController {
   }
 
   @Get(':sportCode/leaderboard')
-  leaderboard(@Param('sportCode') sportCode: SportCode, @Query('limit') limit?: string) {
-    return this.sports.leaderboard(sportCode, limit ? Number(limit) : undefined);
+  leaderboard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sportCode') sportCode: SportCode,
+    @Query() query: QuerySportLeaderboardDto,
+  ) {
+    return this.sports.leaderboard(user.id, sportCode, query.scope, query.limit);
   }
 }

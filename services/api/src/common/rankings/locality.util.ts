@@ -7,7 +7,11 @@ import { RankingScope } from '@prisma/client';
  * matters: opting in at a given scope requires every field from
  * localityCountry through that scope's own field, and viewing a
  * broader scope than the one you opted into is allowed as long as you
- * have that scope's required fields (see RankingsService).
+ * have that scope's required fields. Shared across the Rankings and
+ * Sports modules — see resolve-scope-candidates.util.ts, which both
+ * RankingsService and SportsService use for identical candidate
+ * resolution against the same RankingOptIn data (Build Session 13
+ * continuation Part E — Sports Rankings integration).
  */
 export const LOCALITY_TIER_ORDER: RankingScope[] = [
   RankingScope.NATIONAL,

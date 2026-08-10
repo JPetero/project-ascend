@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../friends/presentation/providers/friends_controller.dart';
+import '../../../rankings/domain/ranking.dart';
 import '../../data/sports_repository.dart';
 import '../../domain/sport_match.dart';
 import '../providers/sports_matches_controller.dart';
@@ -87,6 +88,74 @@ class SportsMatchesScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
+                    const SizedBox(height: AscendSpacing.md),
+                    Text(
+                      '$selectedSportName leaderboard',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: AscendSpacing.sm),
+                    Wrap(
+                      spacing: AscendSpacing.sm,
+                      runSpacing: AscendSpacing.sm,
+                      children: [
+                        for (final scope in RankingScope.values)
+                          ChoiceChip(
+                            label: Text(rankingScopeLabel(scope)),
+                            selected: state.leaderboardScope == scope,
+                            onSelected: (_) =>
+                                controller.selectLeaderboardScope(scope),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AscendSpacing.sm),
+                    if (state.isLeaderboardLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: AscendSpacing.md,
+                        ),
+                        child: AscendLoadingIndicator(),
+                      )
+                    else if (state.leaderboardError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AscendSpacing.sm,
+                        ),
+                        child: Text(
+                          "Couldn't load this leaderboard — try a "
+                          'different scope.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      )
+                    else if (state.leaderboard.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(
+                          vertical: AscendSpacing.sm,
+                        ),
+                        child: Text('No one here yet.'),
+                      )
+                    else
+                      for (final (index, entry) in state.leaderboard.indexed)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AscendSpacing.xs,
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 28,
+                                child: Text(
+                                  '#${index + 1}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                              Expanded(child: Text(entry.displayName)),
+                              Text(
+                                entry.rating.round().toString(),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
                     const SizedBox(height: AscendSpacing.md),
                     if (state.matches.isEmpty)
                       const AscendEmptyState(

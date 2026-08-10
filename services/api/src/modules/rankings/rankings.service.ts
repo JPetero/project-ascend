@@ -1,17 +1,20 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { RankingScope } from '@prisma/client';
+import {
+  LocalityFieldName,
+  isLocalityScope,
+  requiredLocalityFields,
+} from '../../common/rankings/locality.util';
+import {
+  resolveFriendsCandidateIds,
+  resolveLocalityCandidateIds,
+} from '../../common/rankings/resolve-scope-candidates.util';
 import {
   computeActivitySummaries,
   computeActivitySummary,
 } from '../../common/scoring/activity-scoring.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OptInRankingsDto } from './dto/opt-in-rankings.dto';
-import {
-  isLocalityScope,
-  LocalityFieldName,
-  localityTierIndex,
-  requiredLocalityFields,
-} from './rankings-locality.util';
 
 type OptInRow = {
   userId: string;
@@ -87,7 +90,7 @@ export class RankingsService {
       throw new ForbiddenException('Opt in to Rankings to view a leaderboard.');
     }
 
-    const candidateIds = await this.resolveScopeCandidates(viewerId, scope, viewerOptIn);
+    const candidateIds = await this.resolveScopeCandidates(viewerId, scope);
     const season = await this.getOrCreateCurrentSeason();
 
     // Batched — was Promise.all(candidateIds.map(computeActivitySummary)),
@@ -132,11 +135,7 @@ export class RankingsService {
     };
   }
 
-  private async resolveScopeCandidates(
-    viewerId: string,
-    scope: RankingScope,
-    viewerOptIn: OptInRow,
-  ): Promise<string[]> {
+  private async resolveScopeCandidates(viewerId: string, scope: RankingScope): Promise<string[]> {
     if (scope === RankingScope.GLOBAL) {
       const optedIn = await this.prisma.rankingOptIn.findMany({
         where: { scope: RankingScope.GLOBAL },
@@ -151,32 +150,15 @@ export class RankingsService {
       // broader tier needs too, so it can also browse e.g. the CITY or
       // NATIONAL board for the same place. Matching is case-insensitive
       // so "Quezon City" and "Quezon city" land on the same board.
-      if (localityTierIndex(viewerOptIn.scope) < localityTierIndex(scope)) {
-        throw new BadRequestException(
-          `Opt in with a ${scope.toLowerCase()} locality (or narrower) to view this leaderboard.`,
-        );
-      }
-      const localityWhere: Record<string, { equals: string; mode: 'insensitive' }> = {};
-      for (const field of requiredLocalityFields(scope)) {
-        localityWhere[field] = { equals: viewerOptIn[field] as string, mode: 'insensitive' };
-      }
-      const optedIn = await this.prisma.rankingOptIn.findMany({
-        where: { scope, ...localityWhere },
-        select: { userId: true },
-      });
-      return optedIn.map((o) => o.userId);
+      return resolveLocalityCandidateIds(this.prisma, viewerId, scope);
     }
 
     // FRIENDS — everyone the viewer follows (per Community's follow
     // graph) who has also opted in to Rankings in any scope, plus the
     // viewer themselves.
-    const following = await this.prisma.communityFollow.findMany({
-      where: { followerId: viewerId },
-      select: { followingId: true },
-    });
-    const followingIds = following.map((f) => f.followingId);
+    const candidateIds = await resolveFriendsCandidateIds(this.prisma, viewerId);
     const optedIn = await this.prisma.rankingOptIn.findMany({
-      where: { userId: { in: [...followingIds, viewerId] } },
+      where: { userId: { in: candidateIds } },
       select: { userId: true },
     });
     return optedIn.map((o) => o.userId);

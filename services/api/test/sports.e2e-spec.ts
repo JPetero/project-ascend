@@ -162,6 +162,53 @@ describe('Sports Matches (e2e)', () => {
     expect((leaderboard.body.data as unknown[]).length).toBeGreaterThanOrEqual(2);
   });
 
+  it("the sport leaderboard supports scope=FRIENDS, reusing Community's follow graph (Build Session 13 continuation Part E)", async () => {
+    await request(app.getHttpServer())
+      .post(`/community/follow/${userIdB}`)
+      .set(authA())
+      .expect(204);
+
+    const leaderboard = await request(app.getHttpServer())
+      .get('/sports/BADMINTON/leaderboard')
+      .query({ scope: 'FRIENDS' })
+      .set(authA())
+      .expect(200);
+
+    const userIds = (leaderboard.body.data as Array<{ userId: string }>).map((e) => e.userId);
+    expect(userIds).toEqual(expect.arrayContaining([userIdA, userIdB]));
+  });
+
+  it('the sport leaderboard rejects a locality scope from a viewer who has not opted in to Rankings', async () => {
+    await request(app.getHttpServer())
+      .get('/sports/BADMINTON/leaderboard')
+      .query({ scope: 'REGION' })
+      .set(authA())
+      .expect(400);
+  });
+
+  it("the sport leaderboard supports a locality scope by reusing the viewer's Rankings opt-in, excluding a rated player from a different region", async () => {
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authA())
+      .send({ scope: 'REGION', localityCountry: 'Philippines', localityRegion: 'Metro Manila' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authB())
+      .send({ scope: 'REGION', localityCountry: 'Philippines', localityRegion: 'Cebu' })
+      .expect(200);
+
+    const leaderboard = await request(app.getHttpServer())
+      .get('/sports/BADMINTON/leaderboard')
+      .query({ scope: 'REGION' })
+      .set(authA())
+      .expect(200);
+
+    const userIds = (leaderboard.body.data as Array<{ userId: string }>).map((e) => e.userId);
+    expect(userIds).toContain(userIdA);
+    expect(userIds).not.toContain(userIdB);
+  });
+
   it('runs a full Table Tennis lifecycle with a rating tracked independently of Badminton (Build Session 12 Part 23-24)', async () => {
     // A already won a BADMINTON match against B in the previous test, so
     // A's BADMINTON rating is above 1500 — this proves TABLE_TENNIS

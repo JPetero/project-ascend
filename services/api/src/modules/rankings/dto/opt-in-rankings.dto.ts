@@ -2,13 +2,13 @@ import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { RankingScope } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import { IsEnum, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { requiredLocalityFields } from '../rankings-locality.util';
+import { requiredLocalityFields } from '../../../common/rankings/locality.util';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
 // Each locality field is required exactly when the chosen scope's tier
 // needs it — NATIONAL needs localityCountry only, LOCAL needs all four.
-// See rankings-locality.util.ts for the tier order this mirrors.
+// See common/rankings/locality.util.ts for the tier order this mirrors.
 export class OptInRankingsDto {
   @ApiProperty({ enum: RankingScope })
   @IsEnum(RankingScope)

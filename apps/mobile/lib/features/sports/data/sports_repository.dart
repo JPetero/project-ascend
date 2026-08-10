@@ -1,4 +1,5 @@
 import '../../../core/networking/api_client.dart';
+import '../../rankings/domain/ranking.dart';
 import '../domain/sport_match.dart';
 
 /// Thin client for services/api/src/modules/sports — Build Session 8
@@ -102,10 +103,12 @@ class SportsRepository {
 
   Future<List<SportLeaderboardEntry>> leaderboard({
     String sportCode = badmintonCode,
+    RankingScope scope = RankingScope.global,
   }) async {
     final envelope = await _apiClient.get(
       '/sports/$sportCode/leaderboard',
       (data) => data as List<dynamic>,
+      query: {'scope': rankingScopeToJson(scope)},
     );
     return envelope.data!
         .map((e) => SportLeaderboardEntry.fromJson(e as Map<String, dynamic>))

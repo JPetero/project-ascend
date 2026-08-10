@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { RankingScope } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SportsService } from './sports.service';
 
@@ -44,7 +45,14 @@ describe('SportsService', () => {
     };
     sportScoreConfirmation: { create: jest.Mock };
     sportMatchDispute: { create: jest.Mock };
-    sportRating: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    sportRating: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    communityFollow: { findMany: jest.Mock };
+    rankingOptIn: { findUnique: jest.Mock; findMany: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -80,6 +88,7 @@ describe('SportsService', () => {
       sportMatchDispute: { create: jest.fn() },
       sportRating: {
         findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }) =>
           Promise.resolve({
             id: `rating-${data.userId}`,
@@ -91,6 +100,11 @@ describe('SportsService', () => {
           }),
         ),
         update: jest.fn(),
+      },
+      communityFollow: { findMany: jest.fn().mockResolvedValue([]) },
+      rankingOptIn: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
@@ -338,6 +352,67 @@ describe('SportsService', () => {
 
       await expect(service.getById('someone-else', 'match-1')).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('leaderboard (Build Session 13 continuation Part E — Sports Rankings integration)', () => {
+    it("GLOBAL scope returns every rated player, unfiltered — this endpoint's original behavior", async () => {
+      await service.leaderboard('user-1', 'BADMINTON', RankingScope.GLOBAL);
+
+      expect(prisma.sportRating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { sportId: 'sport-1' } }),
+      );
+    });
+
+    it('FRIENDS scope filters ratings to the viewer plus followed users', async () => {
+      prisma.communityFollow.findMany.mockResolvedValue([{ followingId: 'user-2' }]);
+
+      await service.leaderboard('user-1', 'BADMINTON', RankingScope.FRIENDS);
+
+      expect(prisma.communityFollow.findMany).toHaveBeenCalledWith({
+        where: { followerId: 'user-1' },
+        select: { followingId: true },
+      });
+      expect(prisma.sportRating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sportId: 'sport-1', userId: { in: ['user-2', 'user-1'] } },
+        }),
+      );
+    });
+
+    it('rejects a locality-scoped request from a viewer who has not opted in to Rankings', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.leaderboard('user-1', 'BADMINTON', RankingScope.REGION),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("REGION scope reuses the viewer's RankingOptIn locality, matched case-insensitively", async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue({
+        scope: RankingScope.REGION,
+        localityCountry: 'Philippines',
+        localityRegion: 'Metro Manila',
+        localityCity: null,
+        localityArea: null,
+      });
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-2' }]);
+
+      await service.leaderboard('user-1', 'BADMINTON', RankingScope.REGION);
+
+      expect(prisma.rankingOptIn.findMany).toHaveBeenCalledWith({
+        where: {
+          scope: RankingScope.REGION,
+          localityCountry: { equals: 'Philippines', mode: 'insensitive' },
+          localityRegion: { equals: 'Metro Manila', mode: 'insensitive' },
+        },
+        select: { userId: true },
+      });
+      expect(prisma.sportRating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sportId: 'sport-1', userId: { in: ['user-2'] } },
+        }),
       );
     });
   });
