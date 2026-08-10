@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SportCode" ADD VALUE 'TABLE_TENNIS';
