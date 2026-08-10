@@ -39,7 +39,7 @@ function invitation(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe('TrainerGroupsService', () => {
   let service: TrainerGroupsService;
-  let capabilityService: { hasCapabilityForUser: jest.Mock };
+  let capabilityService: { hasCapabilityForUser: jest.Mock; hasCapabilityForUsers: jest.Mock };
   let prisma: {
     trainerGroup: {
       count: jest.Mock;
@@ -142,7 +142,10 @@ describe('TrainerGroupsService', () => {
     };
     // Defaults to the free tier — individual tests opt into Premium via
     // mockResolvedValueOnce(true).
-    capabilityService = { hasCapabilityForUser: jest.fn().mockResolvedValue(false) };
+    capabilityService = {
+      hasCapabilityForUser: jest.fn().mockResolvedValue(false),
+      hasCapabilityForUsers: jest.fn().mockResolvedValue(new Map()),
+    };
     notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
@@ -201,6 +204,85 @@ describe('TrainerGroupsService', () => {
       await service.createGroup('owner-1', { name: 'Second' });
 
       expect(prisma.trainerGroup.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('listMyGroups', () => {
+    it('returns each group correctly serialized, with one batched group fetch and one batched capability lookup regardless of group count', async () => {
+      prisma.trainerGroupMember.findMany.mockResolvedValue([
+        { groupId: 'group-1' },
+        { groupId: 'group-2' },
+        { groupId: 'group-3' },
+      ]);
+      prisma.trainerGroup.findMany.mockResolvedValue([
+        {
+          ...group({ id: 'group-1', ownerId: 'owner-a', name: 'Group One' }),
+          createdAt: new Date('2026-01-01'),
+          members: [
+            {
+              userId: 'member-1',
+              role: TrainerGroupMemberRole.OWNER,
+              joinedAt: new Date('2026-01-01'),
+              user: { communityProfile: { displayName: 'Member One', avatarUrl: null } },
+            },
+          ],
+        },
+        {
+          ...group({ id: 'group-2', ownerId: 'owner-b', name: 'Group Two' }),
+          createdAt: new Date('2026-01-02'),
+          members: [],
+        },
+        {
+          ...group({ id: 'group-3', ownerId: 'owner-a', name: 'Group Three' }),
+          createdAt: new Date('2026-01-03'),
+          members: [],
+        },
+      ]);
+      capabilityService.hasCapabilityForUsers.mockResolvedValue(
+        new Map([
+          ['owner-a', true],
+          ['owner-b', false],
+        ]),
+      );
+
+      const result = await service.listMyGroups('member-1');
+
+      expect(result.map((g) => g.id)).toEqual(['group-1', 'group-2', 'group-3']);
+      expect(result[0]).toMatchObject({ id: 'group-1', ownerId: 'owner-a', isExpanded: true });
+      expect(result[0].members).toEqual([
+        {
+          userId: 'member-1',
+          role: TrainerGroupMemberRole.OWNER,
+          joinedAt: new Date('2026-01-01'),
+          displayName: 'Member One',
+          avatarUrl: null,
+        },
+      ]);
+      expect(result[1]).toMatchObject({ id: 'group-2', ownerId: 'owner-b', isExpanded: false });
+      expect(result[2]).toMatchObject({ id: 'group-3', ownerId: 'owner-a', isExpanded: true });
+
+      // Query-count regression: exactly one membership lookup, one
+      // batched group fetch, and one batched capability lookup — never
+      // one findUniqueOrThrow or one capability call per group.
+      expect(prisma.trainerGroupMember.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.trainerGroup.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.trainerGroup.findUniqueOrThrow).not.toHaveBeenCalled();
+      expect(capabilityService.hasCapabilityForUsers).toHaveBeenCalledTimes(1);
+      expect(capabilityService.hasCapabilityForUsers).toHaveBeenCalledWith(
+        ['owner-a', 'owner-b', 'owner-a'],
+        expect.any(String),
+      );
+      expect(capabilityService.hasCapabilityForUser).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty list without querying groups when the caller has no memberships', async () => {
+      prisma.trainerGroupMember.findMany.mockResolvedValue([]);
+
+      const result = await service.listMyGroups('member-1');
+
+      expect(result).toEqual([]);
+      expect(prisma.trainerGroup.findMany).not.toHaveBeenCalled();
+      expect(capabilityService.hasCapabilityForUsers).not.toHaveBeenCalled();
     });
   });
 
