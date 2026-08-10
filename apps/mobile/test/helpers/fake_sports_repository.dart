@@ -1,3 +1,4 @@
+import 'package:mobile/features/rankings/domain/ranking.dart';
 import 'package:mobile/features/sports/data/sports_repository.dart';
 import 'package:mobile/features/sports/domain/sport_match.dart';
 
@@ -35,19 +36,25 @@ SportMatch sampleSportMatch({
 /// In-memory stand-in for [SportsRepository]. `'user-1'` is the signed-in
 /// test user's id (see FakeAuthRepository).
 class FakeSportsRepository implements SportsRepository {
-  FakeSportsRepository({List<SportMatch>? matches, SportRating? rating})
-    : matches = matches ?? [],
-      rating =
-          rating ??
-          const SportRating(
-            rating: 1500,
-            isProvisional: true,
-            matchesPlayed: 0,
-          );
+  FakeSportsRepository({
+    List<SportMatch>? matches,
+    SportRating? rating,
+    Map<RankingScope, List<SportLeaderboardEntry>>? leaderboards,
+  }) : matches = matches ?? [],
+       rating =
+           rating ??
+           const SportRating(
+             rating: 1500,
+             isProvisional: true,
+             matchesPlayed: 0,
+           ),
+       leaderboards = leaderboards ?? {};
 
   final List<SportMatch> matches;
   SportRating rating;
+  final Map<RankingScope, List<SportLeaderboardEntry>> leaderboards;
   String? lastDisputeReason;
+  RankingScope? lastLeaderboardScope;
 
   @override
   Future<List<SportMatch>> listMine() async => List.unmodifiable(matches);
@@ -169,7 +176,11 @@ class FakeSportsRepository implements SportsRepository {
   @override
   Future<List<SportLeaderboardEntry>> leaderboard({
     String sportCode = SportsRepository.badmintonCode,
-  }) async => const [];
+    RankingScope scope = RankingScope.global,
+  }) async {
+    lastLeaderboardScope = scope;
+    return leaderboards[scope] ?? const [];
+  }
 
   Future<SportMatch> _updateStatus(
     String matchId,

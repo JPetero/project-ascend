@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/core/routing/route_paths.dart';
 import 'package:mobile/features/community/domain/community_profile.dart';
+import 'package:mobile/features/rankings/domain/ranking.dart';
 import 'package:mobile/features/sports/domain/sport_match.dart';
 import 'package:mobile/features/sports/presentation/screens/sports_matches_screen.dart';
 
@@ -13,6 +14,15 @@ import '../../helpers/pump_helpers.dart';
 import '../../helpers/test_provider_scope.dart';
 
 void main() {
+  Future<void> scrollUntilFound(WidgetTester tester, Finder finder) async {
+    await tester.scrollUntilVisible(
+      finder,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('shows an honest empty state and the current rating', (
     tester,
   ) async {
@@ -173,4 +183,65 @@ void main() {
       expect(sportsRepository.matches.single.sportCode, 'TABLE_TENNIS');
     },
   );
+
+  testWidgets(
+    'shows the GLOBAL leaderboard for the selected sport (Build Session 13 continuation Part E)',
+    (tester) async {
+      final repository = FakeSportsRepository(
+        leaderboards: {
+          RankingScope.global: const [
+            SportLeaderboardEntry(
+              userId: 'user-1',
+              displayName: 'Ada',
+              rating: 1520,
+              isProvisional: true,
+              matchesPlayed: 1,
+            ),
+          ],
+        },
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        sportsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SportsMatchesScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      await scrollUntilFound(tester, find.text('Ada'));
+      expect(find.text('Ada'), findsOneWidget);
+      expect(find.text('1520'), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping a scope chip reloads the leaderboard for that scope', (
+    tester,
+  ) async {
+    final repository = FakeSportsRepository();
+    final container = await createTestContainer(
+      signedIn: true,
+      sportsRepository: repository,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SportsMatchesScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    await scrollUntilFound(tester, find.widgetWithText(ChoiceChip, 'Friends'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Friends'));
+    await pumpForAsyncSettle(tester);
+
+    expect(repository.lastLeaderboardScope, RankingScope.friends);
+  });
 }

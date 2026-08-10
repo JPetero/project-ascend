@@ -1,10 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  RankingScope,
   SportCode,
   SportMatchParticipantStatus,
   SportMatchStatus,
   SportScoreProposalStatus,
 } from '@prisma/client';
+import { isLocalityScope } from '../../common/rankings/locality.util';
+import {
+  resolveFriendsCandidateIds,
+  resolveLocalityCandidateIds,
+} from '../../common/rankings/resolve-scope-candidates.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSportMatchDto } from './dto/create-sport-match.dto';
 import { ProposeScoreDto } from './dto/propose-score.dto';
@@ -288,10 +294,22 @@ export class SportsService {
     );
   }
 
-  async leaderboard(sportCode: SportCode, limit = 50) {
+  // Scoped the same way RankingsService's activity-day leaderboard is —
+  // reuses RankingOptIn's locality data rather than inventing a second,
+  // sport-specific opt-in (Build Session 13 continuation Part E). GLOBAL
+  // (every rated player, this endpoint's original behavior) needs no
+  // opt-in at all; FRIENDS/LOCAL/CITY/REGION/NATIONAL do.
+  async leaderboard(viewerId: string, sportCode: SportCode, scope: RankingScope, limit = 50) {
     const sport = await this.getOrCreateSport(sportCode);
+    const candidateIds =
+      scope === RankingScope.GLOBAL
+        ? null
+        : isLocalityScope(scope)
+          ? await resolveLocalityCandidateIds(this.prisma, viewerId, scope)
+          : await resolveFriendsCandidateIds(this.prisma, viewerId);
+
     const ratings = await this.prisma.sportRating.findMany({
-      where: { sportId: sport.id },
+      where: { sportId: sport.id, ...(candidateIds ? { userId: { in: candidateIds } } : {}) },
       orderBy: { rating: 'desc' },
       take: Math.min(limit, 100),
       include: { user: { include: { communityProfile: true } } },
