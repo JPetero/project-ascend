@@ -114,6 +114,22 @@ export class TrainerGroupsService {
     if (dto.inviteeUserId === userId) {
       throw new BadRequestException('You cannot invite yourself.');
     }
+    // Build Session 12 Part 18-21 — unlike Friends/Messages/Joint
+    // Workouts, this had no block check at all: a blocked user could
+    // still be invited into (or still invite) a trainer group. Same
+    // "not found, not forbidden" posture as FriendsService.sendRequest —
+    // never reveal that a block is the reason.
+    const [blockedByInvitee, blockedByInviter] = await Promise.all([
+      this.prisma.communityBlock.findUnique({
+        where: { blockerId_blockedId: { blockerId: dto.inviteeUserId, blockedId: userId } },
+      }),
+      this.prisma.communityBlock.findUnique({
+        where: { blockerId_blockedId: { blockerId: userId, blockedId: dto.inviteeUserId } },
+      }),
+    ]);
+    if (blockedByInvitee || blockedByInviter) {
+      throw new NotFoundException('User not found.');
+    }
     const alreadyMember = await this.prisma.trainerGroupMember.findUnique({
       where: { groupId_userId: { groupId, userId: dto.inviteeUserId } },
     });

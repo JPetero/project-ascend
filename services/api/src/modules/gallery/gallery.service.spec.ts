@@ -27,6 +27,7 @@ describe('GalleryService', () => {
   let mediaService: {
     getById: jest.Mock;
     getObjectUrl: jest.Mock;
+    getPrivateUrl: jest.Mock;
     attachUsage: jest.Mock;
     deleteAsset: jest.Mock;
   };
@@ -53,6 +54,7 @@ describe('GalleryService', () => {
     mediaService = {
       getById: jest.fn(),
       getObjectUrl: jest.fn().mockReturnValue('https://media.example/key.jpg'),
+      getPrivateUrl: jest.fn().mockResolvedValue('https://media.example/signed/key.jpg'),
       attachUsage: jest.fn(),
       deleteAsset: jest.fn(),
     };
@@ -111,7 +113,8 @@ describe('GalleryService', () => {
       });
 
       expect(mediaService.attachUsage).toHaveBeenCalledWith('asset-1', 'GALLERY', 'media-1');
-      expect(result.url).toBe('https://media.example/key.jpg');
+      expect(mediaService.getPrivateUrl).toHaveBeenCalledWith('key.jpg');
+      expect(result.url).toBe('https://media.example/signed/key.jpg');
     });
   });
 

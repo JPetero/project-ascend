@@ -22,6 +22,15 @@ export interface MediaStorageProvider {
   /** A URL suitable for reading the object back — never a raw filesystem path. */
   getObjectUrl(storageKey: string): string;
 
+  /**
+   * A time-limited URL for reading back a PRIVATE-visibility object —
+   * never the same permanent, unauthenticated link `getObjectUrl` hands
+   * out. Callers use this instead of `getObjectUrl` whenever the
+   * underlying MediaAsset's visibility is PRIVATE (see MediaService's
+   * doc comment on `getPrivateUrl`).
+   */
+  getSignedGetUrl(storageKey: string, expirySeconds: number): Promise<string>;
+
   deleteObject(storageKey: string): Promise<void>;
 
   objectExists(storageKey: string): Promise<boolean>;

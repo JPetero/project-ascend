@@ -9,6 +9,7 @@ jest.mock('@aws-sdk/client-s3', () => {
     PutObjectCommand: jest.fn().mockImplementation((input) => ({ input })),
     DeleteObjectCommand: jest.fn().mockImplementation((input) => ({ input })),
     HeadObjectCommand: jest.fn().mockImplementation((input) => ({ input })),
+    GetObjectCommand: jest.fn().mockImplementation((input) => ({ input })),
   };
 });
 
@@ -61,6 +62,20 @@ describe('S3CompatibleStorageProvider', () => {
       configService({ 'media.s3PublicBaseUrl': '' }),
     );
     expect(provider.getObjectUrl('key.jpg')).toBe('ascend-media/key.jpg');
+  });
+
+  it('returns a presigned GET URL for reading back a private object', async () => {
+    const { getSignedUrl } = jest.requireMock('@aws-sdk/s3-request-presigner') as {
+      getSignedUrl: jest.Mock;
+    };
+    const provider = new S3CompatibleStorageProvider(configService());
+
+    const url = await provider.getSignedGetUrl('user-1/gallery/abc.jpg', 900);
+
+    expect(url).toBe('https://r2.example.com/bucket/key?signature=abc');
+    expect(getSignedUrl).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), {
+      expiresIn: 900,
+    });
   });
 
   it('deletes an object via the S3 client', async () => {

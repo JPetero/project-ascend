@@ -45,10 +45,11 @@ describe('MediaService', () => {
   let storage: {
     createUploadTarget: jest.Mock;
     getObjectUrl: jest.Mock;
+    getSignedGetUrl: jest.Mock;
     deleteObject: jest.Mock;
     objectExists: jest.Mock;
   };
-  let localStorage: { writeObject: jest.Mock };
+  let localStorage: { writeObject: jest.Mock; readObject: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -72,10 +73,14 @@ describe('MediaService', () => {
         expiresAt: new Date(Date.now() + 60_000),
       }),
       getObjectUrl: jest.fn().mockReturnValue('/media/objects/key'),
+      getSignedGetUrl: jest.fn().mockResolvedValue('/media/objects?key=signed'),
       deleteObject: jest.fn().mockResolvedValue(undefined),
       objectExists: jest.fn().mockResolvedValue(true),
     };
-    localStorage = { writeObject: jest.fn().mockResolvedValue(undefined) };
+    localStorage = {
+      writeObject: jest.fn().mockResolvedValue(undefined),
+      readObject: jest.fn().mockResolvedValue(Buffer.from('bytes')),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -274,6 +279,57 @@ describe('MediaService', () => {
     it('404s a soft-deleted asset even for its owner', async () => {
       prisma.mediaAsset.findUnique.mockResolvedValue(asset({ retentionState: 'DELETED' }));
       await expect(service.getById('user-1', 'asset-1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('getPrivateUrl', () => {
+    it('delegates to a time-limited signed URL, not the permanent object URL', async () => {
+      const url = await service.getPrivateUrl('user-1/gallery/key.jpg');
+
+      expect(storage.getSignedGetUrl).toHaveBeenCalledWith(
+        'user-1/gallery/key.jpg',
+        expect.any(Number),
+      );
+      expect(storage.getObjectUrl).not.toHaveBeenCalled();
+      expect(url).toBe('/media/objects?key=signed');
+    });
+  });
+
+  describe('readLocalObject', () => {
+    it('404s a private object for a non-owner', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue(asset({ visibility: 'PRIVATE' }));
+      await expect(service.readLocalObject('someone-else', asset().storageKey)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns bytes for the owner of a private object', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue(asset({ visibility: 'PRIVATE' }));
+      const result = await service.readLocalObject('user-1', asset().storageKey);
+      expect(result.buffer).toEqual(Buffer.from('bytes'));
+      expect(result.mimeType).toBe('image/jpeg');
+    });
+
+    it('returns bytes for a non-owner when the object is not private', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue(asset({ visibility: 'PUBLIC' }));
+      await expect(service.readLocalObject('someone-else', asset().storageKey)).resolves.toEqual({
+        buffer: Buffer.from('bytes'),
+        mimeType: 'image/jpeg',
+      });
+    });
+
+    it('404s an object with no matching MediaAsset row', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue(null);
+      await expect(service.readLocalObject('user-1', 'missing-key')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('404s a soft-deleted object even for its owner', async () => {
+      prisma.mediaAsset.findUnique.mockResolvedValue(asset({ retentionState: 'DELETED' }));
+      await expect(service.readLocalObject('user-1', asset().storageKey)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

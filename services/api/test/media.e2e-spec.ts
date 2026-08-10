@@ -188,6 +188,42 @@ describe('Media Platform (e2e)', () => {
     await request(app.getHttpServer()).get(`/media/${mediaAssetId}`).set(authA()).expect(404);
   });
 
+  // Build Session 12 Part 18-21 — the local-dev object-serving route was
+  // previously dead code (never registered), so a freshly-uploaded
+  // PRIVATE asset's storage key was effectively unfetchable either way.
+  // Wiring it up must not accidentally make that key public: it needs to
+  // apply the same owner-or-not-PRIVATE rule getById already enforces.
+  it('the local object-serving route enforces PRIVATE ownership, not just the metadata endpoint', async () => {
+    const mediaAssetId = await uploadAndComplete(authA);
+    const asset = await request(app.getHttpServer())
+      .get(`/media/${mediaAssetId}`)
+      .set(authA())
+      .expect(200);
+    const storageKey = asset.body.data.storageKey as string;
+    expect(asset.body.data.visibility).toBe('PRIVATE');
+
+    await request(app.getHttpServer())
+      .get(`/media/objects?key=${encodeURIComponent(storageKey)}`)
+      .set(authB())
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .get(`/media/objects?key=${encodeURIComponent(storageKey)}`)
+      .set(authA())
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/media/${mediaAssetId}/visibility`)
+      .set(authA())
+      .send({ visibility: 'PUBLIC' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get(`/media/objects?key=${encodeURIComponent(storageKey)}`)
+      .set(authB())
+      .expect(200);
+  });
+
   it('reports a media asset and an admin can act on it to remove it', async () => {
     const mediaAssetId = await uploadAndComplete(authA);
     await request(app.getHttpServer())

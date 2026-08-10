@@ -88,3 +88,6 @@ export const ALLOWED_EXTENSIONS_BY_MIME_TYPE: Record<string, readonly string[]> 
 
 /** Upload-attempt contracts expire after this long if never completed. */
 export const MEDIA_UPLOAD_EXPIRY_MINUTES = 15;
+
+/** Signed read URLs for PRIVATE-visibility media expire after this long. */
+export const MEDIA_PRIVATE_URL_EXPIRY_SECONDS = 15 * 60;
