@@ -22,6 +22,7 @@ describe('GalleryService', () => {
     };
     mediaUsage: { deleteMany: jest.Mock; count: jest.Mock };
     communityProfile: { findUnique: jest.Mock; update: jest.Mock; count: jest.Mock };
+    preference: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let mediaService: {
@@ -49,6 +50,7 @@ describe('GalleryService', () => {
       },
       mediaUsage: { deleteMany: jest.fn(), count: jest.fn() },
       communityProfile: { findUnique: jest.fn(), update: jest.fn(), count: jest.fn() },
+      preference: { findUnique: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
     mediaService = {
@@ -59,6 +61,12 @@ describe('GalleryService', () => {
       deleteAsset: jest.fn(),
     };
     prisma.communityProfile.count.mockResolvedValue(0);
+    // Build Session 13 continuation Part C — createAlbum only reads this
+    // when the caller's own dto.visibility is omitted.
+    prisma.preference.findUnique.mockResolvedValue({
+      defaultGalleryVisibility: 'PRIVATE',
+      progressPhotoDefaultVisibility: 'PRIVATE',
+    });
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -266,6 +274,53 @@ describe('GalleryService', () => {
         expect.objectContaining({ data: expect.objectContaining({ ownerId: 'user-1' }) }),
       );
       expect(result.mediaCount).toBe(0);
+    });
+
+    it(
+      'falls back to Preference.defaultGalleryVisibility for a non-progress album ' +
+        '(Build Session 13 continuation Part C)',
+      async () => {
+        prisma.preference.findUnique.mockResolvedValue({
+          defaultGalleryVisibility: 'SHARED',
+          progressPhotoDefaultVisibility: 'PRIVATE',
+        });
+        prisma.galleryAlbum.create.mockResolvedValue({ id: 'album-1', visibility: 'SHARED' });
+
+        await service.createAlbum('user-1', { name: 'Workouts', category: 'WORKOUTS' });
+
+        expect(prisma.galleryAlbum.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ visibility: 'SHARED' }) }),
+        );
+      },
+    );
+
+    it('falls back to the separate Preference.progressPhotoDefaultVisibility for a PROGRESS album', async () => {
+      prisma.preference.findUnique.mockResolvedValue({
+        defaultGalleryVisibility: 'SHARED',
+        progressPhotoDefaultVisibility: 'PRIVATE',
+      });
+      prisma.galleryAlbum.create.mockResolvedValue({ id: 'album-1', visibility: 'PRIVATE' });
+
+      await service.createAlbum('user-1', { name: 'Progress', category: 'PROGRESS' });
+
+      expect(prisma.galleryAlbum.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ visibility: 'PRIVATE' }) }),
+      );
+    });
+
+    it('an explicit visibility on the request is never overridden by the default preference', async () => {
+      prisma.preference.findUnique.mockResolvedValue({
+        defaultGalleryVisibility: 'PRIVATE',
+        progressPhotoDefaultVisibility: 'PRIVATE',
+      });
+      prisma.galleryAlbum.create.mockResolvedValue({ id: 'album-1', visibility: 'SHARED' });
+
+      await service.createAlbum('user-1', { name: 'Workouts', visibility: 'SHARED' } as never);
+
+      expect(prisma.preference.findUnique).not.toHaveBeenCalled();
+      expect(prisma.galleryAlbum.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ visibility: 'SHARED' }) }),
+      );
     });
   });
 });

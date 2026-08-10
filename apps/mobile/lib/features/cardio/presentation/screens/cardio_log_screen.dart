@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/validation/form_validators.dart';
 import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
+import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../data/cardio_session_repository.dart';
 import '../../domain/cardio_session.dart';
 import '../providers/cardio_session_controller.dart';
@@ -32,6 +33,17 @@ class _CardioLogScreenState extends ConsumerState<CardioLogScreen> {
   CardioActivityType _activityType = CardioActivityType.run;
   bool _shareRoute = false;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Build Session 13 continuation Part C (Privacy Center) —
+    // Preference.defaultHideCardioRoute's pre-filled state, read once
+    // rather than watched, matching this field's own nature as a
+    // starting point the user can still change per-session below.
+    final preferences = ref.read(preferencesControllerProvider).asData?.value;
+    _shareRoute = !(preferences?.defaultHideCardioRoute ?? true);
+  }
 
   @override
   void dispose() {

@@ -1,3 +1,11 @@
+import '../../community/domain/community_post.dart'
+    show
+        CommunityVisibility,
+        communityVisibilityFromJson,
+        communityVisibilityToJson;
+import '../../gallery/domain/gallery_album.dart'
+    show GalleryVisibility, galleryVisibilityFromJson, galleryVisibilityToJson;
+
 enum Companion { atlas, nova }
 
 enum CompanionMode { standard, chibi }
@@ -59,6 +67,10 @@ class PreferencesModel {
     required this.aiMemoryEnabled,
     this.conversationHistoryEnabled = true,
     this.textScale = 1.0,
+    this.defaultPostVisibility = CommunityVisibility.public,
+    this.defaultGalleryVisibility = GalleryVisibility.private_,
+    this.progressPhotoDefaultVisibility = GalleryVisibility.private_,
+    this.defaultHideCardioRoute = true,
   });
 
   final Companion companion;
@@ -78,6 +90,14 @@ class PreferencesModel {
   // `MediaQuery.textScaler` in app.dart, not a replacement for it. See
   // AccessibilityCenterScreen for the fixed set of values it's set to.
   final double textScale;
+  // Build Session 13 continuation Part C (Privacy Center) — see each
+  // field's own Preference schema comment on the backend. Applies to
+  // Reels the same as text/image posts: see defaultPostVisibility's
+  // backend comment for why there's no separate Reel-audience field.
+  final CommunityVisibility defaultPostVisibility;
+  final GalleryVisibility defaultGalleryVisibility;
+  final GalleryVisibility progressPhotoDefaultVisibility;
+  final bool defaultHideCardioRoute;
 
   factory PreferencesModel.fromJson(Map<String, dynamic> json) {
     return PreferencesModel(
@@ -100,6 +120,16 @@ class PreferencesModel {
       conversationHistoryEnabled:
           json['conversationHistoryEnabled'] as bool? ?? true,
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      defaultPostVisibility: communityVisibilityFromJson(
+        json['defaultPostVisibility'] as String? ?? 'PUBLIC',
+      ),
+      defaultGalleryVisibility: galleryVisibilityFromJson(
+        json['defaultGalleryVisibility'] as String? ?? 'PRIVATE',
+      ),
+      progressPhotoDefaultVisibility: galleryVisibilityFromJson(
+        json['progressPhotoDefaultVisibility'] as String? ?? 'PRIVATE',
+      ),
+      defaultHideCardioRoute: json['defaultHideCardioRoute'] as bool? ?? true,
     );
   }
 
@@ -114,6 +144,14 @@ class PreferencesModel {
     'aiMemoryEnabled': aiMemoryEnabled,
     'conversationHistoryEnabled': conversationHistoryEnabled,
     'textScale': textScale,
+    'defaultPostVisibility': communityVisibilityToJson(defaultPostVisibility),
+    'defaultGalleryVisibility': galleryVisibilityToJson(
+      defaultGalleryVisibility,
+    ),
+    'progressPhotoDefaultVisibility': galleryVisibilityToJson(
+      progressPhotoDefaultVisibility,
+    ),
+    'defaultHideCardioRoute': defaultHideCardioRoute,
   };
 
   PreferencesModel copyWith({
@@ -127,6 +165,10 @@ class PreferencesModel {
     bool? aiMemoryEnabled,
     bool? conversationHistoryEnabled,
     double? textScale,
+    CommunityVisibility? defaultPostVisibility,
+    GalleryVisibility? defaultGalleryVisibility,
+    GalleryVisibility? progressPhotoDefaultVisibility,
+    bool? defaultHideCardioRoute,
   }) {
     return PreferencesModel(
       companion: companion ?? this.companion,
@@ -140,6 +182,14 @@ class PreferencesModel {
       conversationHistoryEnabled:
           conversationHistoryEnabled ?? this.conversationHistoryEnabled,
       textScale: textScale ?? this.textScale,
+      defaultPostVisibility:
+          defaultPostVisibility ?? this.defaultPostVisibility,
+      defaultGalleryVisibility:
+          defaultGalleryVisibility ?? this.defaultGalleryVisibility,
+      progressPhotoDefaultVisibility:
+          progressPhotoDefaultVisibility ?? this.progressPhotoDefaultVisibility,
+      defaultHideCardioRoute:
+          defaultHideCardioRoute ?? this.defaultHideCardioRoute,
     );
   }
 }

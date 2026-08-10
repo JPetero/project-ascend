@@ -11,6 +11,8 @@ import 'package:mobile/features/auth/data/auth_repository.dart';
 import 'package:mobile/features/auth/domain/auth_identity.dart';
 import 'package:mobile/features/auth/domain/auth_user.dart';
 import 'package:mobile/features/auth/domain/device_session.dart';
+import 'package:mobile/features/community/domain/community_post.dart';
+import 'package:mobile/features/gallery/domain/gallery_album.dart';
 import 'package:mobile/features/profile/data/preferences_repository.dart';
 import 'package:mobile/features/profile/data/profile_repository.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
@@ -356,6 +358,23 @@ class FakePreferencesRepository extends PreferencesRepository {
       aiMemoryEnabled: patch['aiMemoryEnabled'] as bool?,
       conversationHistoryEnabled: patch['conversationHistoryEnabled'] as bool?,
       textScale: (patch['textScale'] as num?)?.toDouble(),
+      defaultPostVisibility: patch['defaultPostVisibility'] == null
+          ? null
+          : communityVisibilityFromJson(
+              patch['defaultPostVisibility'] as String,
+            ),
+      defaultGalleryVisibility: patch['defaultGalleryVisibility'] == null
+          ? null
+          : galleryVisibilityFromJson(
+              patch['defaultGalleryVisibility'] as String,
+            ),
+      progressPhotoDefaultVisibility:
+          patch['progressPhotoDefaultVisibility'] == null
+          ? null
+          : galleryVisibilityFromJson(
+              patch['progressPhotoDefaultVisibility'] as String,
+            ),
+      defaultHideCardioRoute: patch['defaultHideCardioRoute'] as bool?,
     );
     return _preferences;
   }
