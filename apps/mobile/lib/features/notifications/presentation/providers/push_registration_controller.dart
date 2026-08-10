@@ -8,6 +8,8 @@ import '../../../../core/notifications/firebase_push_notification_service.dart';
 import '../../../../core/notifications/push_notification_service.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../data/notifications_repository.dart';
 import '../../domain/notification_deep_link.dart';
 import '../../domain/notification_models.dart';
@@ -109,11 +111,27 @@ final pushRegistrationControllerProvider = Provider<PushRegistrationController>(
     );
     ref.onDispose(controller.dispose);
 
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+    // REMOTE_PUSH gates registration only (Build Session 13 continuation
+    // Part A) — local reminders and the in-app notifications inbox don't
+    // depend on this at all. Unregistering on sign-out always runs
+    // regardless of the flag, so a device that was registered before the
+    // flag flipped off still gets cleaned up.
+    //
+    // Awaits `featureFlagsProvider.future` before reading the flag rather
+    // than a synchronous `ref.read(featureEnabledProvider(...))`: this
+    // listener's `fireImmediately` fire happens on sign-in before the
+    // flags fetch has resolved, so a synchronous read would always see
+    // `registryDefault` (true, SAFE_CORE) even when the resolved value is
+    // explicitly false — registering a token the flag says not to.
+    ref.listen<AuthState>(authControllerProvider, (previous, next) async {
       final wasAuthenticated = previous?.status == AuthStatus.authenticated;
       final isAuthenticated = next.status == AuthStatus.authenticated;
       if (isAuthenticated && !wasAuthenticated) {
-        controller.onSignedIn();
+        final flags = await ref.read(featureFlagsProvider.future);
+        final pushEnabled =
+            flags[AscendFeature.remotePush.key] ??
+            AscendFeature.remotePush.registryDefault;
+        if (pushEnabled) controller.onSignedIn();
       } else if (!isAuthenticated && wasAuthenticated) {
         controller.onSignedOut();
       }

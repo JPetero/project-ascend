@@ -31,12 +31,23 @@ import 'ai_provider.dart';
 /// [AiProvider.researchReply]'s honest "not available" default rather
 /// than surfacing a raw error.
 class LiveAiProvider extends AiProvider {
-  LiveAiProvider({required ApiClient apiClient, required AiProvider fallback})
-    : _apiClient = apiClient,
-      _fallback = fallback;
+  LiveAiProvider({
+    required ApiClient apiClient,
+    required AiProvider fallback,
+    this.chatEnabled = true,
+  }) : _apiClient = apiClient,
+       _fallback = fallback;
 
   final ApiClient _apiClient;
   final AiProvider _fallback;
+
+  /// LIVE_AI (Build Session 13 continuation Part A) — when false,
+  /// [generateReply] never calls `/assistant/reply` at all and goes
+  /// straight to [_fallback], the same honest-degradation path a
+  /// network failure already takes. Deliberately does NOT affect
+  /// [researchReply], which the Research mode screen gates independently
+  /// via its own RESEARCH_MODE flag.
+  final bool chatEnabled;
 
   /// Set when the backend's last `/assistant/reply` response included a
   /// SENSITIVE-category `pendingMemory` (Build Session 12 Part 4) —
@@ -69,6 +80,14 @@ class LiveAiProvider extends AiProvider {
     List<ChatMessage> history = const [],
   }) async {
     pendingMemoryCandidate = null;
+    if (!chatEnabled) {
+      return _fallback.generateReply(
+        input: input,
+        companion: companion,
+        style: style,
+        history: history,
+      );
+    }
     try {
       final envelope = await _apiClient.post(
         '/assistant/reply',
