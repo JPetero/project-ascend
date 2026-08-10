@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/entitlements/capability.dart';
 import '../../../../core/entitlements/capability_provider.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../../purchases/domain/store_product.dart';
 import '../../../purchases/presentation/providers/purchase_controller.dart';
 import '../../domain/subscription_status.dart';
@@ -22,6 +24,9 @@ class SubscriptionScreen extends ConsumerWidget {
     final state = ref.watch(subscriptionControllerProvider);
     final controller = ref.read(subscriptionControllerProvider.notifier);
     final purchaseState = ref.watch(purchaseControllerProvider);
+    final purchasesEnabled = ref.watch(
+      featureEnabledProvider(AscendFeature.storePurchases),
+    );
 
     ref.listen<PurchaseState>(purchaseControllerProvider, (previous, next) {
       if (next.justUnlockedPremium && previous?.justUnlockedPremium != true) {
@@ -77,15 +82,21 @@ class SubscriptionScreen extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: AscendSpacing.sm),
-                      _UpgradeSection(
-                        purchaseState: purchaseState,
-                        isEligible:
-                            state.status?.eligibility?.status ==
-                            AffordabilityStatus.approved,
-                        onBuy: (product) => ref
-                            .read(purchaseControllerProvider.notifier)
-                            .buy(product),
-                      ),
+                      if (purchasesEnabled)
+                        _UpgradeSection(
+                          purchaseState: purchaseState,
+                          isEligible:
+                              state.status?.eligibility?.status ==
+                              AffordabilityStatus.approved,
+                          onBuy: (product) => ref
+                              .read(purchaseControllerProvider.notifier)
+                              .buy(product),
+                        )
+                      else
+                        const Text(
+                          "Purchases aren't enabled for this build yet.",
+                          style: TextStyle(fontSize: 12),
+                        ),
                     ],
                     const SizedBox(height: AscendSpacing.lg),
                     Text(

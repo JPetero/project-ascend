@@ -7,6 +7,8 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../../nutrition/domain/meal_type.dart';
 import '../../domain/vision_module.dart';
 import '../../pose_analysis/domain/supported_exercise.dart';
@@ -134,6 +136,9 @@ class VisionModuleScreen extends ConsumerWidget {
 
     final hasLiveAnalysis =
         module == VisionModule.formCoach || module == VisionModule.repCounter;
+    final liveAnalysisEnabled = ref.watch(
+      featureEnabledProvider(AscendFeature.visionFormCoach),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -175,11 +180,18 @@ class VisionModuleScreen extends ConsumerWidget {
                       "have concerns.",
                     ),
                     const SizedBox(height: AscendSpacing.md),
-                    AscendPrimaryButton(
-                      label: 'Choose an exercise',
-                      onPressed: () => _pickExerciseAndStart(context),
-                      expand: false,
-                    ),
+                    if (liveAnalysisEnabled)
+                      AscendPrimaryButton(
+                        label: 'Choose an exercise',
+                        onPressed: () => _pickExerciseAndStart(context),
+                        expand: false,
+                      )
+                    else
+                      const Text(
+                        "Live camera analysis isn't enabled for this build "
+                        'yet.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                   ],
                 ),
               ),

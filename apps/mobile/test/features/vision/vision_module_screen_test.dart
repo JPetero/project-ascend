@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/media/data/media_picker_service.dart';
 import 'package:mobile/core/media/presentation/providers/media_upload_controller.dart';
+import 'package:mobile/features/feature_flags/presentation/providers/feature_flags_provider.dart';
 import 'package:mobile/features/gallery/presentation/providers/gallery_controller.dart';
 import 'package:mobile/features/vision/domain/vision_module.dart';
 import 'package:mobile/features/vision/presentation/screens/vision_module_screen.dart';
@@ -15,6 +16,7 @@ Widget _wrap(
   Widget child, {
   FakeMediaPickerService? pickerService,
   FakeGalleryRepository? galleryRepository,
+  Map<String, bool> flags = const {},
 }) {
   return ProviderScope(
     overrides: [
@@ -24,6 +26,7 @@ Widget _wrap(
       galleryRepositoryProvider.overrideWithValue(
         galleryRepository ?? FakeGalleryRepository(),
       ),
+      featureFlagsProvider.overrideWith((ref) async => flags),
     ],
     child: MaterialApp(home: child),
   );
@@ -53,16 +56,38 @@ void main() {
   );
 
   testWidgets(
-    'Rep Counter and Form Coach V1: offers a real live camera analysis entry point',
+    'Rep Counter and Form Coach V1: offers a real live camera analysis entry point when VISION_FORM_COACH is enabled',
     (tester) async {
       await tester.pumpWidget(
-        _wrap(const VisionModuleScreen(module: VisionModule.repCounter)),
+        _wrap(
+          const VisionModuleScreen(module: VisionModule.repCounter),
+          flags: const {'VISION_FORM_COACH': true},
+        ),
       );
+      await pumpForAsyncSettle(tester);
 
       expect(find.text('Rep Counter'), findsWidgets);
       expect(find.text('Live camera analysis'), findsOneWidget);
       expect(find.text('Choose an exercise'), findsOneWidget);
       expect(find.byIcon(Icons.history_outlined), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Build Session 13 Part 1 — hides the live analysis entry point and shows an honest '
+    'message when VISION_FORM_COACH is not enabled (its safe registry default)',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(const VisionModuleScreen(module: VisionModule.repCounter)),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Live camera analysis'), findsOneWidget);
+      expect(find.text('Choose an exercise'), findsNothing);
+      expect(
+        find.textContaining("isn't enabled for this build yet"),
+        findsOneWidget,
+      );
     },
   );
 

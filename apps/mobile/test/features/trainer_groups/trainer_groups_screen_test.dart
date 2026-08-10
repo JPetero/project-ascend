@@ -51,7 +51,7 @@ void main() {
       final container = await createTestContainer(
         signedIn: true,
         featureFlagsRepository: FakeFeatureFlagsRepository(
-          flags: const {'trainer_dashboard': false},
+          flags: const {'TRAINER_DASHBOARD': false},
         ),
       );
       addTearDown(container.dispose);

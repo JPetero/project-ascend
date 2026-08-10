@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
-import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart'
+    show featureEnabledProvider;
 import '../../domain/trainer_group.dart';
 import '../providers/trainer_groups_controller.dart';
 
@@ -19,11 +21,9 @@ class TrainerGroupsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(trainerGroupsControllerProvider);
     final controller = ref.read(trainerGroupsControllerProvider.notifier);
-    // Build Session 12 Part 15-17 — fail-open: absent (not yet loaded, or
-    // no FeatureFlag row at all) reads as enabled, same contract as every
-    // other feature-flag check. See featureFlagsProvider's doc comment.
-    final flags = ref.watch(featureFlagsProvider).asData?.value ?? const {};
-    final showTrainerDashboard = flags['trainer_dashboard'] ?? true;
+    final showTrainerDashboard = ref.watch(
+      featureEnabledProvider(AscendFeature.trainerDashboard),
+    );
 
     return Scaffold(
       appBar: AppBar(
