@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { CoachingStyle, Companion, CompanionMode, ThemeMode } from '@prisma/client';
+import {
+  CoachingStyle,
+  Companion,
+  CommunityVisibility,
+  CompanionMode,
+  GalleryVisibility,
+  ThemeMode,
+} from '@prisma/client';
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdatePreferencesDto {
@@ -64,4 +71,26 @@ export class UpdatePreferencesDto {
   @Min(0.85)
   @Max(1.5)
   textScale?: number;
+
+  // Build Session 13 continuation Part C (Privacy Center) — see each
+  // field's own schema.prisma comment.
+  @ApiPropertyOptional({ enum: CommunityVisibility })
+  @IsOptional()
+  @IsEnum(CommunityVisibility)
+  defaultPostVisibility?: CommunityVisibility;
+
+  @ApiPropertyOptional({ enum: GalleryVisibility })
+  @IsOptional()
+  @IsEnum(GalleryVisibility)
+  defaultGalleryVisibility?: GalleryVisibility;
+
+  @ApiPropertyOptional({ enum: GalleryVisibility })
+  @IsOptional()
+  @IsEnum(GalleryVisibility)
+  progressPhotoDefaultVisibility?: GalleryVisibility;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  defaultHideCardioRoute?: boolean;
 }

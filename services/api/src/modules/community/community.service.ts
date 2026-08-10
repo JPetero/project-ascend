@@ -160,6 +160,22 @@ export class CommunityService {
   // --- Posts --------------------------------------------------------------
 
   async createPost(userId: string, dto: CreateCommunityPostDto) {
+    // Build Session 13 continuation Part C (Privacy Center) — an
+    // omitted `visibility` used to silently fall through to the Prisma
+    // column's own PUBLIC default, which no per-user preference could
+    // ever override. Falls back to the caller's
+    // Preference.defaultPostVisibility instead, applying to Reels
+    // (mediaType VIDEO) exactly the same as text/image posts since both
+    // share this one column.
+    let visibility = dto.visibility;
+    if (!visibility) {
+      const preference = await this.prisma.preference.findUnique({
+        where: { userId },
+        select: { defaultPostVisibility: true },
+      });
+      visibility = preference?.defaultPostVisibility;
+    }
+
     let mediaUrl = dto.mediaUrl;
 
     if (dto.mediaAssetId) {
@@ -179,7 +195,7 @@ export class CommunityService {
       await this.mediaService.setVisibility(
         userId,
         dto.mediaAssetId,
-        dto.visibility === CommunityVisibility.PRIVATE ? 'PRIVATE' : 'PUBLIC',
+        visibility === CommunityVisibility.PRIVATE ? 'PRIVATE' : 'PUBLIC',
       );
       mediaUrl = this.mediaService.getObjectUrl(asset.storageKey);
     }
@@ -190,7 +206,7 @@ export class CommunityService {
         mediaType: dto.mediaType ?? undefined,
         mediaUrl,
         caption: dto.caption,
-        visibility: dto.visibility ?? undefined,
+        visibility: visibility ?? undefined,
         isTrainerContent: dto.isTrainerContent ?? false,
       },
     });

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { GalleryCategory } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MediaService } from '../media/media.service';
 import { AddGalleryMediaDto } from './dto/add-gallery-media.dto';
@@ -41,12 +42,30 @@ export class GalleryService {
   }
 
   async createAlbum(ownerId: string, dto: CreateGalleryAlbumDto) {
+    // Build Session 13 continuation Part C (Privacy Center) — an
+    // omitted `visibility` used to fall straight through to the Prisma
+    // column's own PRIVATE default, which no per-user preference could
+    // override. Progress albums fall back to their own, independently
+    // tightenable default — see Preference.progressPhotoDefaultVisibility's
+    // schema comment.
+    let visibility = dto.visibility;
+    if (!visibility) {
+      const preference = await this.prisma.preference.findUnique({
+        where: { userId: ownerId },
+        select: { defaultGalleryVisibility: true, progressPhotoDefaultVisibility: true },
+      });
+      visibility =
+        dto.category === GalleryCategory.PROGRESS
+          ? preference?.progressPhotoDefaultVisibility
+          : preference?.defaultGalleryVisibility;
+    }
+
     const album = await this.prisma.galleryAlbum.create({
       data: {
         ownerId,
         name: dto.name,
         category: dto.category ?? undefined,
-        visibility: dto.visibility ?? undefined,
+        visibility: visibility ?? undefined,
       },
     });
     return { ...album, mediaCount: 0 };

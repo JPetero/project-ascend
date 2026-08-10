@@ -371,6 +371,34 @@ model Preference {
   // UpdatePreferencesDto's range rather than an enum, so future in-
   // between values remain possible without a migration.
   textScale                  Float         @default(1.0)
+  // Build Session 13 continuation Part C (Privacy Center) — the
+  // fallback CommunityService.createPost uses whenever a post's own
+  // `visibility` is omitted, so "post publicly by default" becomes a
+  // user-changeable default rather than a hardcoded Prisma column
+  // default nothing ever read. Deliberately one field for both text/
+  // image posts and Reels: a Reel is just a CommunityPost with
+  // mediaType VIDEO (see CommunityPostMediaType) sharing this same
+  // `visibility` column — there is no separate Reel-visibility concept
+  // to default independently.
+  defaultPostVisibility      CommunityVisibility @default(PUBLIC)
+  // Mirrors GalleryAlbum.visibility's own PRIVATE default (Gallery is
+  // private-by-default, unlike Community) — lets a user who always
+  // wants SHARED albums stop re-selecting it every time, without
+  // changing the per-album Prisma default new API clients still get if
+  // they omit it entirely.
+  defaultGalleryVisibility      GalleryVisibility @default(PRIVATE)
+  // Deliberately separate from `defaultGalleryVisibility`: progress
+  // photos are inherently more sensitive (body/fitness images) than a
+  // general workout-selfie album, so this can be tightened independently
+  // even though both currently default to the same PRIVATE value.
+  progressPhotoDefaultVisibility GalleryVisibility @default(PRIVATE)
+  // The pre-filled state of the single "share my route" toggle on the
+  // cardio session logging screens — see CardioSession.hideRoute's
+  // schema comment for why one flag already drives hideRoute,
+  // hideStartLocation, and hideEndLocation together client-side. True
+  // (hidden) by default, matching every one of those three columns'
+  // own Prisma default.
+  defaultHideCardioRoute     Boolean       @default(true)
   createdAt                  DateTime      @default(now())
   updatedAt                  DateTime      @updatedAt
 

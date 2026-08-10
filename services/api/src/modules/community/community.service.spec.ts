@@ -42,6 +42,7 @@ describe('CommunityService', () => {
     };
     communityBlock: { upsert: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
     communityReport: { create: jest.Mock };
+    preference: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let mediaService: {
@@ -70,12 +71,18 @@ describe('CommunityService', () => {
       },
       communityBlock: { upsert: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
       communityReport: { create: jest.fn() },
+      preference: { findUnique: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.resolve(ops)),
     };
     prisma.communityPost.count.mockResolvedValue(0);
     prisma.communityFollow.count.mockResolvedValue(0);
     prisma.communityFollow.findUnique.mockResolvedValue(null);
     prisma.communityBlock.findFirst.mockResolvedValue(null);
+    // Build Session 13 continuation Part C — createPost only reads this
+    // when the caller's own dto.visibility is omitted; most tests set it
+    // explicitly, so a safe default (registry PUBLIC) here keeps the
+    // ones that don't from needing to know about this lookup at all.
+    prisma.preference.findUnique.mockResolvedValue({ defaultPostVisibility: 'PUBLIC' });
     mediaService = {
       getById: jest.fn(),
       setVisibility: jest.fn(),
@@ -144,6 +151,44 @@ describe('CommunityService', () => {
           mediaAssetId: 'asset-1',
         } as never),
       ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+  });
+
+  describe('createPost default visibility (Build Session 13 continuation Part C)', () => {
+    it('falls back to the caller’s Preference.defaultPostVisibility when visibility is omitted', async () => {
+      prisma.preference.findUnique.mockResolvedValue({ defaultPostVisibility: 'FOLLOWERS' });
+
+      await service
+        .createPost('author-1', { mediaType: 'TEXT', caption: 'hi' } as never)
+        .catch(() => undefined);
+
+      expect(prisma.preference.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'author-1' } }),
+      );
+      expect(prisma.communityPost.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ visibility: 'FOLLOWERS' }),
+        }),
+      );
+    });
+
+    it('an explicit visibility on the request is never overridden by the default preference', async () => {
+      prisma.preference.findUnique.mockResolvedValue({ defaultPostVisibility: 'PRIVATE' });
+
+      await service
+        .createPost('author-1', {
+          mediaType: 'TEXT',
+          caption: 'hi',
+          visibility: 'PUBLIC',
+        } as never)
+        .catch(() => undefined);
+
+      expect(prisma.preference.findUnique).not.toHaveBeenCalled();
+      expect(prisma.communityPost.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ visibility: 'PUBLIC' }),
+        }),
+      );
     });
   });
 

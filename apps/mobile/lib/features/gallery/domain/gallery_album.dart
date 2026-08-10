@@ -55,6 +55,12 @@ String galleryVisibilityToJson(GalleryVisibility visibility) =>
 GalleryVisibility galleryVisibilityFromJson(String value) =>
     value == 'SHARED' ? GalleryVisibility.shared : GalleryVisibility.private_;
 
+String galleryVisibilityLabel(GalleryVisibility visibility) =>
+    switch (visibility) {
+      GalleryVisibility.private_ => 'Private',
+      GalleryVisibility.shared => 'Shared to Community',
+    };
+
 class GalleryAlbum {
   const GalleryAlbum({
     required this.id,

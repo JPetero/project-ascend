@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../achievements/presentation/providers/achievement_celebration_controller.dart';
+import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../domain/cardio_session.dart';
 import '../../domain/live_cardio_session.dart';
 import '../providers/live_cardio_session_controller.dart';
@@ -125,10 +126,17 @@ class _LiveCardioScreenState extends ConsumerState<LiveCardioScreen>
     final session = ref.read(liveCardioSessionControllerProvider);
     if (session == null) return;
 
+    // Build Session 13 continuation Part C (Privacy Center) —
+    // Preference.defaultHideCardioRoute's pre-filled state, matching
+    // CardioLogScreen's own read-once initialization.
+    final preferences = ref.read(preferencesControllerProvider).asData?.value;
     final shareRoute = await showAscendBottomSheet<bool>(
       context: context,
       title: 'Finish session',
-      child: _FinishSheet(session: session),
+      child: _FinishSheet(
+        session: session,
+        initialShareRoute: !(preferences?.defaultHideCardioRoute ?? true),
+      ),
     );
     if (shareRoute == null) return; // dismissed without choosing
 
@@ -384,16 +392,17 @@ class _Stat extends StatelessWidget {
 }
 
 class _FinishSheet extends StatefulWidget {
-  const _FinishSheet({required this.session});
+  const _FinishSheet({required this.session, required this.initialShareRoute});
 
   final LiveCardioSessionState session;
+  final bool initialShareRoute;
 
   @override
   State<_FinishSheet> createState() => _FinishSheetState();
 }
 
 class _FinishSheetState extends State<_FinishSheet> {
-  bool _shareRoute = false;
+  late bool _shareRoute = widget.initialShareRoute;
 
   @override
   Widget build(BuildContext context) {
