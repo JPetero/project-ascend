@@ -7,6 +7,8 @@ import '../../../../core/entitlements/capability.dart';
 import '../../../../core/entitlements/capability_provider.dart';
 import '../../../../core/routing/app_shell.dart';
 import '../../../../core/routing/route_paths.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../../profile/domain/preferences_model.dart';
 import '../../../profile/presentation/providers/preferences_controller.dart';
 import '../../domain/companion_dialogue.dart';
@@ -139,6 +141,9 @@ class _AscendCommandCenterScreenState
         voiceState.listeningStatus == VoiceListeningStatus.listening;
     final isRequestingVoicePermission =
         voiceState.listeningStatus == VoiceListeningStatus.requestingPermission;
+    final researchModeEnabled = ref.watch(
+      featureEnabledProvider(AscendFeature.researchMode),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -157,17 +162,18 @@ class _AscendCommandCenterScreenState
                       : 'Speak replies aloud (Premium)')
                 : 'Speak replies aloud (Premium)',
           ),
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ResearchModeScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.science_outlined),
-            tooltip: 'Research mode',
-          ),
+          if (researchModeEnabled)
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ResearchModeScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.science_outlined),
+              tooltip: 'Research mode',
+            ),
           const NotificationBellAction(),
           const ProfileIconAction(),
         ],

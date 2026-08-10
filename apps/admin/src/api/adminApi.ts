@@ -85,15 +85,25 @@ export const ADMIN_PERMISSIONS: AdminPermission[] = [
 ];
 
 // Feature Flags platform — Build Session 12 Part 15-17. Had no admin UI
-// until Build Session 12 Part 25-26 wired this up.
+// until Build Session 12 Part 25-26 wired this up. Redesigned around an
+// explicit registry in Build Session 13 Part 1 (see services/api's
+// feature-flag-registry.ts) — every known key now appears here even
+// without an override row, annotated with its default and risk.
+export type FeatureFlagRisk = 'SAFE_CORE' | 'RISKY_EXTERNAL';
+
 export interface FeatureFlag {
-  id: string;
+  id: string | null;
   key: string;
   description: string | null;
   enabled: boolean;
   rolloutPercentage: number;
-  createdAt: string;
-  updatedAt: string;
+  /** null for an ad-hoc key with no registry entry. */
+  defaultEnabled: boolean | null;
+  risk: FeatureFlagRisk | null;
+  /** Whether an explicit override row exists, vs. showing the registry default. */
+  hasOverride: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface UpsertFeatureFlagInput {

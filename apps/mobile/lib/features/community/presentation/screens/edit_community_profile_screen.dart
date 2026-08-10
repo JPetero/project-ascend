@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/design_system/design_system.dart';
 import '../../../../core/routing/route_paths.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../feature_flags/domain/ascend_feature.dart';
+import '../../../feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../../domain/community_profile.dart';
 import '../providers/community_feed_controller.dart';
 import '../providers/community_profile_controller.dart';
@@ -155,11 +157,15 @@ class _EditCommunityProfileScreenState
                   value: _isTrainer,
                   onChanged: (value) => setState(() => _isTrainer = value),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => context.push(RoutePaths.trainerVerification),
-                  icon: const Icon(Icons.verified_outlined),
-                  label: const Text('Apply for real trainer verification'),
-                ),
+                if (ref.watch(
+                  featureEnabledProvider(AscendFeature.trainerVerification),
+                ))
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        context.push(RoutePaths.trainerVerification),
+                    icon: const Icon(Icons.verified_outlined),
+                    label: const Text('Apply for real trainer verification'),
+                  ),
                 if (_error != null) ...[
                   const SizedBox(height: AscendSpacing.sm),
                   Text(

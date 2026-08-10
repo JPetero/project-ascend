@@ -87,64 +87,112 @@ describe('Feature Flags and Release Readiness (e2e)', () => {
       .expect(403);
   });
 
-  it('a key absent from the resolved map is fail-open (never present as false) for an ordinary member', async () => {
+  it(
+    'Build Session 13 Part 1 — every registered flag resolves to its real registry ' +
+      'default with zero FeatureFlag rows in the database, never absent',
+    async () => {
+      const res = await request(app.getHttpServer())
+        .get('/feature-flags')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      // Safe/core surfaces default open.
+      expect(res.body.data.TRAINER_DASHBOARD).toBe(true);
+      expect(res.body.data.TRAINER_VERIFICATION).toBe(true);
+      expect(res.body.data.REMOTE_PUSH).toBe(true);
+      // Risky/external/Premium surfaces default closed until an admin
+      // explicitly turns them on.
+      expect(res.body.data.LIVE_AI).toBe(false);
+      expect(res.body.data.RESEARCH_MODE).toBe(false);
+      expect(res.body.data.STORE_PURCHASES).toBe(false);
+      expect(res.body.data.ASCEND_PROMOTE).toBe(false);
+      expect(res.body.data.VISION_FORM_COACH).toBe(false);
+    },
+  );
+
+  it('an unregistered, never-created ad-hoc key is genuinely absent from resolution', async () => {
     const res = await request(app.getHttpServer())
       .get('/feature-flags')
       .set('Authorization', `Bearer ${memberToken}`)
       .expect(200);
-    expect(res.body.data).toEqual({});
+    expect(res.body.data.does_not_exist_key).toBeUndefined();
   });
 
-  it('creates a flag via the admin route and it appears in the listing', async () => {
+  it('the admin listing includes every registered key, with its default/risk, even with no override row', async () => {
+    const listed = await request(app.getHttpServer())
+      .get('/admin/feature-flags')
+      .set('Authorization', `Bearer ${platformAdminToken}`)
+      .expect(200);
+
+    const liveAi = listed.body.data.find((f: { key: string }) => f.key === 'LIVE_AI');
+    expect(liveAi).toMatchObject({
+      enabled: false,
+      defaultEnabled: false,
+      risk: 'RISKY_EXTERNAL',
+      hasOverride: false,
+    });
+  });
+
+  it('creates an override via the admin route and it appears enabled in the listing', async () => {
     const created = await request(app.getHttpServer())
-      .post('/admin/feature-flags/trainer_dashboard')
+      .post('/admin/feature-flags/TRAINER_DASHBOARD')
       .set('Authorization', `Bearer ${platformAdminToken}`)
       .send({ description: 'Trainer dashboard icon', enabled: true, rolloutPercentage: 100 })
       .expect(201);
-    expect(created.body.data.key).toBe('trainer_dashboard');
+    expect(created.body.data.key).toBe('TRAINER_DASHBOARD');
     expect(created.body.data.enabled).toBe(true);
 
     const listed = await request(app.getHttpServer())
       .get('/admin/feature-flags')
       .set('Authorization', `Bearer ${platformAdminToken}`)
       .expect(200);
-    expect(listed.body.data.map((f: { key: string }) => f.key)).toContain('trainer_dashboard');
+    const trainerDashboard = listed.body.data.find(
+      (f: { key: string }) => f.key === 'TRAINER_DASHBOARD',
+    );
+    expect(trainerDashboard).toMatchObject({ hasOverride: true, enabled: true });
   });
 
-  it('resolves an enabled 100%-rollout flag to true for a signed-in member', async () => {
+  it('resolves an enabled 100%-rollout override to true for a signed-in member', async () => {
     const res = await request(app.getHttpServer())
       .get('/feature-flags')
       .set('Authorization', `Bearer ${memberToken}`)
       .expect(200);
-    expect(res.body.data.trainer_dashboard).toBe(true);
+    expect(res.body.data.TRAINER_DASHBOARD).toBe(true);
   });
 
-  it('disabling the flag resolves it to false, not absent, for the member', async () => {
-    await request(app.getHttpServer())
-      .post('/admin/feature-flags/trainer_dashboard')
-      .set('Authorization', `Bearer ${platformAdminToken}`)
-      .send({ enabled: false })
-      .expect(201);
+  it(
+    'disabling a normally-open flag via an explicit override resolves it to false — an ' +
+      'admin can always turn a safe-default flag off too',
+    async () => {
+      await request(app.getHttpServer())
+        .post('/admin/feature-flags/TRAINER_DASHBOARD')
+        .set('Authorization', `Bearer ${platformAdminToken}`)
+        .send({ enabled: false })
+        .expect(201);
 
-    const res = await request(app.getHttpServer())
-      .get('/feature-flags')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .expect(200);
-    expect(res.body.data.trainer_dashboard).toBe(false);
-  });
+      const res = await request(app.getHttpServer())
+        .get('/feature-flags')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      expect(res.body.data.TRAINER_DASHBOARD).toBe(false);
+    },
+  );
 
-  it('deletes a flag, after which it is absent (fail-open) from resolution again', async () => {
-    await request(app.getHttpServer())
-      .delete('/admin/feature-flags/trainer_dashboard')
-      .set('Authorization', `Bearer ${platformAdminToken}`)
-      .expect(200);
+  it(
+    'deletes the override, after which resolution reverts to the registry default ' +
+      '(true) rather than disappearing — a registered key can never go absent',
+    async () => {
+      await request(app.getHttpServer())
+        .delete('/admin/feature-flags/TRAINER_DASHBOARD')
+        .set('Authorization', `Bearer ${platformAdminToken}`)
+        .expect(200);
 
-    const res = await request(app.getHttpServer())
-      .get('/feature-flags')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .expect(200);
-    expect(res.body.data.trainer_dashboard).toBeUndefined();
-  });
+      const res = await request(app.getHttpServer())
+        .get('/feature-flags')
+        .set('Authorization', `Bearer ${memberToken}`)
+        .expect(200);
+      expect(res.body.data.TRAINER_DASHBOARD).toBe(true);
+    },
+  );
 
   it('404s deleting a flag that does not exist', async () => {
     await request(app.getHttpServer())

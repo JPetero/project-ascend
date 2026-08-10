@@ -140,12 +140,13 @@ export class AdminController {
     return this.adminService.revokePermission(user.id, userId, permission);
   }
 
-  // --- Feature Flags (Build Session 12 Part 15-17) -----------------------
+  // --- Feature Flags (Build Session 12 Part 15-17; registry-backed
+  // listing since Build Session 13 Part 1) -------------------------------
 
   @Get('feature-flags')
   @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
   listFeatureFlags() {
-    return this.featureFlagsService.listAll();
+    return this.featureFlagsService.listAllWithDefinitions();
   }
 
   @Post('feature-flags/:key')

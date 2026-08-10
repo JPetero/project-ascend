@@ -4,9 +4,11 @@ import type { FeatureFlag } from '../api/adminApi';
 import { ApiError } from '../api/client';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
 
-// Feature Flags admin UI — Build Session 12 Part 25-26. The backend
-// (Build Session 12 Part 15-17) has always supported arbitrary flag
-// keys; there was just no admin surface to manage them until now.
+// Feature Flags admin UI — Build Session 12 Part 25-26, redesigned
+// around an explicit registry in Build Session 13 Part 1. Every known
+// flag now appears here even with no override row, annotated with its
+// registry default and risk classification — an admin can discover and
+// flip a flag without guessing its exact key string first.
 // GET /admin/feature-flags returns a plain array, not the paginated
 // {data, meta} envelope every other admin queue uses, so this page
 // can't use usePagedResource and manages its own list state instead.
@@ -102,6 +104,8 @@ export function FeatureFlagsPage() {
             <tr>
               <th>Key</th>
               <th>Description</th>
+              <th>Risk</th>
+              <th>Default</th>
               <th>Enabled</th>
               <th>Rollout %</th>
               <th></th>
@@ -109,9 +113,17 @@ export function FeatureFlagsPage() {
           </thead>
           <tbody>
             {flags.map((flag) => (
-              <tr key={flag.id}>
+              <tr key={flag.key}>
                 <td>{flag.key}</td>
                 <td>{flag.description ?? '—'}</td>
+                <td>{flag.risk ?? 'AD_HOC'}</td>
+                <td>
+                  {flag.defaultEnabled === null
+                    ? '—'
+                    : flag.defaultEnabled
+                      ? 'Open'
+                      : 'Closed'}
+                </td>
                 <td>
                   <input
                     type="checkbox"
@@ -131,7 +143,9 @@ export function FeatureFlagsPage() {
                   />
                 </td>
                 <td>
-                  <button onClick={() => remove(flag.key)}>Delete</button>
+                  {flag.hasOverride && (
+                    <button onClick={() => remove(flag.key)}>Reset to default</button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -7,11 +7,18 @@ import 'package:mobile/features/purchases/domain/store_product.dart';
 import 'package:mobile/features/subscriptions/domain/subscription_status.dart';
 import 'package:mobile/features/subscriptions/presentation/screens/subscription_screen.dart';
 
+import '../../helpers/fake_feature_flags_repository.dart';
 import '../../helpers/fake_purchase_service.dart';
 import '../../helpers/fake_purchases_repository.dart';
 import '../../helpers/fake_subscriptions_repository.dart';
 import '../../helpers/pump_helpers.dart';
 import '../../helpers/test_provider_scope.dart';
+
+/// STORE_PURCHASES defaults closed (Build Session 13 Part 1) — every
+/// test below that exercises the real purchase flow opts in explicitly,
+/// same as production requires an admin to.
+FakeFeatureFlagsRepository _purchasesEnabled() =>
+    FakeFeatureFlagsRepository(flags: const {'STORE_PURCHASES': true});
 
 const _standardProduct = StoreProduct(
   id: PurchaseProductIds.premiumStandard,
@@ -44,6 +51,7 @@ void main() {
       final container = await createTestContainer(
         signedIn: true,
         purchaseService: FakePurchaseService(available: false),
+        featureFlagsRepository: _purchasesEnabled(),
       );
       addTearDown(container.dispose);
 
@@ -73,6 +81,7 @@ void main() {
       final container = await createTestContainer(
         signedIn: true,
         purchaseService: purchaseService,
+        featureFlagsRepository: _purchasesEnabled(),
       );
       addTearDown(container.dispose);
 
@@ -107,6 +116,7 @@ void main() {
       purchaseService: purchaseService,
       purchasesRepository: FakePurchasesRepository(),
       subscriptionsRepository: subscriptionsRepository,
+      featureFlagsRepository: _purchasesEnabled(),
     );
     addTearDown(container.dispose);
 
