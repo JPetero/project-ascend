@@ -2,7 +2,7 @@ import '../../../core/networking/api_client.dart';
 import '../domain/ranking.dart';
 
 /// Thin client for services/api/src/modules/rankings — opt-in status and
-/// the FRIENDS/REGION/GLOBAL leaderboards. See
+/// the FRIENDS/LOCAL/CITY/REGION/NATIONAL/GLOBAL leaderboards. See
 /// packages/docs/product/user-scenario-bible.md Scenario 16a.
 class RankingsRepository {
   RankingsRepository({required ApiClient apiClient}) : _apiClient = apiClient;
@@ -17,11 +17,23 @@ class RankingsRepository {
     return RankingMyStatus.fromJson(envelope.data!);
   }
 
-  Future<void> optIn({required RankingScope scope, String? regionLabel}) async {
+  Future<void> optIn({
+    required RankingScope scope,
+    String? localityCountry,
+    String? localityRegion,
+    String? localityCity,
+    String? localityArea,
+  }) async {
     await _apiClient.put(
       '/rankings/opt-in',
       (_) => null,
-      data: {'scope': rankingScopeToJson(scope), 'regionLabel': ?regionLabel},
+      data: {
+        'scope': rankingScopeToJson(scope),
+        'localityCountry': ?localityCountry,
+        'localityRegion': ?localityRegion,
+        'localityCity': ?localityCity,
+        'localityArea': ?localityArea,
+      },
     );
   }
 

@@ -1864,37 +1864,67 @@ model TrainerGroupScheduledSessionParticipant {
 
 // --- Rankings and Challenges — Founder Scenario 16a. Opt-in and off by
 // default: no RankingOptIn row at all means "private progress only",
-// the scenario's default state. This MVP simplifies the scenario's
-// full local/city/region/state/national/global granularity down to
-// three scopes (FRIENDS/REGION/GLOBAL) — see
-// packages/docs/build-session-7.md Part 6 for that scope decision.
-// Scoring deliberately never rewards raw volume (weight lifted,
-// calories burned) or an uninterrupted streak alone — see
+// the scenario's default state. The MVP (see packages/docs/
+// build-session-7.md Part 6) folded the scenario's full local/city/
+// region/state/national/global granularity down to three scopes
+// (FRIENDS/REGION/GLOBAL); Build Session 13 continuation Part D
+// restores the full hierarchy — see RankingScope and the locality
+// fields below. Scoring deliberately never rewards raw volume (weight
+// lifted, calories burned) or an uninterrupted streak alone — see
 // RankingsService's activity-day scoring for how that's enforced.
-// `regionLabel` is the same coarse, user-typed, non-GPS field pattern
-// CardioSession.regionLabel already established — never an exact
-// coordinate.
+// The locality fields are the same coarse, user-typed, non-GPS field
+// pattern CardioSession.regionLabel already established — never an
+// exact coordinate, always manually entered rather than GPS-derived
+// (Scenario 16a explicitly calls for manual location selection as an
+// alternative to GPS).
 
+// A leaderboard tier, broadest to narrowest after FRIENDS: GLOBAL >
+// NATIONAL > REGION (state/province) > CITY > LOCAL (a neighborhood
+// or district within a city). Opting in at a given tier requires
+// filling in every locality field from localityCountry down through
+// that tier's own field (see OptInRankingsDto) — so a LOCAL opt-in
+// always carries enough data to also resolve the CITY/REGION/NATIONAL
+// leaderboards for the same place. This is aggregate opt-in-group
+// scoping only — never who-is-physically-near-you discovery; see
+// packages/docs/product/parking-lot.md's "Stranger proximity
+// matching" entry for that explicitly out-of-scope, separate feature.
 enum RankingScope {
   FRIENDS
+  LOCAL
+  CITY
   REGION
+  NATIONAL
   GLOBAL
 }
 
 model RankingOptIn {
-  id          String       @id @default(uuid())
-  userId      String       @unique
-  scope       RankingScope
-  regionLabel String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id     String       @id @default(uuid())
+  userId String       @unique
+  scope  RankingScope
+
+  // Structured locality hierarchy, broadest to narrowest. Each is a
+  // free-typed, coarse label (e.g. "Philippines" / "Metro Manila" /
+  // "Quezon City" / "Diliman") — never a coordinate. Populated from
+  // localityCountry down through whichever tier `scope` requires; see
+  // OptInRankingsDto and RankingsService.resolveScopeCandidates.
+  localityCountry String?
+  localityRegion  String?
+  localityCity    String?
+  localityArea    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Every leaderboard load filters by scope (GLOBAL) or scope+regionLabel
-  // (REGION) — see RankingsService.resolveScopeCandidates. Without this,
-  // that query was a full table scan (Build Session 12 Part 27-32).
-  @@index([scope, regionLabel])
+  // Every leaderboard load filters by scope (GLOBAL/FRIENDS) or
+  // scope+the locality columns up to the requested tier (NATIONAL/
+  // REGION/CITY/LOCAL) — see RankingsService.resolveScopeCandidates.
+  // Left-to-right column order matches the hierarchy so a leaderboard
+  // at any tier can use this index as a prefix scan (Build Session 12
+  // Part 27-32 established the original scope+regionLabel version of
+  // this index after that query was a full table scan).
+  @@index([scope, localityCountry, localityRegion, localityCity, localityArea], map: "ranking_opt_ins_locality_idx")
   @@map("ranking_opt_ins")
 }
 

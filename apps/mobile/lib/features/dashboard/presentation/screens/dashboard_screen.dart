@@ -963,7 +963,7 @@ class _RankingsRow extends ConsumerWidget {
                 Text('Rankings', style: Theme.of(context).textTheme.titleSmall),
                 Text(
                   mine != null
-                      ? 'Rank #${mine.rank} · ${_scopeLabel(state.selectedScope)}'
+                      ? 'Rank #${mine.rank} · ${rankingScopeLabel(state.selectedScope)}'
                       : 'Opted in — rank updates as the season scores in.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
@@ -975,12 +975,6 @@ class _RankingsRow extends ConsumerWidget {
       ),
     );
   }
-
-  String _scopeLabel(RankingScope scope) => switch (scope) {
-    RankingScope.friends => 'Friends',
-    RankingScope.region => 'Region',
-    RankingScope.global => 'Global',
-  };
 }
 
 /// Real friend count and pending-request count — Build Session 9 Part 1.

@@ -6,23 +6,49 @@ import {
 } from '../../common/scoring/activity-scoring.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OptInRankingsDto } from './dto/opt-in-rankings.dto';
+import {
+  isLocalityScope,
+  LocalityFieldName,
+  localityTierIndex,
+  requiredLocalityFields,
+} from './rankings-locality.util';
+
+type OptInRow = {
+  userId: string;
+  scope: RankingScope;
+  localityCountry: string | null;
+  localityRegion: string | null;
+  localityCity: string | null;
+  localityArea: string | null;
+};
 
 /**
  * Rankings — Founder Scenario 16a. Opt-in and off by default (no
  * `RankingOptIn` row = private, never appears anywhere); scores never
  * reward raw volume or an uninterrupted streak alone (see
  * common/scoring/activity-scoring.util.ts); no exact location is ever
- * stored or returned, only a user-typed coarse region label.
+ * stored or returned, only user-typed coarse locality labels.
  */
 @Injectable()
 export class RankingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async optIn(userId: string, dto: OptInRankingsDto) {
+    // Only the fields the chosen scope's tier actually needs are kept —
+    // switching from e.g. LOCAL back to GLOBAL clears the old locality
+    // data rather than leaving it stale and unused.
+    const required = new Set(requiredLocalityFields(dto.scope));
+    const locality: Record<LocalityFieldName, string | null> = {
+      localityCountry: required.has('localityCountry') ? (dto.localityCountry ?? null) : null,
+      localityRegion: required.has('localityRegion') ? (dto.localityRegion ?? null) : null,
+      localityCity: required.has('localityCity') ? (dto.localityCity ?? null) : null,
+      localityArea: required.has('localityArea') ? (dto.localityArea ?? null) : null,
+    };
+
     const optIn = await this.prisma.rankingOptIn.upsert({
       where: { userId },
-      update: { scope: dto.scope, regionLabel: dto.regionLabel ?? null },
-      create: { userId, scope: dto.scope, regionLabel: dto.regionLabel },
+      update: { scope: dto.scope, ...locality },
+      create: { userId, scope: dto.scope, ...locality },
     });
     return this.serializeOptIn(optIn);
   }
@@ -45,7 +71,10 @@ export class RankingsService {
     return {
       optedIn: true,
       scope: optIn.scope,
-      regionLabel: optIn.regionLabel,
+      localityCountry: optIn.localityCountry,
+      localityRegion: optIn.localityRegion,
+      localityCity: optIn.localityCity,
+      localityArea: optIn.localityArea,
       season: this.serializeSeason(season),
       points: summary.points,
       activeDays: summary.activeDays,
@@ -106,7 +135,7 @@ export class RankingsService {
   private async resolveScopeCandidates(
     viewerId: string,
     scope: RankingScope,
-    viewerOptIn: { scope: RankingScope; regionLabel: string | null },
+    viewerOptIn: OptInRow,
   ): Promise<string[]> {
     if (scope === RankingScope.GLOBAL) {
       const optedIn = await this.prisma.rankingOptIn.findMany({
@@ -116,12 +145,23 @@ export class RankingsService {
       return optedIn.map((o) => o.userId);
     }
 
-    if (scope === RankingScope.REGION) {
-      if (viewerOptIn.scope !== RankingScope.REGION || !viewerOptIn.regionLabel) {
-        throw new BadRequestException('Opt in with a region to view the regional leaderboard.');
+    if (isLocalityScope(scope)) {
+      // Viewing NATIONAL/REGION/CITY/LOCAL requires having opted in at
+      // that tier or narrower — a LOCAL opt-in has every field a
+      // broader tier needs too, so it can also browse e.g. the CITY or
+      // NATIONAL board for the same place. Matching is case-insensitive
+      // so "Quezon City" and "Quezon city" land on the same board.
+      if (localityTierIndex(viewerOptIn.scope) < localityTierIndex(scope)) {
+        throw new BadRequestException(
+          `Opt in with a ${scope.toLowerCase()} locality (or narrower) to view this leaderboard.`,
+        );
+      }
+      const localityWhere: Record<string, { equals: string; mode: 'insensitive' }> = {};
+      for (const field of requiredLocalityFields(scope)) {
+        localityWhere[field] = { equals: viewerOptIn[field] as string, mode: 'insensitive' };
       }
       const optedIn = await this.prisma.rankingOptIn.findMany({
-        where: { scope: RankingScope.REGION, regionLabel: viewerOptIn.regionLabel },
+        where: { scope, ...localityWhere },
         select: { userId: true },
       });
       return optedIn.map((o) => o.userId);
@@ -165,12 +205,15 @@ export class RankingsService {
     });
   }
 
-  private serializeOptIn(optIn: {
-    userId: string;
-    scope: RankingScope;
-    regionLabel: string | null;
-  }) {
-    return { userId: optIn.userId, scope: optIn.scope, regionLabel: optIn.regionLabel };
+  private serializeOptIn(optIn: OptInRow) {
+    return {
+      userId: optIn.userId,
+      scope: optIn.scope,
+      localityCountry: optIn.localityCountry,
+      localityRegion: optIn.localityRegion,
+      localityCity: optIn.localityCity,
+      localityArea: optIn.localityArea,
+    };
   }
 
   private serializeSeason(season: { id: string; label: string; startsAt: Date; endsAt: Date }) {
