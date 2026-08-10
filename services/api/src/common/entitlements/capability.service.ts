@@ -48,4 +48,55 @@ export class CapabilityService {
   async hasCapabilityForUser(userId: string, capability: AppCapability): Promise<boolean> {
     return this.hasCapability(await this.getPlanTier(userId), capability);
   }
+
+  /**
+   * Batched form of `getPlanTier` for callers resolving many users at
+   * once (e.g. TrainerGroupsService.listMyGroups' group owners) — one
+   * `findMany` plus one `updateMany` for any lapsed rows, instead of a
+   * `findUnique`/`update` pair per user. Same lazy-downgrade semantics
+   * as `getPlanTier`: an expired PREMIUM row reads and persists as FREE.
+   * Deduplicates `userIds` internally, so callers don't need to.
+   */
+  async getPlanTiersForUsers(userIds: string[]): Promise<Map<string, PlanTier>> {
+    const uniqueIds = Array.from(new Set(userIds));
+    const result = new Map<string, PlanTier>(uniqueIds.map((id) => [id, PlanTier.FREE]));
+    if (uniqueIds.length === 0) return result;
+
+    const subscriptions = await this.prisma.userSubscription.findMany({
+      where: { userId: { in: uniqueIds } },
+    });
+
+    const now = new Date();
+    const expiredUserIds: string[] = [];
+    for (const subscription of subscriptions) {
+      if (subscription.tier !== 'PREMIUM') continue;
+      if (subscription.expiresAt && subscription.expiresAt < now) {
+        expiredUserIds.push(subscription.userId);
+        continue;
+      }
+      result.set(subscription.userId, PlanTier.PREMIUM);
+    }
+
+    if (expiredUserIds.length > 0) {
+      await this.prisma.userSubscription.updateMany({
+        where: { userId: { in: expiredUserIds } },
+        data: { tier: 'FREE' },
+      });
+    }
+
+    return result;
+  }
+
+  async hasCapabilityForUsers(
+    userIds: string[],
+    capability: AppCapability,
+  ): Promise<Map<string, boolean>> {
+    const tiers = await this.getPlanTiersForUsers(userIds);
+    return new Map(
+      Array.from(tiers.entries()).map(([userId, tier]) => [
+        userId,
+        this.hasCapability(tier, capability),
+      ]),
+    );
+  }
 }

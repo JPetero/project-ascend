@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   NotificationType,
+  Prisma,
   TrainerGroupInvitationStatus,
   TrainerGroupMemberRole,
   WorkoutAssignmentStatus,
@@ -34,6 +35,20 @@ import { InviteTrainerGroupMemberDto } from './dto/invite-trainer-group-member.d
 import { SendTrainerGroupMessageDto } from './dto/send-trainer-group-message.dto';
 import { SetTrainerGroupMemberRoleDto } from './dto/set-trainer-group-member-role.dto';
 import { ShareTrainerGroupPlanDto } from './dto/share-trainer-group-plan.dto';
+
+/** Shared `include` for serializeGroup/serializeGroupData — kept as one
+ * constant so the single-group and batched (listMyGroups) query paths
+ * fetch and shape group + member data identically. */
+const trainerGroupWithMembersInclude = {
+  members: {
+    include: { user: { include: { communityProfile: true } } },
+    orderBy: { joinedAt: 'asc' },
+  },
+} satisfies Prisma.TrainerGroupInclude;
+
+type TrainerGroupWithMembers = Prisma.TrainerGroupGetPayload<{
+  include: typeof trainerGroupWithMembersInclude;
+}>;
 
 /**
  * Trainer groups — see schema.prisma's Trainer group comment and
@@ -85,12 +100,39 @@ export class TrainerGroupsService {
     return this.serializeGroup(group.id, userId);
   }
 
+  /**
+   * Build Session 13 Part 2/28 — previously N+1: one findUniqueOrThrow
+   * plus one capability lookup per group via serializeGroup(). Now a
+   * single membership query, a single batched group fetch, and a single
+   * batched capability lookup across all distinct owners, regardless of
+   * how many groups the caller belongs to. Same response shape and
+   * membership order as before.
+   */
   async listMyGroups(userId: string) {
     const memberships = await this.prisma.trainerGroupMember.findMany({
       where: { userId },
       select: { groupId: true },
     });
-    return Promise.all(memberships.map((m) => this.serializeGroup(m.groupId, userId)));
+    const groupIds = memberships.map((m) => m.groupId);
+    if (groupIds.length === 0) return [];
+
+    const groups = await this.prisma.trainerGroup.findMany({
+      where: { id: { in: groupIds } },
+      include: trainerGroupWithMembersInclude,
+    });
+    const groupsById = new Map(groups.map((g) => [g.id, g]));
+
+    const expandedByOwner = await this.capabilityService.hasCapabilityForUsers(
+      groups.map((g) => g.ownerId),
+      AppCapability.TRAINER_GROUPS_EXPANDED,
+    );
+
+    return groupIds
+      .map((id) => groupsById.get(id))
+      .filter((group): group is TrainerGroupWithMembers => group != null)
+      .map((group) =>
+        this.serializeGroupData(group, userId, expandedByOwner.get(group.ownerId) ?? false),
+      );
   }
 
   async getGroup(userId: string, groupId: string) {
@@ -811,14 +853,13 @@ export class TrainerGroupsService {
   private async serializeGroup(groupId: string, viewerId: string) {
     const group = await this.prisma.trainerGroup.findUniqueOrThrow({
       where: { id: groupId },
-      include: {
-        members: {
-          include: { user: { include: { communityProfile: true } } },
-          orderBy: { joinedAt: 'asc' },
-        },
-      },
+      include: trainerGroupWithMembersInclude,
     });
     const expanded = await this.isExpanded(group.ownerId);
+    return this.serializeGroupData(group, viewerId, expanded);
+  }
+
+  private serializeGroupData(group: TrainerGroupWithMembers, viewerId: string, expanded: boolean) {
     return {
       id: group.id,
       ownerId: group.ownerId,
