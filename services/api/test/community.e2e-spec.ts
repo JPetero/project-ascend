@@ -177,7 +177,7 @@ describe('Community profiles/posts/Reels (e2e)', () => {
       .send({ mediaType: 'IMAGE', mediaAssetId, caption: 'Uploaded through the Media Platform' })
       .expect(201);
 
-    expect(created.body.data.mediaUrl).toContain('/media/objects/');
+    expect(created.body.data.mediaUrl).toContain('/media/objects?key=');
 
     const asset = await request(app.getHttpServer())
       .get(`/media/${mediaAssetId}`)

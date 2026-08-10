@@ -31,8 +31,21 @@ export class LocalDevelopmentStorageProvider implements MediaStorageProvider {
   }
 
   getObjectUrl(storageKey: string): string {
-    // Never a filesystem path — an API-relative serving route.
-    return `/media/objects/${encodeURIComponent(storageKey)}`;
+    // Never a filesystem path — an API-relative serving route, gated by
+    // MediaController.getObject's auth + visibility check (see
+    // getSignedGetUrl's doc comment for why the same route backs both).
+    // `key` is a query param rather than a path segment so a storage key
+    // containing "/" never has to survive Express's path decoding.
+    return `/media/objects?key=${encodeURIComponent(storageKey)}`;
+  }
+
+  // Build Session 12 Part 18-21 — local dev has no real cloud signing
+  // capability, so `GET /media/objects` (MediaController) is the real
+  // access gate here instead of an expiring token: it re-checks
+  // ownership/visibility on every request via MediaService.readLocalObject.
+  // `expirySeconds` is accepted only to satisfy the shared interface.
+  async getSignedGetUrl(storageKey: string, _expirySeconds: number): Promise<string> {
+    return this.getObjectUrl(storageKey);
   }
 
   async deleteObject(storageKey: string): Promise<void> {

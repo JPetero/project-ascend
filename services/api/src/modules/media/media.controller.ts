@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
@@ -17,6 +27,20 @@ export class MediaController {
   @Post('uploads')
   initiateUpload(@CurrentUser() user: AuthenticatedUser, @Body() dto: InitiateUploadDto) {
     return this.mediaService.initiateUpload(user.id, dto);
+  }
+
+  // Build Session 12 Part 18-21 — local-dev-only object serving route,
+  // authenticated + visibility-checked (see MediaService.readLocalObject
+  // and LocalDevelopmentStorageProvider.getSignedGetUrl's doc comment).
+  // `key` is a query param, not a path segment, so a storage key
+  // containing "/" never has to survive Express's path-segment decoding.
+  @Get('objects')
+  async getObject(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('key') key: string,
+  ): Promise<StreamableFile> {
+    const { buffer, mimeType } = await this.mediaService.readLocalObject(user.id, key);
+    return new StreamableFile(buffer, { type: mimeType });
   }
 
   // Local-dev-only completion path — see LocalDevelopmentStorageProvider.

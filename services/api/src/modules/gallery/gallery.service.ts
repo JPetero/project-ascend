@@ -66,7 +66,7 @@ export class GalleryService {
       visibility: album.visibility,
       createdAt: album.createdAt,
       updatedAt: album.updatedAt,
-      media: media.map((item) => this.serializeMedia(item)),
+      media: await Promise.all(media.map((item) => this.serializeMedia(item))),
     };
   }
 
@@ -123,6 +123,36 @@ export class GalleryService {
     await this.mediaService.attachUsage(dto.mediaAssetId, 'GALLERY', media.id);
 
     return this.serializeMedia({ ...media, mediaAsset: asset });
+  }
+
+  private async serializeMedia(item: {
+    id: string;
+    albumId: string;
+    mediaAssetId: string;
+    note: string | null;
+    poseTag: string | null;
+    weightNote: string | null;
+    capturedAt: Date | null;
+    createdAt: Date;
+    mediaAsset: { storageKey: string; mediaType?: string };
+  }) {
+    return {
+      id: item.id,
+      albumId: item.albumId,
+      mediaAssetId: item.mediaAssetId,
+      // Build Session 12 Part 18-21 — a time-limited signed URL, not the
+      // permanent link getObjectUrl hands out: every gallery item is a
+      // PRIVATE-visibility MediaAsset by default (this is a "private-by-
+      // default personal gallery" — see this class's own doc comment),
+      // so its underlying object must never resolve forever if the URL
+      // leaks. See MediaService.getPrivateUrl's doc comment.
+      url: await this.mediaService.getPrivateUrl(item.mediaAsset.storageKey),
+      note: item.note,
+      poseTag: item.poseTag,
+      weightNote: item.weightNote,
+      capturedAt: item.capturedAt,
+      createdAt: item.createdAt,
+    };
   }
 
   async removeMedia(ownerId: string, mediaId: string): Promise<void> {
@@ -206,29 +236,5 @@ export class GalleryService {
       throw new NotFoundException('Gallery media not found.');
     }
     return media;
-  }
-
-  private serializeMedia(item: {
-    id: string;
-    albumId: string;
-    mediaAssetId: string;
-    note: string | null;
-    poseTag: string | null;
-    weightNote: string | null;
-    capturedAt: Date | null;
-    createdAt: Date;
-    mediaAsset: { storageKey: string; mediaType?: string };
-  }) {
-    return {
-      id: item.id,
-      albumId: item.albumId,
-      mediaAssetId: item.mediaAssetId,
-      url: this.mediaService.getObjectUrl(item.mediaAsset.storageKey),
-      note: item.note,
-      poseTag: item.poseTag,
-      weightNote: item.weightNote,
-      capturedAt: item.capturedAt,
-      createdAt: item.createdAt,
-    };
   }
 }

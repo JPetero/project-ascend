@@ -33,8 +33,13 @@ describe('LocalDevelopmentStorageProvider', () => {
 
   it('returns an API-relative object URL, never a filesystem path', () => {
     const url = provider.getObjectUrl('user-1/profile_image/abc.jpg');
-    expect(url).toBe('/media/objects/user-1%2Fprofile_image%2Fabc.jpg');
+    expect(url).toBe('/media/objects?key=user-1%2Fprofile_image%2Fabc.jpg');
     expect(url).not.toContain(tempDir);
+  });
+
+  it('getSignedGetUrl returns the same auth-gated route as getObjectUrl', async () => {
+    const url = await provider.getSignedGetUrl('user-1/profile_image/abc.jpg', 900);
+    expect(url).toBe(provider.getObjectUrl('user-1/profile_image/abc.jpg'));
   });
 
   it('writes and reads bytes for a storage key', async () => {

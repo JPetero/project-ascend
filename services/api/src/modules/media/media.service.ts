@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ALLOWED_EXTENSIONS_BY_MIME_TYPE, MEDIA_LIMITS } from '../../common/policy/media-policy';
+import {
+  ALLOWED_EXTENSIONS_BY_MIME_TYPE,
+  MEDIA_LIMITS,
+  MEDIA_PRIVATE_URL_EXPIRY_SECONDS,
+} from '../../common/policy/media-policy';
 import { fileSignatureMatchesMimeType } from '../../common/media/media-file-signature.util';
 import { InitiateUploadDto } from './dto/initiate-upload.dto';
 import { MEDIA_STORAGE_PROVIDER, MediaStorageProvider } from './storage/media-storage.provider';
@@ -210,6 +214,42 @@ export class MediaService {
 
   getObjectUrl(storageKey: string): string {
     return this.storage.getObjectUrl(storageKey);
+  }
+
+  /**
+   * Build Session 12 Part 18-21 — the URL a caller should hand out for a
+   * PRIVATE-visibility asset (e.g. a personal gallery item). Unlike
+   * `getObjectUrl`, this is time-limited: `getObjectUrl` returns a
+   * permanent, unauthenticated link regardless of visibility (fine for
+   * PUBLIC/UNLISTED content that's meant to be reachable once
+   * referenced, per createPost's own visibility gate), but a PRIVATE
+   * asset's storage key must never resolve to a link that keeps working
+   * forever if it ever leaks.
+   */
+  async getPrivateUrl(storageKey: string): Promise<string> {
+    return this.storage.getSignedGetUrl(storageKey, MEDIA_PRIVATE_URL_EXPIRY_SECONDS);
+  }
+
+  /**
+   * Backs the local-dev-only `GET /media/objects/:key` route — the real
+   * access gate for local storage, since there's no cloud signing to
+   * lean on (see LocalDevelopmentStorageProvider.getSignedGetUrl). Applies
+   * the exact same visibility rule as `getById`.
+   */
+  async readLocalObject(
+    requestingUserId: string,
+    storageKey: string,
+  ): Promise<{ buffer: Buffer; mimeType: string }> {
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { storageKey } });
+    if (!asset || asset.retentionState === 'DELETED') {
+      throw new NotFoundException('Media object not found.');
+    }
+    const isOwner = asset.ownerId === requestingUserId;
+    if (asset.visibility === 'PRIVATE' && !isOwner) {
+      throw new NotFoundException('Media object not found.');
+    }
+    const buffer = await this.localStorage.readObject(storageKey);
+    return { buffer, mimeType: asset.mimeType };
   }
 
   private async assertOwned(ownerId: string, mediaAssetId: string) {

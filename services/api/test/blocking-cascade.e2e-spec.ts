@@ -150,4 +150,45 @@ describe('Blocking cascade across friends, community, and messages (e2e)', () =>
       .send({ body: 'All good now?' })
       .expect(201);
   });
+
+  it('a trainer group invite is blocked in both directions once either side has blocked the other (Build Session 12 Part 18-21)', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/trainer-groups')
+      .set(authA())
+      .send({ name: 'A cannot invite blocked group' })
+      .expect(201);
+    const groupId = created.body.data.id as string;
+
+    await request(app.getHttpServer()).post(`/community/block/${userIdA}`).set(authB()).expect(204);
+
+    await request(app.getHttpServer())
+      .post(`/trainer-groups/${groupId}/invitations`)
+      .set(authA())
+      .send({ inviteeUserId: userIdB })
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .delete(`/community/block/${userIdA}`)
+      .set(authB())
+      .expect(204);
+
+    await request(app.getHttpServer()).post(`/community/block/${userIdB}`).set(authA()).expect(204);
+
+    await request(app.getHttpServer())
+      .post(`/trainer-groups/${groupId}/invitations`)
+      .set(authA())
+      .send({ inviteeUserId: userIdB })
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .delete(`/community/block/${userIdB}`)
+      .set(authA())
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .post(`/trainer-groups/${groupId}/invitations`)
+      .set(authA())
+      .send({ inviteeUserId: userIdB })
+      .expect(201);
+  });
 });

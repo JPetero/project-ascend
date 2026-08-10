@@ -83,6 +83,7 @@ describe('TrainerGroupsService', () => {
       findMany: jest.Mock;
       update: jest.Mock;
     };
+    communityBlock: { findUnique: jest.Mock };
     $transaction: jest.Mock;
   };
   let notifications: { notify: jest.Mock };
@@ -131,6 +132,7 @@ describe('TrainerGroupsService', () => {
         findMany: jest.fn(),
         update: jest.fn(),
       },
+      communityBlock: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn((arg: unknown) => {
         if (typeof arg === 'function') {
           return (arg as (tx: unknown) => unknown)(prisma);
@@ -238,6 +240,26 @@ describe('TrainerGroupsService', () => {
       await expect(
         service.invite('owner-1', 'group-1', { inviteeUserId: 'invitee-1' }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('404s (not 403s) inviting someone who has blocked the caller', async () => {
+      prisma.communityBlock.findUnique.mockResolvedValueOnce({ id: 'block-1' });
+
+      await expect(
+        service.invite('owner-1', 'group-1', { inviteeUserId: 'invitee-1' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.trainerGroupInvitation.upsert).not.toHaveBeenCalled();
+    });
+
+    it('404s inviting someone the caller has blocked', async () => {
+      prisma.communityBlock.findUnique
+        .mockResolvedValueOnce(null) // blocked by invitee
+        .mockResolvedValueOnce({ id: 'block-1' }); // blocked by caller
+
+      await expect(
+        service.invite('owner-1', 'group-1', { inviteeUserId: 'invitee-1' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.trainerGroupInvitation.upsert).not.toHaveBeenCalled();
     });
 
     it('rejects inviting past the free-tier member limit', async () => {

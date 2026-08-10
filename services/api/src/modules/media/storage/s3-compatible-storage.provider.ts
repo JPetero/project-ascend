@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -69,6 +70,11 @@ export class S3CompatibleStorageProvider implements MediaStorageProvider {
       return `${this.publicBaseUrl.replace(/\/$/, '')}/${storageKey}`;
     }
     return `${this.bucket}/${storageKey}`;
+  }
+
+  async getSignedGetUrl(storageKey: string, expirySeconds: number): Promise<string> {
+    const command = new GetObjectCommand({ Bucket: this.bucket, Key: storageKey });
+    return getSignedUrl(this.client, command, { expiresIn: expirySeconds });
   }
 
   async deleteObject(storageKey: string): Promise<void> {
