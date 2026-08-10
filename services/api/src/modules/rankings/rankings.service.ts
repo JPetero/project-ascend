@@ -1,6 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { RankingScope } from '@prisma/client';
-import { computeActivitySummary } from '../../common/scoring/activity-scoring.util';
+import {
+  computeActivitySummaries,
+  computeActivitySummary,
+} from '../../common/scoring/activity-scoring.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OptInRankingsDto } from './dto/opt-in-rankings.dto';
 
@@ -58,17 +61,18 @@ export class RankingsService {
     const candidateIds = await this.resolveScopeCandidates(viewerId, scope, viewerOptIn);
     const season = await this.getOrCreateCurrentSeason();
 
-    const scored = await Promise.all(
-      candidateIds.map(async (userId) => {
-        const summary = await computeActivitySummary(
-          this.prisma,
-          userId,
-          season.startsAt,
-          season.endsAt,
-        );
-        return { userId, ...summary };
-      }),
+    // Batched — was Promise.all(candidateIds.map(computeActivitySummary)),
+    // 3 queries per candidate regardless of which page was requested.
+    const summaryByUser = await computeActivitySummaries(
+      this.prisma,
+      candidateIds,
+      season.startsAt,
+      season.endsAt,
     );
+    const scored = candidateIds.map((userId) => ({
+      userId,
+      ...(summaryByUser.get(userId) ?? { activeDays: 0, points: 0 }),
+    }));
 
     scored.sort(
       (a, b) =>

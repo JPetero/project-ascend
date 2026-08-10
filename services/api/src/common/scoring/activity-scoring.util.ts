@@ -66,3 +66,73 @@ export async function computeActivitySummary(
 
   return { activeDays: allDays.size, points };
 }
+
+/**
+ * Batched sibling of {@link computeActivitySummary} for fan-out call
+ * sites that need a summary per candidate in one shot — a leaderboard
+ * or a challenge's participant list — instead of one round of 3 queries
+ * per candidate (`Promise.all(candidateIds.map(computeActivitySummary))`
+ * was the real N+1 pattern this replaced). Candidates absent from the
+ * result map had no qualifying activity at all in the window.
+ */
+export async function computeActivitySummaries(
+  prisma: PrismaService,
+  userIds: string[],
+  from: Date,
+  to: Date,
+): Promise<Map<string, ActivitySummary>> {
+  if (userIds.length === 0) return new Map();
+
+  const [workoutSessions, cardioSessions, mealEntries] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: {
+        userId: { in: userIds },
+        status: WorkoutSessionStatus.COMPLETED,
+        completedAt: { gte: from, lte: to },
+      },
+      select: { userId: true, completedAt: true },
+    }),
+    prisma.cardioSession.findMany({
+      where: { userId: { in: userIds }, startedAt: { gte: from, lte: to } },
+      select: { userId: true, startedAt: true },
+    }),
+    prisma.mealEntry.findMany({
+      where: { userId: { in: userIds }, date: { gte: from, lte: to } },
+      select: { userId: true, date: true },
+    }),
+  ]);
+
+  const workoutDaysByUser = groupDayKeysByUser(workoutSessions, (s) => s.completedAt as Date);
+  const cardioDaysByUser = groupDayKeysByUser(cardioSessions, (s) => s.startedAt);
+  const nutritionDaysByUser = groupDayKeysByUser(mealEntries, (m) => m.date);
+
+  const result = new Map<string, ActivitySummary>();
+  for (const userId of userIds) {
+    const workoutDays = workoutDaysByUser.get(userId) ?? new Set<string>();
+    const cardioDays = cardioDaysByUser.get(userId) ?? new Set<string>();
+    const nutritionDays = nutritionDaysByUser.get(userId) ?? new Set<string>();
+    const allDays = new Set([...workoutDays, ...cardioDays, ...nutritionDays]);
+
+    let points = 0;
+    for (const day of allDays) {
+      const domainsLogged =
+        Number(workoutDays.has(day)) + Number(cardioDays.has(day)) + Number(nutritionDays.has(day));
+      points += domainsLogged >= 2 ? 2 : 1;
+    }
+    result.set(userId, { activeDays: allDays.size, points });
+  }
+  return result;
+}
+
+function groupDayKeysByUser<T extends { userId: string }>(
+  rows: T[],
+  getDate: (row: T) => Date,
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const set = map.get(row.userId) ?? new Set<string>();
+    set.add(utcDateKey(getDate(row)));
+    map.set(row.userId, set);
+  }
+  return map;
+}

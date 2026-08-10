@@ -52,13 +52,41 @@ export class FriendsService {
       take: 20,
     });
 
-    return Promise.all(
-      profiles.map(async (profile) => ({
-        ...profile,
-        isFriend: await this.areFriends(viewerId, profile.userId),
-        pendingRequest: await this.findActiveRequestBetween(viewerId, profile.userId),
-      })),
+    // Batched — was 2 queries per matched profile
+    // (Promise.all(profiles.map(async ... areFriends/findActiveRequestBetween)))
+    // on this type-ahead search's hot path (Build Session 12 Part 27-32).
+    const candidateIds = profiles.map((p) => p.userId);
+    const [friendships, pendingRequests] = await Promise.all([
+      this.prisma.friendship.findMany({
+        where: {
+          OR: [
+            { userAId: viewerId, userBId: { in: candidateIds } },
+            { userBId: viewerId, userAId: { in: candidateIds } },
+          ],
+        },
+      }),
+      this.prisma.friendRequest.findMany({
+        where: {
+          status: FriendRequestStatus.PENDING,
+          OR: [
+            { senderId: viewerId, recipientId: { in: candidateIds } },
+            { recipientId: viewerId, senderId: { in: candidateIds } },
+          ],
+        },
+      }),
+    ]);
+    const friendUserIds = new Set(
+      friendships.map((f) => (f.userAId === viewerId ? f.userBId : f.userAId)),
     );
+    const pendingRequestByUser = new Map(
+      pendingRequests.map((r) => [r.senderId === viewerId ? r.recipientId : r.senderId, r]),
+    );
+
+    return profiles.map((profile) => ({
+      ...profile,
+      isFriend: friendUserIds.has(profile.userId),
+      pendingRequest: pendingRequestByUser.get(profile.userId) ?? null,
+    }));
   }
 
   async sendRequest(senderId: string, recipientId: string) {

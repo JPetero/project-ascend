@@ -104,6 +104,104 @@ describe('Friendship system (e2e)', () => {
     expect(names).toContain('Bea Friendly');
   });
 
+  it(
+    'reports isFriend and pendingRequest correctly per matched profile, including the ' +
+      'correct request direction (Build Session 12 Part 27-32 — regression for the batched rewrite)',
+    async () => {
+      const d = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Dev',
+          email: 'friends-search-d@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const e = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Eve',
+          email: 'friends-search-e@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const f = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          firstName: 'Fin',
+          email: 'friends-search-f@example.com',
+          password: 'Str0ngPass!',
+          confirmPassword: 'Str0ngPass!',
+          acceptedTerms: true,
+        })
+        .expect(201);
+      const authD = authFor(d.body.data.tokens.accessToken as string);
+      const authE = authFor(e.body.data.tokens.accessToken as string);
+      const authFF = authFor(f.body.data.tokens.accessToken as string);
+      const userIdD = d.body.data.user.id as string;
+      const userIdE = e.body.data.user.id as string;
+      const userIdF = f.body.data.user.id as string;
+
+      await request(app.getHttpServer())
+        .post('/community/profile')
+        .set(authD)
+        .send({ displayName: 'Dev Searchable' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/community/profile')
+        .set(authE)
+        .send({ displayName: 'Eve Searchable' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/community/profile')
+        .set(authFF)
+        .send({ displayName: 'Fin Searchable' })
+        .expect(201);
+
+      // D and E become friends; F sends D a still-pending request.
+      const req = await request(app.getHttpServer())
+        .post('/friends/requests')
+        .set(authD)
+        .send({ recipientId: userIdE })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/friends/requests/${req.body.data.id}/accept`)
+        .set(authE)
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/friends/requests')
+        .set(authFF)
+        .send({ recipientId: userIdD })
+        .expect(201);
+
+      const results = await request(app.getHttpServer())
+        .get('/friends/search')
+        .query({ query: 'Searchable' })
+        .set(authD)
+        .expect(200);
+
+      const byId = new Map(
+        (
+          results.body.data as Array<{
+            userId: string;
+            isFriend: boolean;
+            pendingRequest: { senderId: string; recipientId: string } | null;
+          }>
+        ).map((r) => [r.userId, r]),
+      );
+      expect(byId.get(userIdE)?.isFriend).toBe(true);
+      expect(byId.get(userIdE)?.pendingRequest).toBeNull();
+      expect(byId.get(userIdF)?.isFriend).toBe(false);
+      expect(byId.get(userIdF)?.pendingRequest).toMatchObject({
+        senderId: userIdF,
+        recipientId: userIdD,
+      });
+    },
+  );
+
   it('sends a request, lists it as incoming/outgoing, and accepts it into a real friendship', async () => {
     const sent = await request(app.getHttpServer())
       .post('/friends/requests')
