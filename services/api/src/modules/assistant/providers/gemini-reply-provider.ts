@@ -7,6 +7,7 @@ import { AssistantReplyDto } from '../dto/assistant-reply.dto';
 import { AiReplyProvider } from './ai-reply-provider.interface';
 
 const MAX_REPLY_TOKENS = 400;
+const MAX_SYNTHESIS_TOKENS = 600;
 
 /**
  * Build Session 10 Part 14 — selectable via `AI_PROVIDER=gemini`. No
@@ -61,6 +62,28 @@ export class GeminiReplyProvider implements AiReplyProvider {
 
     const chat = model.startChat({ history });
     const result = await chat.sendMessage(dto.input);
+    const text = result.response.text().trim();
+
+    if (!text) {
+      throw new ServiceUnavailableException('Live AI returned an empty reply.');
+    }
+    return text;
+  }
+
+  async generateResearchSynthesis(prompt: string): Promise<string> {
+    if (!this.apiKey) {
+      throw new ServiceUnavailableException(
+        'Live AI is not configured. Set GEMINI_API_KEY to enable it.',
+      );
+    }
+    this.client ??= new GoogleGenerativeAI(this.apiKey);
+
+    const model = this.client.getGenerativeModel({
+      model: this.model,
+      generationConfig: { maxOutputTokens: MAX_SYNTHESIS_TOKENS },
+    });
+
+    const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
 
     if (!text) {

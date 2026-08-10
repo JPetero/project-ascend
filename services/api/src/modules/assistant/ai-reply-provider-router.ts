@@ -69,6 +69,25 @@ export class AiReplyProviderRouter implements AiReplyProvider {
     memoryNotes?: string[],
     safetyContext?: string,
   ): Promise<string> {
+    return this.executeWithFallback((provider) =>
+      provider.generateReply(dto, memoryNotes, safetyContext),
+    );
+  }
+
+  async generateResearchSynthesis(prompt: string): Promise<string> {
+    return this.executeWithFallback((provider) => provider.generateResearchSynthesis(prompt));
+  }
+
+  /**
+   * Shared sequential-fallback loop behind both `generateReply` and
+   * `generateResearchSynthesis` (S13 Part 10-12) — the only difference
+   * between the two is which method on each provider gets called, so the
+   * ordering/circuit-breaker/`lastAttempts`-recording logic lives here
+   * once instead of twice.
+   */
+  private async executeWithFallback<T>(
+    callProvider: (provider: AiReplyProvider) => Promise<T>,
+  ): Promise<T> {
     this.lastAttempts = [];
     let lastError: unknown;
 
@@ -78,7 +97,7 @@ export class AiReplyProviderRouter implements AiReplyProvider {
       const startedAt = Date.now();
       try {
         const { result, latencyMs } = await this.circuitBreaker.execute(key, () =>
-          provider.generateReply(dto, memoryNotes, safetyContext),
+          callProvider(provider),
         );
         this.lastAttempts.push({
           provider: key,

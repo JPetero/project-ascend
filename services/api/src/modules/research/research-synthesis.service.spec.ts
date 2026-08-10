@@ -1,3 +1,4 @@
+import { AiReplyProvider } from '../assistant/providers/ai-reply-provider.interface';
 import { ResearchQueryPlannerService } from './research-query-planner.service';
 import { ResearchSynthesisService } from './research-synthesis.service';
 import { EvidenceCategoryDto, EvidenceQualityDto, ResearchDocumentResult } from './research.types';
@@ -16,13 +17,28 @@ function doc(overrides: Partial<ResearchDocumentResult> = {}): ResearchDocumentR
   };
 }
 
-function buildService(fetchDocumentsImpl: (query: string) => Promise<ResearchDocumentResult[]>) {
+function fakeAiProvider(overrides: Partial<AiReplyProvider> = {}): AiReplyProvider {
+  return {
+    isConfigured: overrides.isConfigured ?? false,
+    generateReply: overrides.generateReply ?? jest.fn(),
+    generateResearchSynthesis: overrides.generateResearchSynthesis ?? jest.fn(),
+  };
+}
+
+function buildService(
+  fetchDocumentsImpl: (query: string) => Promise<ResearchDocumentResult[]>,
+  aiProvider: AiReplyProvider = fakeAiProvider(),
+) {
   const provider: ResearchProvider = {
     isConfigured: true,
     fetchDocuments: jest.fn(fetchDocumentsImpl),
   };
-  const service = new ResearchSynthesisService(provider, new ResearchQueryPlannerService());
-  return { service, provider };
+  const service = new ResearchSynthesisService(
+    provider,
+    new ResearchQueryPlannerService(),
+    aiProvider,
+  );
+  return { service, provider, aiProvider };
 }
 
 describe('ResearchSynthesisService', () => {
@@ -31,7 +47,11 @@ describe('ResearchSynthesisService', () => {
       isConfigured: false,
       fetchDocuments: jest.fn().mockRejectedValue(new Error('not configured')),
     };
-    const service = new ResearchSynthesisService(provider, new ResearchQueryPlannerService());
+    const service = new ResearchSynthesisService(
+      provider,
+      new ResearchQueryPlannerService(),
+      fakeAiProvider(),
+    );
 
     await expect(service.answer('creatine')).rejects.toThrow('not configured');
   });
@@ -165,5 +185,97 @@ describe('ResearchSynthesisService', () => {
 
     expect(validated).toEqual(answer.citations);
     expect(validated.some((c) => c.sourceId === rogue.sourceId)).toBe(false);
+  });
+
+  describe('generative synthesis (S13 Part 10-12)', () => {
+    it('never calls the AI provider when it is not configured, and uses the extractive answer', async () => {
+      const aiProvider = fakeAiProvider({ isConfigured: false });
+      const { service } = buildService(async () => [doc()], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(aiProvider.generateResearchSynthesis).not.toHaveBeenCalled();
+      expect(answer.conciseAnswer).toBe(doc().excerpt);
+    });
+
+    it('prefers a grounded generative answer, stripping citation tags before returning it', async () => {
+      const strong = doc();
+      const alsoStrong = doc({
+        sourceId: 'https://nih.gov/b',
+        url: 'https://nih.gov/b',
+        publisher: 'National Institutes of Health',
+        evidenceCategory: EvidenceCategoryDto.GOVERNMENT,
+        excerpt: 'Second source excerpt.',
+      });
+      const aiProvider = fakeAiProvider({
+        isConfigured: true,
+        generateResearchSynthesis: jest
+          .fn()
+          .mockResolvedValue('Exercise helps a lot[S1]. It also helps more[S2].'),
+      });
+      const { service } = buildService(async () => [strong, alsoStrong], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(answer.conciseAnswer).toBe('Exercise helps a lot. It also helps more.');
+      expect(aiProvider.generateResearchSynthesis).toHaveBeenCalledWith(
+        expect.stringContaining('is creatine safe'),
+      );
+    });
+
+    it('drops an ungrounded sentence and falls back to the extractive answer when nothing survives', async () => {
+      const aiProvider = fakeAiProvider({
+        isConfigured: true,
+        generateResearchSynthesis: jest
+          .fn()
+          .mockResolvedValue('A claim with no citation tag at all.'),
+      });
+      const strong = doc();
+      const { service } = buildService(async () => [strong], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(answer.conciseAnswer).toBe(strong.excerpt);
+    });
+
+    it('falls back to the extractive answer when the AI provider throws', async () => {
+      const aiProvider = fakeAiProvider({
+        isConfigured: true,
+        generateResearchSynthesis: jest.fn().mockRejectedValue(new Error('provider down')),
+      });
+      const strong = doc();
+      const { service } = buildService(async () => [strong], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(answer.conciseAnswer).toBe(strong.excerpt);
+    });
+
+    it('keeps a sentence with a mix of valid and invalid tags, using only the valid reference', async () => {
+      const strong = doc();
+      const aiProvider = fakeAiProvider({
+        isConfigured: true,
+        generateResearchSynthesis: jest.fn().mockResolvedValue('Exercise helps a lot[S1][S99].'),
+      });
+      const { service } = buildService(async () => [strong], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(answer.conciseAnswer).toBe('Exercise helps a lot.');
+    });
+
+    it('does not let a generative answer change the validated citations/sources', async () => {
+      const strong = doc();
+      const aiProvider = fakeAiProvider({
+        isConfigured: true,
+        generateResearchSynthesis: jest.fn().mockResolvedValue('Exercise helps a lot[S1].'),
+      });
+      const { service } = buildService(async () => [strong], aiProvider);
+
+      const answer = await service.answer('is creatine safe');
+
+      expect(answer.citations).toEqual([{ sourceId: strong.sourceId, quote: strong.excerpt }]);
+      expect(answer.sources).toEqual([strong]);
+    });
   });
 });

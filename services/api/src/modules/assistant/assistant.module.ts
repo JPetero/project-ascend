@@ -35,6 +35,12 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
  * needs it too — see that module's doc comment). `CapabilityService`/
  * `AiEntitlementService`/`PrismaService` all come from global modules,
  * so nothing else needs importing here.
+ *
+ * `AI_REPLY_PROVIDER` is exported (S13 Part 10-12) so `ResearchModule` can
+ * inject the same resilient router for `generateResearchSynthesis` —
+ * `AssistantController`'s `POST /assistant/reply` is no longer the only
+ * caller, but the provider selection/fallback/circuit-breaker logic stays
+ * defined exactly once here regardless of how many modules consume it.
  */
 @Module({
   imports: [ConfigModule],
@@ -56,5 +62,6 @@ import { OpenAiReplyProvider } from './providers/openai-reply-provider';
       useExisting: AiReplyProviderRouter,
     },
   ],
+  exports: [AI_REPLY_PROVIDER],
 })
 export class AssistantModule {}

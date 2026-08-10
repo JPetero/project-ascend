@@ -7,6 +7,7 @@ import { AssistantReplyDto } from '../dto/assistant-reply.dto';
 import { AiReplyProvider } from './ai-reply-provider.interface';
 
 const MAX_REPLY_TOKENS = 400;
+const MAX_SYNTHESIS_TOKENS = 600;
 
 /**
  * The original (Build Session 9 Part 15/16) live-LLM adapter, and this
@@ -50,6 +51,32 @@ export class AnthropicReplyProvider implements AiReplyProvider {
       max_tokens: MAX_REPLY_TOKENS,
       system: buildSystemPrompt(dto.companion, dto.style, memoryNotes, safetyContext),
       messages: buildMessages(dto.history, dto.input),
+    });
+
+    const text = message.content
+      .filter((block) => block.type === 'text')
+      .map((block) => (block as { text: string }).text)
+      .join('\n')
+      .trim();
+
+    if (!text) {
+      throw new ServiceUnavailableException('Live AI returned an empty reply.');
+    }
+    return text;
+  }
+
+  async generateResearchSynthesis(prompt: string): Promise<string> {
+    if (!this.apiKey) {
+      throw new ServiceUnavailableException(
+        'Live AI is not configured. Set ANTHROPIC_API_KEY to enable it.',
+      );
+    }
+    this.client ??= new Anthropic({ apiKey: this.apiKey });
+
+    const message = await this.client.messages.create({
+      model: this.model,
+      max_tokens: MAX_SYNTHESIS_TOKENS,
+      messages: [{ role: 'user', content: prompt }],
     });
 
     const text = message.content

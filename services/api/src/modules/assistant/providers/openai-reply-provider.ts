@@ -7,6 +7,7 @@ import { AssistantReplyDto } from '../dto/assistant-reply.dto';
 import { AiReplyProvider } from './ai-reply-provider.interface';
 
 const MAX_REPLY_TOKENS = 400;
+const MAX_SYNTHESIS_TOKENS = 600;
 
 /**
  * Build Session 10 Part 14 — selectable via `AI_PROVIDER=openai`. No
@@ -53,6 +54,27 @@ export class OpenAiReplyProvider implements AiReplyProvider {
         },
         ...buildMessages(dto.history, dto.input),
       ],
+    });
+
+    const text = completion.choices[0]?.message.content?.trim();
+    if (!text) {
+      throw new ServiceUnavailableException('Live AI returned an empty reply.');
+    }
+    return text;
+  }
+
+  async generateResearchSynthesis(prompt: string): Promise<string> {
+    if (!this.apiKey) {
+      throw new ServiceUnavailableException(
+        'Live AI is not configured. Set OPENAI_API_KEY to enable it.',
+      );
+    }
+    this.client ??= new OpenAI({ apiKey: this.apiKey });
+
+    const completion = await this.client.chat.completions.create({
+      model: this.model,
+      max_completion_tokens: MAX_SYNTHESIS_TOKENS,
+      messages: [{ role: 'user', content: prompt }],
     });
 
     const text = completion.choices[0]?.message.content?.trim();
