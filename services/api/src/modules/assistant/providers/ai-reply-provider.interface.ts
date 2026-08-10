@@ -18,6 +18,14 @@ export interface AiReplyProvider {
     memoryNotes?: string[],
     safetyContext?: string,
   ): Promise<string>;
+  // S13 Part 10-12 — a single-turn, persona-free completion used by
+  // ResearchSynthesisService to generate a grounded, citation-tagged
+  // answer from a flat prompt. Deliberately not `generateReply`: that
+  // method's `AssistantReplyDto`/`buildSystemPrompt` shape injects Atlas/
+  // Nova companion-persona framing, which would be actively wrong context
+  // for research synthesis. Every implementation honestly rejects when
+  // unconfigured, same as `generateReply`.
+  generateResearchSynthesis(prompt: string): Promise<string>;
 }
 
 export const AI_REPLY_PROVIDER = Symbol('AI_REPLY_PROVIDER');

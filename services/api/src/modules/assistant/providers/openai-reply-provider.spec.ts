@@ -20,6 +20,17 @@ describe('OpenAiReplyProvider', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  it('honestly rejects generateResearchSynthesis when no API key is configured', async () => {
+    const configService = {
+      get: () => ({ openaiApiKey: undefined, openaiModel: 'gpt-4o-mini' }),
+    } as unknown as ConfigService;
+    const provider = new OpenAiReplyProvider(configService);
+
+    await expect(
+      provider.generateResearchSynthesis('summarize these sources'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
   it('reports configured when an API key is present, without making a network call', () => {
     const configService = {
       get: () => ({ openaiApiKey: 'sk-test-key', openaiModel: 'gpt-4o-mini' }),

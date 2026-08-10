@@ -20,10 +20,18 @@ function configServiceWith(
   } as unknown as ConfigService;
 }
 
-function fakeProvider(overrides: { isConfigured?: boolean; generateReply?: jest.Mock } = {}) {
+function fakeProvider(
+  overrides: {
+    isConfigured?: boolean;
+    generateReply?: jest.Mock;
+    generateResearchSynthesis?: jest.Mock;
+  } = {},
+) {
   return {
     isConfigured: overrides.isConfigured ?? true,
     generateReply: overrides.generateReply ?? jest.fn().mockResolvedValue('a reply'),
+    generateResearchSynthesis:
+      overrides.generateResearchSynthesis ?? jest.fn().mockResolvedValue('a synthesis'),
   };
 }
 
@@ -191,5 +199,67 @@ describe('AiReplyProviderRouter', () => {
     // The circuit is open now — anthropic is never attempted again.
     expect(anthropic.generateReply).toHaveBeenCalledTimes(3);
     expect(openai.generateReply).toHaveBeenCalledTimes(4);
+  });
+
+  describe('generateResearchSynthesis', () => {
+    it('calls only the preferred provider when it succeeds', async () => {
+      const anthropic = fakeProvider({
+        generateResearchSynthesis: jest.fn().mockResolvedValue('grounded answer'),
+      });
+      const openai = fakeProvider();
+      const gemini = fakeProvider();
+      const router = new AiReplyProviderRouter(
+        configServiceWith('anthropic'),
+        new AiProviderCircuitBreaker(),
+        anthropic as unknown as AnthropicReplyProvider,
+        openai as unknown as OpenAiReplyProvider,
+        gemini as unknown as GeminiReplyProvider,
+      );
+
+      const result = await router.generateResearchSynthesis('summarize these sources');
+
+      expect(result).toBe('grounded answer');
+      expect(anthropic.generateResearchSynthesis).toHaveBeenCalledWith('summarize these sources');
+      expect(openai.generateResearchSynthesis).not.toHaveBeenCalled();
+    });
+
+    it('falls back sequentially on failure, same as generateReply', async () => {
+      const anthropic = fakeProvider({
+        generateResearchSynthesis: jest.fn().mockRejectedValue(new Error('anthropic down')),
+      });
+      const openai = fakeProvider({
+        generateResearchSynthesis: jest.fn().mockResolvedValue('openai synthesis'),
+      });
+      const gemini = fakeProvider();
+      const router = new AiReplyProviderRouter(
+        configServiceWith('anthropic'),
+        new AiProviderCircuitBreaker(),
+        anthropic as unknown as AnthropicReplyProvider,
+        openai as unknown as OpenAiReplyProvider,
+        gemini as unknown as GeminiReplyProvider,
+      );
+
+      const result = await router.generateResearchSynthesis('summarize these sources');
+
+      expect(result).toBe('openai synthesis');
+      expect(gemini.generateResearchSynthesis).not.toHaveBeenCalled();
+    });
+
+    it('honestly rejects when nothing is configured', async () => {
+      const anthropic = fakeProvider({ isConfigured: false });
+      const openai = fakeProvider({ isConfigured: false });
+      const gemini = fakeProvider({ isConfigured: false });
+      const router = new AiReplyProviderRouter(
+        configServiceWith('anthropic'),
+        new AiProviderCircuitBreaker(),
+        anthropic as unknown as AnthropicReplyProvider,
+        openai as unknown as OpenAiReplyProvider,
+        gemini as unknown as GeminiReplyProvider,
+      );
+
+      await expect(
+        router.generateResearchSynthesis('summarize these sources'),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    });
   });
 });

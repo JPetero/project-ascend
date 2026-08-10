@@ -36,6 +36,7 @@ function buildService(options?: {
   const provider: AiReplyProvider = {
     isConfigured: true,
     generateReply,
+    generateResearchSynthesis: jest.fn().mockResolvedValue('unused'),
     ...options?.provider,
   };
   const prisma = {
@@ -624,7 +625,11 @@ describe('AssistantService', () => {
       ) as unknown as PrismaService;
 
       const generateReply = jest.fn().mockResolvedValue('a reply');
-      const provider: AiReplyProvider = { isConfigured: true, generateReply };
+      const provider: AiReplyProvider = {
+        isConfigured: true,
+        generateReply,
+        generateResearchSynthesis: jest.fn().mockResolvedValue('unused'),
+      };
       const memory = {
         getNotes: jest.fn().mockResolvedValue([]),
         remember: jest.fn().mockResolvedValue(undefined),

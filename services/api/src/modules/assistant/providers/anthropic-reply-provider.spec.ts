@@ -20,6 +20,17 @@ describe('AnthropicReplyProvider', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  it('honestly rejects generateResearchSynthesis when no API key is configured', async () => {
+    const configService = {
+      get: () => ({ anthropicApiKey: undefined, anthropicModel: 'claude-haiku-4-5-20251001' }),
+    } as unknown as ConfigService;
+    const provider = new AnthropicReplyProvider(configService);
+
+    await expect(
+      provider.generateResearchSynthesis('summarize these sources'),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
   it('reports configured when an API key is present, without making a network call', () => {
     const configService = {
       get: () => ({ anthropicApiKey: 'sk-test-key', anthropicModel: 'claude-haiku-4-5-20251001' }),

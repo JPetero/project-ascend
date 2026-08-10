@@ -46,7 +46,11 @@ import { AiReplyProvider } from './providers/ai-reply-provider.interface';
  */
 function buildService(options?: { planTier?: 'FREE' | 'PREMIUM' }) {
   const generateReply = jest.fn().mockResolvedValue('a live provider reply');
-  const provider: AiReplyProvider = { isConfigured: true, generateReply };
+  const provider: AiReplyProvider = {
+    isConfigured: true,
+    generateReply,
+    generateResearchSynthesis: jest.fn().mockResolvedValue('unused'),
+  };
   const prisma = {
     preference: { findUnique: jest.fn().mockResolvedValue({ aiMemoryEnabled: false }) },
   } as unknown as PrismaService;

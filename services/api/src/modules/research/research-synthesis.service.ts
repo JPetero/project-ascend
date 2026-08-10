@@ -1,4 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import {
+  AI_REPLY_PROVIDER,
+  AiReplyProvider,
+} from '../assistant/providers/ai-reply-provider.interface';
+import { buildSynthesisPrompt, parseGroundedAnswer } from './research-grounding.util';
 import { ResearchQueryPlannerService } from './research-query-planner.service';
 import {
   EvidenceCategoryDto,
@@ -112,23 +117,30 @@ function emptyAnswer(query: string): ResearchAnswerResult {
 /**
  * The grounded research pipeline itself (Build Session 12 Part 5):
  * query planning → retrieval → normalization/classification (both inside
- * `ResearchProvider.fetchDocuments`) → dedupe/ranking → extractive
- * synthesis → citation validation. `conciseAnswer`/`deeperExplanation`
- * are built by quoting/concatenating real retrieved excerpts, never by
- * generating new prose — the same "no generative step that could
- * hallucinate a fact" property `BraveSearchResearchProvider` documents,
- * just applied across multiple documents instead of one. `citations`
- * still goes through `validateCitations` as an explicit, tested hard
- * boundary: any citation whose `sourceId` doesn't match a real retrieved
- * `sources` entry is dropped rather than ever reaching the client — the
- * enforcement point a future generative synthesizer would also have to
- * pass through.
+ * `ResearchProvider.fetchDocuments`) → dedupe/ranking → synthesis →
+ * citation validation. `deeperExplanation` is still always built by
+ * quoting/concatenating real retrieved excerpts, never generated prose.
+ *
+ * `conciseAnswer` (S13 Part 10-12) prefers a grounded generative answer
+ * from `tryGenerativeSynthesis` when an `AiReplyProvider` is configured,
+ * falling back to the original extractive `buildConciseAnswer` whenever
+ * no provider is configured, every provider fails, or the model's answer
+ * doesn't survive `parseGroundedAnswer`'s citation-tag verification (see
+ * that function's doc comment for the "never fabricate a citation" rule
+ * it enforces, per user-scenario-bible.md Scenario 19). This keeps the
+ * "no generative step that could hallucinate a fact" property intact:
+ * the generative path is additive and only ever emits text this module
+ * has verified is tied to a real retrieved source, never a bare model
+ * claim. `citations` still goes through `validateCitations` as an
+ * explicit, tested hard boundary regardless of which path produced
+ * `conciseAnswer`.
  */
 @Injectable()
 export class ResearchSynthesisService {
   constructor(
     @Inject(RESEARCH_PROVIDER) private readonly provider: ResearchProvider,
     private readonly planner: ResearchQueryPlannerService,
+    @Inject(AI_REPLY_PROVIDER) private readonly aiProvider: AiReplyProvider,
   ) {}
 
   async answer(query: string): Promise<ResearchAnswerResult> {
@@ -147,15 +159,40 @@ export class ResearchSynthesisService {
       .filter((document) => document.excerpt)
       .map((document) => ({ sourceId: document.sourceId, quote: document.excerpt! }));
 
+    const generatedAnswer = await this.tryGenerativeSynthesis(query, documents);
+
     return {
       query,
-      conciseAnswer: buildConciseAnswer(query, documents[0]),
+      conciseAnswer: generatedAnswer ?? buildConciseAnswer(query, documents[0]),
       deeperExplanation: buildDeeperExplanation(documents),
       uncertaintyNote: buildUncertaintyNote(documents),
       contradictoryEvidenceNote: findContradictoryEvidenceNote(documents),
       citations: this.validateCitations(citations, documents),
       sources: documents,
     };
+  }
+
+  /**
+   * Returns `null` (never throws) whenever a grounded generative answer
+   * isn't available, so `answer()` can unconditionally fall back to the
+   * extractive path — an unconfigured provider, a provider error, and an
+   * ungrounded model response are all treated identically as "no
+   * generative answer this time," never a request failure.
+   */
+  private async tryGenerativeSynthesis(
+    query: string,
+    documents: ResearchDocumentResult[],
+  ): Promise<string | null> {
+    if (!this.aiProvider.isConfigured) return null;
+
+    try {
+      const raw = await this.aiProvider.generateResearchSynthesis(
+        buildSynthesisPrompt(query, documents),
+      );
+      return parseGroundedAnswer(raw, documents);
+    } catch {
+      return null;
+    }
   }
 
   /**
