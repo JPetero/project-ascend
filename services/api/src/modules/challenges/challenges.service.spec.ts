@@ -1,11 +1,11 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { computeActivitySummary } from '../../common/scoring/activity-scoring.util';
+import { computeActivitySummaries } from '../../common/scoring/activity-scoring.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ChallengesService } from './challenges.service';
 
 jest.mock('../../common/scoring/activity-scoring.util');
-const mockedComputeActivitySummary = computeActivitySummary as jest.Mock;
+const mockedComputeActivitySummaries = computeActivitySummaries as jest.Mock;
 
 function challenge(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -39,8 +39,11 @@ describe('ChallengesService', () => {
   };
 
   beforeEach(async () => {
-    mockedComputeActivitySummary.mockReset();
-    mockedComputeActivitySummary.mockResolvedValue({ activeDays: 2, points: 2 });
+    mockedComputeActivitySummaries.mockReset();
+    mockedComputeActivitySummaries.mockImplementation(
+      async (_prisma: unknown, userIds: string[]) =>
+        new Map(userIds.map((id) => [id, { activeDays: 2, points: 2 }])),
+    );
 
     prisma = {
       challenge: {
@@ -167,7 +170,7 @@ describe('ChallengesService', () => {
 
       expect(result.isParticipant).toBe(false);
       expect(result.participants).toBeNull();
-      expect(mockedComputeActivitySummary).not.toHaveBeenCalled();
+      expect(mockedComputeActivitySummaries).not.toHaveBeenCalled();
     });
 
     it('includes per-participant progress for a participant', async () => {

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Challenge } from '@prisma/client';
-import { computeActivitySummary } from '../../common/scoring/activity-scoring.util';
+import { computeActivitySummaries } from '../../common/scoring/activity-scoring.util';
 import { paginationArgs, paginationMeta } from '../../common/pagination/pagination-query.dto';
 import { PaginationQueryDto } from '../../common/pagination/pagination-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -107,23 +107,21 @@ export class ChallengesService {
     });
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
 
-    const withProgress = await Promise.all(
-      participants.map(async (participant) => {
-        const activitySummary = await computeActivitySummary(
-          this.prisma,
-          participant.userId,
-          challenge.startsAt,
-          progressTo,
-        );
-        return {
-          userId: participant.userId,
-          displayName: profileByUser.get(participant.userId)?.displayName ?? null,
-          avatarUrl: profileByUser.get(participant.userId)?.avatarUrl ?? null,
-          activeDays: activitySummary.activeDays,
-          totalDays,
-        };
-      }),
+    // Batched — one round of queries for every participant instead of
+    // Promise.all(participants.map(computeActivitySummary)).
+    const activitySummaryByUser = await computeActivitySummaries(
+      this.prisma,
+      participants.map((p) => p.userId),
+      challenge.startsAt,
+      progressTo,
     );
+    const withProgress = participants.map((participant) => ({
+      userId: participant.userId,
+      displayName: profileByUser.get(participant.userId)?.displayName ?? null,
+      avatarUrl: profileByUser.get(participant.userId)?.avatarUrl ?? null,
+      activeDays: activitySummaryByUser.get(participant.userId)?.activeDays ?? 0,
+      totalDays,
+    }));
 
     return { ...summary, isParticipant: true, participants: withProgress };
   }

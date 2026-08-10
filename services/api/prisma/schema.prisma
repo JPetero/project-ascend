@@ -817,6 +817,10 @@ model WorkoutSession {
 
   @@index([userId])
   @@index([userId, status])
+  // Covers computeActivitySummary(ies)'s
+  // {userId, status: COMPLETED, completedAt: {gte, lte}} query — Rankings
+  // and Challenges' hottest read path (Build Session 12 Part 27-32).
+  @@index([userId, status, completedAt])
   @@index([workoutPlanId])
   @@map("workout_sessions")
 }
@@ -1799,6 +1803,10 @@ model RankingOptIn {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Every leaderboard load filters by scope (GLOBAL) or scope+regionLabel
+  // (REGION) — see RankingsService.resolveScopeCandidates. Without this,
+  // that query was a full table scan (Build Session 12 Part 27-32).
+  @@index([scope, regionLabel])
   @@map("ranking_opt_ins")
 }
 

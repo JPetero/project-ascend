@@ -1,12 +1,16 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { RankingScope } from '@prisma/client';
-import { computeActivitySummary } from '../../common/scoring/activity-scoring.util';
+import {
+  computeActivitySummaries,
+  computeActivitySummary,
+} from '../../common/scoring/activity-scoring.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RankingsService } from './rankings.service';
 
 jest.mock('../../common/scoring/activity-scoring.util');
 const mockedComputeActivitySummary = computeActivitySummary as jest.Mock;
+const mockedComputeActivitySummaries = computeActivitySummaries as jest.Mock;
 
 function season(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -35,6 +39,11 @@ describe('RankingsService', () => {
   beforeEach(async () => {
     mockedComputeActivitySummary.mockReset();
     mockedComputeActivitySummary.mockResolvedValue({ activeDays: 3, points: 4 });
+    mockedComputeActivitySummaries.mockReset();
+    mockedComputeActivitySummaries.mockImplementation(
+      async (_prisma: unknown, userIds: string[]) =>
+        new Map(userIds.map((id) => [id, { activeDays: 3, points: 4 }])),
+    );
 
     prisma = {
       rankingOptIn: {
