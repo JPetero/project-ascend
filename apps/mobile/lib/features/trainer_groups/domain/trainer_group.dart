@@ -207,7 +207,13 @@ class TrainerGroupAnnouncement {
   }
 }
 
-enum WorkoutAssignmentStatus { pending, accepted, completed, canceled }
+enum WorkoutAssignmentStatus {
+  pending,
+  accepted,
+  declined,
+  completed,
+  canceled,
+}
 
 WorkoutAssignmentStatus workoutAssignmentStatusFromJson(String value) =>
     WorkoutAssignmentStatus.values.firstWhere(
@@ -221,7 +227,10 @@ WorkoutAssignmentStatus workoutAssignmentStatusFromJson(String value) =>
 /// clone's id, present once [status] passes [WorkoutAssignmentStatus.pending].
 /// [status] flips to [WorkoutAssignmentStatus.completed] automatically
 /// the moment the assignee finishes a session against that cloned plan —
-/// there is no "mark done" action to call.
+/// there is no "mark done" action to call. Build Session 13 Part 4 added
+/// [WorkoutAssignmentStatus.declined] (kept as a real row instead of the
+/// old delete-on-dismiss) and [isOverdue], which is always server-derived
+/// from [dueAt] — never something the client sets.
 class WorkoutAssignment {
   const WorkoutAssignment({
     required this.id,
@@ -236,6 +245,7 @@ class WorkoutAssignment {
     required this.status,
     required this.createdAt,
     this.completedAt,
+    this.isOverdue = false,
   });
 
   final String id;
@@ -250,6 +260,7 @@ class WorkoutAssignment {
   final WorkoutAssignmentStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
+  final bool isOverdue;
 
   factory WorkoutAssignment.fromJson(Map<String, dynamic> json) {
     return WorkoutAssignment(
@@ -269,6 +280,7 @@ class WorkoutAssignment {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'] as String)
           : null,
+      isOverdue: json['isOverdue'] as bool? ?? false,
     );
   }
 }
@@ -417,6 +429,39 @@ class TrainerDashboardGroup {
   }
 }
 
+/// assigned/accepted/declined/active/completed/overdue counts across the
+/// whole roster (Build Session 13 Part 4). `active` mirrors `accepted` —
+/// see TrainerGroupsService.getTrainerDashboard's comment on why there's
+/// no separate "started" signal.
+class TrainerAssignmentCounts {
+  const TrainerAssignmentCounts({
+    this.assigned = 0,
+    this.accepted = 0,
+    this.declined = 0,
+    this.active = 0,
+    this.completed = 0,
+    this.overdue = 0,
+  });
+
+  final int assigned;
+  final int accepted;
+  final int declined;
+  final int active;
+  final int completed;
+  final int overdue;
+
+  factory TrainerAssignmentCounts.fromJson(Map<String, dynamic> json) {
+    return TrainerAssignmentCounts(
+      assigned: json['assigned'] as int? ?? 0,
+      accepted: json['accepted'] as int? ?? 0,
+      declined: json['declined'] as int? ?? 0,
+      active: json['active'] as int? ?? 0,
+      completed: json['completed'] as int? ?? 0,
+      overdue: json['overdue'] as int? ?? 0,
+    );
+  }
+}
+
 /// A read-only aggregate across every group the caller owns or
 /// moderates (Build Session 12 Part 11) — composed entirely from
 /// existing membership/assignment/scheduled-session data, no new write
@@ -426,11 +471,13 @@ class TrainerDashboard {
     required this.groups,
     required this.upcomingSessions,
     required this.recentAssignments,
+    this.assignmentCounts = const TrainerAssignmentCounts(),
   });
 
   final List<TrainerDashboardGroup> groups;
   final List<TrainerGroupScheduledSession> upcomingSessions;
   final List<WorkoutAssignment> recentAssignments;
+  final TrainerAssignmentCounts assignmentCounts;
 
   factory TrainerDashboard.fromJson(Map<String, dynamic> json) {
     return TrainerDashboard(
@@ -447,6 +494,11 @@ class TrainerDashboard {
       recentAssignments: (json['recentAssignments'] as List<dynamic>)
           .map((a) => WorkoutAssignment.fromJson(a as Map<String, dynamic>))
           .toList(),
+      assignmentCounts: json['assignmentCounts'] != null
+          ? TrainerAssignmentCounts.fromJson(
+              json['assignmentCounts'] as Map<String, dynamic>,
+            )
+          : const TrainerAssignmentCounts(),
     );
   }
 }

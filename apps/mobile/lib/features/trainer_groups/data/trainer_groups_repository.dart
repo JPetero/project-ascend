@@ -195,6 +195,7 @@ class TrainerGroupsRepository {
     required String workoutPlanId,
     required List<String> assigneeUserIds,
     String? note,
+    DateTime? dueAt,
   }) async {
     final envelope = await _apiClient.post(
       '/trainer-groups/$groupId/assignments',
@@ -203,6 +204,7 @@ class TrainerGroupsRepository {
         'workoutPlanId': workoutPlanId,
         'assigneeUserIds': assigneeUserIds,
         'note': ?note,
+        'dueAt': ?dueAt?.toIso8601String(),
       },
     );
     return envelope.data!
@@ -246,6 +248,16 @@ class TrainerGroupsRepository {
       '/trainer-groups/assignments/$assignmentId',
       (_) => null,
     );
+  }
+
+  /// Build Session 13 Part 4 — the assignee's own decline, kept as a row
+  /// (status DECLINED) rather than removed, unlike [cancelAssignment].
+  Future<WorkoutAssignment> declineAssignment(String assignmentId) async {
+    final envelope = await _apiClient.post(
+      '/trainer-groups/assignments/$assignmentId/decline',
+      (data) => data as Map<String, dynamic>,
+    );
+    return WorkoutAssignment.fromJson(envelope.data!);
   }
 
   // --- Scheduled sessions (Build Session 12 Part 10) -----------------------

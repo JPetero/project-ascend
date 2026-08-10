@@ -195,6 +195,8 @@ class _TrainerGroupDetailScreenState
     if (planId == null || !mounted) return;
 
     final assignees = <String>{};
+    final noteController = TextEditingController();
+    DateTime? dueAt;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -203,6 +205,7 @@ class _TrainerGroupDetailScreenState
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final member in group.members)
                   if (member.userId != group.ownerId)
@@ -217,6 +220,33 @@ class _TrainerGroupDetailScreenState
                         }
                       }),
                     ),
+                const SizedBox(height: AscendSpacing.sm),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note — optional',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: AscendSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    dueAt == null
+                        ? 'No due date'
+                        : 'Due ${dueAt!.toLocal().toString().split(' ').first}',
+                  ),
+                  trailing: const Icon(Icons.calendar_today_outlined),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogContext,
+                      initialDate: DateTime.now().add(const Duration(days: 7)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) setState(() => dueAt = picked);
+                  },
+                ),
               ],
             ),
           ),
@@ -240,6 +270,10 @@ class _TrainerGroupDetailScreenState
     final ok = await controller.createAssignments(
       workoutPlanId: planId,
       assigneeUserIds: assignees.toList(),
+      note: noteController.text.trim().isEmpty
+          ? null
+          : noteController.text.trim(),
+      dueAt: dueAt,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1055,6 +1089,8 @@ class _AssignmentsTab extends StatelessWidget {
         return 'Pending';
       case WorkoutAssignmentStatus.accepted:
         return 'In progress';
+      case WorkoutAssignmentStatus.declined:
+        return 'Declined';
       case WorkoutAssignmentStatus.completed:
         return 'Completed';
       case WorkoutAssignmentStatus.canceled:
@@ -1092,10 +1128,16 @@ class _AssignmentsTab extends StatelessWidget {
                                   ),
                                   Text(
                                     '${_assigneeLabel(assignment.assigneeId)} · '
-                                    '${_statusLabel(assignment.status)}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
+                                    '${assignment.isOverdue ? "Overdue" : _statusLabel(assignment.status)}'
+                                    '${assignment.dueAt != null ? " · Due ${assignment.dueAt!.toLocal().toString().split(' ').first}" : ''}',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: assignment.isOverdue
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.error
+                                              : null,
+                                        ),
                                   ),
                                 ],
                               ),

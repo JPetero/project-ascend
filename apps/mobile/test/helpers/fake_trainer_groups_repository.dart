@@ -250,6 +250,7 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
     required String workoutPlanId,
     required List<String> assigneeUserIds,
     String? note,
+    DateTime? dueAt,
   }) async {
     final created = [
       for (final assigneeId in assigneeUserIds)
@@ -261,12 +262,35 @@ class FakeTrainerGroupsRepository implements TrainerGroupsRepository {
           sourcePlanId: workoutPlanId,
           sourcePlanName: 'Plan $workoutPlanId',
           note: note,
+          dueAt: dueAt,
           status: WorkoutAssignmentStatus.pending,
           createdAt: DateTime.now(),
         ),
     ];
     assignments.addAll(created);
     return created;
+  }
+
+  @override
+  Future<WorkoutAssignment> declineAssignment(String assignmentId) async {
+    final index = assignments.indexWhere((a) => a.id == assignmentId);
+    final existing = assignments[index];
+    final updated = WorkoutAssignment(
+      id: existing.id,
+      groupId: existing.groupId,
+      assignedById: existing.assignedById,
+      assigneeId: existing.assigneeId,
+      sourcePlanId: existing.sourcePlanId,
+      sourcePlanName: existing.sourcePlanName,
+      assignedPlanId: existing.assignedPlanId,
+      note: existing.note,
+      dueAt: existing.dueAt,
+      status: WorkoutAssignmentStatus.declined,
+      createdAt: existing.createdAt,
+      completedAt: existing.completedAt,
+    );
+    assignments[index] = updated;
+    return updated;
   }
 
   @override

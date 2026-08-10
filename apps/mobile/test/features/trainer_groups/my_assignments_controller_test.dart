@@ -61,4 +61,26 @@ void main() {
     expect(ok, isTrue);
     expect(controller.state.assignments, isEmpty);
   });
+
+  test(
+    'decline() replaces the assignment in place with status declined (Build Session 13 Part 4)',
+    () async {
+      final repository = FakeTrainerGroupsRepository();
+      await repository.createAssignments(
+        'group-1',
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['me'],
+      );
+      final controller = MyAssignmentsController(repository: repository);
+      addTearDown(controller.dispose);
+      await Future<void>.delayed(Duration.zero);
+      final assignmentId = controller.state.assignments.single.id;
+
+      final ok = await controller.decline(assignmentId);
+
+      expect(ok, isTrue);
+      expect(controller.state.assignments, hasLength(1));
+      expect(controller.state.assignments.single.status.name, 'declined');
+    },
+  );
 }

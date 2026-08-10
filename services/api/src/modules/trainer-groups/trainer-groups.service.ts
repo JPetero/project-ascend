@@ -66,6 +66,41 @@ function emptyParticipantSummary(): ScheduledSessionParticipantSummary {
 }
 
 /**
+ * Derived, never stored — see WorkoutAssignmentStatus's schema comment
+ * and Build Session 13 Part 4's module doc note on "active"/overdue.
+ * Only PENDING/ACCEPTED assignments can be overdue; a DECLINED,
+ * COMPLETED, or CANCELED one is already resolved regardless of dueAt.
+ */
+/**
+ * Build Session 13 Part 4's trainer dashboard bucket counts. `active` is
+ * intentionally identical to `accepted` — see getTrainerDashboard's
+ * comment on why there's no separate "started" signal.
+ */
+interface AssignmentCounts {
+  assigned: number;
+  accepted: number;
+  declined: number;
+  active: number;
+  completed: number;
+  overdue: number;
+}
+
+function emptyAssignmentCounts(): AssignmentCounts {
+  return { assigned: 0, accepted: 0, declined: 0, active: 0, completed: 0, overdue: 0 };
+}
+
+function isAssignmentOverdue(a: { dueAt: Date | null; status: WorkoutAssignmentStatus }): boolean {
+  if (!a.dueAt) return false;
+  if (
+    a.status !== WorkoutAssignmentStatus.PENDING &&
+    a.status !== WorkoutAssignmentStatus.ACCEPTED
+  ) {
+    return false;
+  }
+  return a.dueAt.getTime() < Date.now();
+}
+
+/**
  * UPCOMING/COMPLETED/CANCELED is always derived, never a stored field —
  * see the schema comment on TrainerGroupScheduledSession. Assumes a
  * 60-minute session when no `durationMinutes` was given, matching the
@@ -671,6 +706,32 @@ export class TrainerGroupsService {
   }
 
   /**
+   * Build Session 13 Part 4 — the assignee's own "no thanks," distinct
+   * from cancelAssignment's delete: the row is kept with status DECLINED
+   * so it counts on the trainer dashboard instead of vanishing without a
+   * trace. Only the assignee may decline, and only while still PENDING —
+   * once accepted, cancelAssignment (assigner or assignee) is the way to
+   * remove it.
+   */
+  async declineAssignment(userId: string, assignmentId: string) {
+    const assignment = await this.prisma.workoutAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { sourcePlan: { select: { name: true } } },
+    });
+    if (!assignment || assignment.assigneeId !== userId) {
+      throw new NotFoundException('Assignment not found.');
+    }
+    if (assignment.status !== WorkoutAssignmentStatus.PENDING) {
+      throw new ConflictException('This assignment has already been responded to.');
+    }
+    const updated = await this.prisma.workoutAssignment.update({
+      where: { id: assignmentId },
+      data: { status: WorkoutAssignmentStatus.DECLINED },
+    });
+    return this.serializeAssignment(updated, assignment.sourcePlan.name);
+  }
+
+  /**
    * Called from WorkoutSessionsService.finish() so an assignment
    * resolves itself the moment the assignee completes a session against
    * its cloned plan — never something either party has to remember to
@@ -948,38 +1009,85 @@ export class TrainerGroupsService {
     });
     const groupIds = memberships.map((m) => m.groupId);
     if (groupIds.length === 0) {
-      return { groups: [], upcomingSessions: [], recentAssignments: [] };
+      return {
+        groups: [],
+        upcomingSessions: [],
+        recentAssignments: [],
+        assignmentCounts: emptyAssignmentCounts(),
+      };
     }
 
-    const [groups, upcomingSessions, recentAssignments, pendingCounts] = await Promise.all([
-      this.prisma.trainerGroup.findMany({
-        where: { id: { in: groupIds } },
-        include: { _count: { select: { members: true } } },
-      }),
-      this.prisma.trainerGroupScheduledSession.findMany({
-        where: { groupId: { in: groupIds }, canceledAt: null, scheduledAt: { gte: new Date() } },
-        orderBy: { scheduledAt: 'asc' },
-        take: 10,
-        include: { workoutPlan: { select: { name: true } } },
-      }),
-      this.prisma.workoutAssignment.findMany({
-        where: { groupId: { in: groupIds } },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        include: { sourcePlan: { select: { name: true } } },
-      }),
-      this.prisma.workoutAssignment.groupBy({
-        by: ['groupId'],
-        where: { groupId: { in: groupIds }, status: WorkoutAssignmentStatus.PENDING },
-        _count: { _all: true },
-      }),
-    ]);
+    const [groups, upcomingSessions, recentAssignments, pendingCounts, statusCounts, overdueCount] =
+      await Promise.all([
+        this.prisma.trainerGroup.findMany({
+          where: { id: { in: groupIds } },
+          include: { _count: { select: { members: true } } },
+        }),
+        this.prisma.trainerGroupScheduledSession.findMany({
+          where: { groupId: { in: groupIds }, canceledAt: null, scheduledAt: { gte: new Date() } },
+          orderBy: { scheduledAt: 'asc' },
+          take: 10,
+          include: { workoutPlan: { select: { name: true } } },
+        }),
+        this.prisma.workoutAssignment.findMany({
+          where: { groupId: { in: groupIds } },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: { sourcePlan: { select: { name: true } } },
+        }),
+        this.prisma.workoutAssignment.groupBy({
+          by: ['groupId'],
+          where: { groupId: { in: groupIds }, status: WorkoutAssignmentStatus.PENDING },
+          _count: { _all: true },
+        }),
+        // One groupBy across the whole roster for the dashboard's
+        // assigned/accepted/declined/completed counts.
+        this.prisma.workoutAssignment.groupBy({
+          by: ['status'],
+          where: { groupId: { in: groupIds } },
+          _count: { _all: true },
+        }),
+        // Overdue is derived (see isAssignmentOverdue), so it needs its
+        // own count rather than reading off statusCounts.
+        this.prisma.workoutAssignment.count({
+          where: {
+            groupId: { in: groupIds },
+            dueAt: { lt: new Date() },
+            status: { in: [WorkoutAssignmentStatus.PENDING, WorkoutAssignmentStatus.ACCEPTED] },
+          },
+        }),
+      ]);
 
     const pendingByGroup = new Map(pendingCounts.map((p) => [p.groupId, p._count._all]));
     const sessionSummaries = await this.summarizeParticipants(
       upcomingSessions.map((s) => s.id),
       userId,
     );
+
+    const assignmentCounts = emptyAssignmentCounts();
+    for (const c of statusCounts) {
+      switch (c.status) {
+        case WorkoutAssignmentStatus.PENDING:
+          assignmentCounts.assigned = c._count._all;
+          break;
+        case WorkoutAssignmentStatus.ACCEPTED:
+          // "Active" mirrors "accepted" — there's no separate signal for
+          // whether the assignee has actually started a session against
+          // it yet, only whether they've accepted the assignment.
+          assignmentCounts.accepted = c._count._all;
+          assignmentCounts.active = c._count._all;
+          break;
+        case WorkoutAssignmentStatus.DECLINED:
+          assignmentCounts.declined = c._count._all;
+          break;
+        case WorkoutAssignmentStatus.COMPLETED:
+          assignmentCounts.completed = c._count._all;
+          break;
+        case WorkoutAssignmentStatus.CANCELED:
+          break;
+      }
+    }
+    assignmentCounts.overdue = overdueCount;
 
     return {
       groups: groups.map((g) => ({
@@ -998,6 +1106,7 @@ export class TrainerGroupsService {
       recentAssignments: recentAssignments.map((a) =>
         this.serializeAssignment(a, a.sourcePlan.name),
       ),
+      assignmentCounts,
     };
   }
 
@@ -1112,6 +1221,7 @@ export class TrainerGroupsService {
       status: a.status,
       createdAt: a.createdAt,
       completedAt: a.completedAt,
+      isOverdue: isAssignmentOverdue(a),
     };
   }
 

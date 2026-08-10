@@ -77,6 +77,7 @@ describe('TrainerGroupsService', () => {
       updateMany: jest.Mock;
       delete: jest.Mock;
       groupBy: jest.Mock;
+      count: jest.Mock;
     };
     trainerGroupScheduledSession: {
       create: jest.Mock;
@@ -134,6 +135,7 @@ describe('TrainerGroupsService', () => {
         updateMany: jest.fn(),
         delete: jest.fn(),
         groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       trainerGroupScheduledSession: {
         create: jest.fn(),
@@ -797,6 +799,33 @@ describe('TrainerGroupsService', () => {
         'assignment-member-a',
       );
     });
+
+    it('marks a PENDING assignment overdue once its due date has passed, but not one with no due date (Build Session 13 Part 4)', async () => {
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.workoutPlan.findUnique.mockResolvedValue({
+        id: 'plan-1',
+        userId: 'owner-1',
+        name: 'Push Day',
+      });
+      prisma.trainerGroupMember.findMany.mockResolvedValue([{ userId: 'member-a' }]);
+      prisma.workoutAssignment.create.mockResolvedValue({
+        id: 'assignment-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+        assignedPlanId: null,
+        note: null,
+        dueAt: new Date(Date.now() - 86_400_000),
+        createdAt: new Date(),
+        completedAt: null,
+      });
+
+      const result = await service.createAssignments('owner-1', 'group-1', {
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['member-a'],
+      });
+
+      expect(result[0].isOverdue).toBe(true);
+    });
   });
 
   describe('acceptAssignment', () => {
@@ -909,6 +938,70 @@ describe('TrainerGroupsService', () => {
       expect(prisma.workoutAssignment.delete).toHaveBeenCalledWith({
         where: { id: 'assignment-1' },
       });
+    });
+  });
+
+  describe('declineAssignment (Build Session 13 Part 4)', () => {
+    it('404s when the caller is not the assignee', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+        sourcePlan: { name: 'Push Day' },
+      });
+
+      await expect(service.declineAssignment('owner-1', 'assignment-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.workoutAssignment.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects declining an assignment already responded to', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.ACCEPTED,
+        sourcePlan: { name: 'Push Day' },
+      });
+
+      await expect(service.declineAssignment('member-a', 'assignment-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it('keeps the row with status DECLINED instead of deleting it', async () => {
+      prisma.workoutAssignment.findUnique.mockResolvedValue({
+        id: 'assignment-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        status: WorkoutAssignmentStatus.PENDING,
+        sourcePlan: { name: 'Push Day' },
+      });
+      prisma.workoutAssignment.update.mockResolvedValue({
+        id: 'assignment-1',
+        groupId: 'group-1',
+        assignedById: 'owner-1',
+        assigneeId: 'member-a',
+        sourcePlanId: 'plan-1',
+        assignedPlanId: null,
+        note: null,
+        dueAt: null,
+        status: WorkoutAssignmentStatus.DECLINED,
+        createdAt: new Date(),
+        completedAt: null,
+      });
+
+      const result = await service.declineAssignment('member-a', 'assignment-1');
+
+      expect(prisma.workoutAssignment.update).toHaveBeenCalledWith({
+        where: { id: 'assignment-1' },
+        data: { status: WorkoutAssignmentStatus.DECLINED },
+      });
+      expect(prisma.workoutAssignment.delete).not.toHaveBeenCalled();
+      expect(result.status).toBe(WorkoutAssignmentStatus.DECLINED);
+      expect(result.sourcePlanName).toBe('Push Day');
     });
   });
 
@@ -1215,7 +1308,19 @@ describe('TrainerGroupsService', () => {
 
       const result = await service.getTrainerDashboard('nobody');
 
-      expect(result).toEqual({ groups: [], upcomingSessions: [], recentAssignments: [] });
+      expect(result).toEqual({
+        groups: [],
+        upcomingSessions: [],
+        recentAssignments: [],
+        assignmentCounts: {
+          assigned: 0,
+          accepted: 0,
+          declined: 0,
+          active: 0,
+          completed: 0,
+          overdue: 0,
+        },
+      });
     });
 
     it('aggregates member counts and pending assignments per owned group', async () => {
@@ -1225,15 +1330,29 @@ describe('TrainerGroupsService', () => {
       ]);
       prisma.trainerGroupScheduledSession.findMany.mockResolvedValue([]);
       prisma.workoutAssignment.findMany.mockResolvedValue([]);
-      prisma.workoutAssignment.groupBy.mockResolvedValue([
-        { groupId: 'group-1', _count: { _all: 2 } },
-      ]);
+      prisma.workoutAssignment.groupBy
+        .mockResolvedValueOnce([{ groupId: 'group-1', _count: { _all: 2 } }])
+        .mockResolvedValueOnce([
+          { status: 'PENDING', _count: { _all: 2 } },
+          { status: 'ACCEPTED', _count: { _all: 1 } },
+          { status: 'DECLINED', _count: { _all: 1 } },
+          { status: 'COMPLETED', _count: { _all: 3 } },
+        ]);
+      prisma.workoutAssignment.count.mockResolvedValue(1);
 
       const result = await service.getTrainerDashboard('owner-1');
 
       expect(result.groups).toEqual([
         { id: 'group-1', name: 'Strong Squad', memberCount: 3, pendingAssignmentCount: 2 },
       ]);
+      expect(result.assignmentCounts).toEqual({
+        assigned: 2,
+        accepted: 1,
+        declined: 1,
+        active: 1,
+        completed: 3,
+        overdue: 1,
+      });
     });
   });
 });
