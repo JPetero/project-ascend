@@ -37,6 +37,7 @@ import 'package:mobile/features/notifications/presentation/providers/notificatio
 import 'package:mobile/features/notifications/presentation/providers/push_registration_controller.dart';
 import 'package:mobile/features/notifications/presentation/providers/workout_reminder_controller.dart';
 import 'package:mobile/features/data_export/presentation/providers/data_export_controller.dart';
+import 'package:mobile/features/feature_flags/presentation/providers/feature_flags_provider.dart';
 import 'package:mobile/features/sports/presentation/providers/sports_matches_controller.dart';
 import 'package:mobile/features/profile/domain/preferences_model.dart';
 import 'package:mobile/features/profile/domain/profile_model.dart';
@@ -72,6 +73,7 @@ import 'fake_media_picker_service.dart';
 import 'fake_media_repository.dart';
 import 'fake_messages_repository.dart';
 import 'fake_data_export_repository.dart';
+import 'fake_feature_flags_repository.dart';
 import 'fake_local_notification_scheduling_service.dart';
 import 'fake_notifications_repository.dart';
 import 'fake_push_notification_service.dart';
@@ -147,6 +149,7 @@ Future<ProviderContainer> createTestContainer({
   FakeGoogleAuthProvider? googleAuthProvider,
   FakeAppleAuthProvider? appleAuthProvider,
   FakePushNotificationService? pushNotificationService,
+  FakeFeatureFlagsRepository? featureFlagsRepository,
   bool failProfileFetch = false,
 }) async {
   SharedPreferences.setMockInitialValues({});
@@ -330,6 +333,9 @@ Future<ProviderContainer> createTestContainer({
       ),
       pushNotificationServiceProvider.overrideWithValue(
         pushNotificationService ?? FakePushNotificationService(),
+      ),
+      featureFlagsRepositoryProvider.overrideWithValue(
+        featureFlagsRepository ?? FakeFeatureFlagsRepository(),
       ),
     ],
   );

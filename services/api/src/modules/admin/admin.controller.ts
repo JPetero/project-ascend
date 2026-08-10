@@ -16,6 +16,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireAdminPermission } from '../../common/decorators/require-admin-permission.decorator';
 import { AdminPermissionGuard } from '../../common/guards/admin-permission.guard';
 import { AuthenticatedUser } from '../auth/types/jwt-payload.type';
+import { UpsertFeatureFlagDto } from '../feature-flags/dto/upsert-feature-flag.dto';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { AdminService } from './admin.service';
 import { ActionReportDto } from './dto/action-report.dto';
 import { DecideCampaignDto } from './dto/decide-campaign.dto';
@@ -26,13 +28,18 @@ import { ListEligibilityDto } from './dto/list-eligibility.dto';
 import { ListReportsDto } from './dto/list-reports.dto';
 import { ListTicketsDto } from './dto/list-tickets.dto';
 import { AdminReplyTicketDto } from './dto/reply-ticket.dto';
+import { ReleaseReadinessService } from './release-readiness.service';
 
 @ApiBearerAuth()
 @ApiTags('admin')
 @UseGuards(AdminPermissionGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly featureFlagsService: FeatureFlagsService,
+    private readonly releaseReadinessService: ReleaseReadinessService,
+  ) {}
 
   @Get('community-reports')
   @RequireAdminPermission(AdminPermission.MODERATE_COMMUNITY)
@@ -129,5 +136,33 @@ export class AdminController {
     @Param('permission', new ParseEnumPipe(AdminPermission)) permission: AdminPermission,
   ) {
     return this.adminService.revokePermission(user.id, userId, permission);
+  }
+
+  // --- Feature Flags (Build Session 12 Part 15-17) -----------------------
+
+  @Get('feature-flags')
+  @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
+  listFeatureFlags() {
+    return this.featureFlagsService.listAll();
+  }
+
+  @Post('feature-flags/:key')
+  @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
+  upsertFeatureFlag(@Param('key') key: string, @Body() dto: UpsertFeatureFlagDto) {
+    return this.featureFlagsService.upsert(key, dto);
+  }
+
+  @Delete('feature-flags/:key')
+  @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
+  deleteFeatureFlag(@Param('key') key: string) {
+    return this.featureFlagsService.delete(key);
+  }
+
+  // --- Release Readiness (Build Session 12 Part 15-17) --------------------
+
+  @Get('release-readiness')
+  @RequireAdminPermission(AdminPermission.MANAGE_PLATFORM)
+  releaseReadiness() {
+    return this.releaseReadinessService.check();
   }
 }

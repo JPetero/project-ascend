@@ -45,6 +45,12 @@ enum AdminPermission {
   MANAGE_SUPPORT
   REVIEW_PROMOTIONS
   MANAGE_ADMINS
+  // Build Session 12 Part 15-17 — covers both the Feature Flags admin
+  // surface and the Release Readiness diagnostic. Deliberately one
+  // permission for both: they are the same "platform operations" concern
+  // and neither is sensitive enough (no user data, no moderation power)
+  // to warrant its own grant.
+  MANAGE_PLATFORM
 }
 
 model AdminPermissionGrant {
@@ -3189,4 +3195,25 @@ model VisionFormObservation {
 
   @@index([sessionId])
   @@map("vision_form_observations")
+}
+
+// Build Session 12 Part 15-17 — minimal feature flag platform. `key` is the
+// stable machine identifier clients/admins reference (e.g.
+// "trainer_dashboard"). `rolloutPercentage` gates a deterministic
+// hash-bucketed rollout among users when `enabled` is true; 100 (the
+// default) means "on for everyone who isn't excluded by `enabled`".
+// Resolution is fail-open on the client: a key absent from the resolved
+// map is treated as enabled, so shipping a feature never requires a flag
+// record up front — only an explicit disabled/partial-rollout record
+// turns something off.
+model FeatureFlag {
+  id                String   @id @default(uuid())
+  key               String   @unique
+  description       String?
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int      @default(100)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("feature_flags")
 }

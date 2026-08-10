@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design_system/ascend_theme.dart';
 import '../core/routing/app_router.dart';
 import '../features/achievements/presentation/widgets/achievement_celebration_overlay.dart';
+import '../features/feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../features/notifications/presentation/providers/push_registration_controller.dart';
 import '../features/profile/domain/preferences_model.dart';
 import '../features/profile/presentation/providers/preferences_controller.dart';
@@ -18,6 +19,9 @@ class AscendApp extends ConsumerWidget {
     // starts remote push registration/tap-navigation (Build Session 11
     // Part 5/6), not just a value read.
     ref.watch(pushRegistrationControllerProvider);
+    // Same "watching starts it" reasoning — resolves the caller's feature
+    // flag map once at startup/sign-in (Build Session 12 Part 15-17).
+    ref.watch(featureFlagsProvider);
     final themeMode = ref.watch(
       preferencesControllerProvider.select(
         (s) => s.asData?.value?.themeMode ?? AppThemeMode.system,

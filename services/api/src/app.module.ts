@@ -23,6 +23,7 @@ import { EntitlementsModule } from './common/entitlements/entitlements.module';
 import { EquipmentTypesModule } from './modules/equipment-types/equipment-types.module';
 import { ExerciseCategoriesModule } from './modules/exercise-categories/exercise-categories.module';
 import { ExercisesModule } from './modules/exercises/exercises.module';
+import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { FoodsModule } from './modules/foods/foods.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { GalleryModule } from './modules/gallery/gallery.module';
@@ -121,6 +122,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PurchasesModule,
     VisionModule,
     ResearchModule,
+    FeatureFlagsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
