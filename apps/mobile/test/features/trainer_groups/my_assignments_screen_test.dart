@@ -25,7 +25,7 @@ void main() {
     expect(find.text('Nothing assigned yet'), findsOneWidget);
   });
 
-  testWidgets('lists a pending assignment with Accept and Dismiss actions', (
+  testWidgets('lists a pending assignment with Accept and Decline actions', (
     tester,
   ) async {
     final repository = FakeTrainerGroupsRepository();
@@ -50,35 +50,39 @@ void main() {
 
     expect(find.text('Plan plan-1'), findsOneWidget);
     expect(find.text('Accept'), findsOneWidget);
-    expect(find.text('Dismiss'), findsOneWidget);
+    expect(find.text('Decline'), findsOneWidget);
   });
 
-  testWidgets('dismissing an assignment removes it from the list', (
-    tester,
-  ) async {
-    final repository = FakeTrainerGroupsRepository();
-    await repository.createAssignments(
-      'group-1',
-      workoutPlanId: 'plan-1',
-      assigneeUserIds: ['me'],
-    );
-    final container = await createTestContainer(
-      signedIn: true,
-      trainerGroupsRepository: repository,
-    );
-    addTearDown(container.dispose);
+  testWidgets(
+    'declining an assignment keeps it visible, now labeled Declined (Build Session 13 Part 4)',
+    (tester) async {
+      final repository = FakeTrainerGroupsRepository();
+      await repository.createAssignments(
+        'group-1',
+        workoutPlanId: 'plan-1',
+        assigneeUserIds: ['me'],
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        trainerGroupsRepository: repository,
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MyAssignmentsScreen()),
-      ),
-    );
-    await pumpForAsyncSettle(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: MyAssignmentsScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
 
-    await tester.tap(find.text('Dismiss'));
-    await pumpForAsyncSettle(tester);
+      await tester.tap(find.text('Decline'));
+      await pumpForAsyncSettle(tester);
 
-    expect(find.text('Nothing assigned yet'), findsOneWidget);
-  });
+      expect(find.text('Plan plan-1'), findsOneWidget);
+      expect(find.text('Declined'), findsOneWidget);
+      expect(find.text('Decline'), findsNothing);
+      expect(find.text('Accept'), findsNothing);
+    },
+  );
 }

@@ -1708,6 +1708,12 @@ model TrainerGroupAnnouncement {
 enum WorkoutAssignmentStatus {
   PENDING
   ACCEPTED
+  // Build Session 13 Part 4 — previously a decline was indistinguishable
+  // from any other removal (cancelAssignment deleted the row outright),
+  // so a trainer dashboard could never show a real "declined" count.
+  // DECLINED keeps the row instead of deleting it; CANCELED (below)
+  // remains the assigner's own withdraw-it action, which still deletes.
+  DECLINED
   COMPLETED
   CANCELED
 }

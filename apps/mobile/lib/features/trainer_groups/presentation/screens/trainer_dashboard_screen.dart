@@ -46,6 +46,41 @@ class TrainerDashboardScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(AscendSpacing.md),
                 children: [
                   Text(
+                    'Assignments',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: AscendSpacing.sm),
+                  AscendCard(
+                    child: Wrap(
+                      spacing: AscendSpacing.md,
+                      runSpacing: AscendSpacing.sm,
+                      children: [
+                        _CountChip(
+                          label: 'Assigned',
+                          count: data.assignmentCounts.assigned,
+                        ),
+                        _CountChip(
+                          label: 'Accepted',
+                          count: data.assignmentCounts.accepted,
+                        ),
+                        _CountChip(
+                          label: 'Declined',
+                          count: data.assignmentCounts.declined,
+                        ),
+                        _CountChip(
+                          label: 'Completed',
+                          count: data.assignmentCounts.completed,
+                        ),
+                        _CountChip(
+                          label: 'Overdue',
+                          count: data.assignmentCounts.overdue,
+                          isAlert: data.assignmentCounts.overdue > 0,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AscendSpacing.lg),
+                  Text(
                     'Your groups',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
@@ -127,10 +162,40 @@ class TrainerDashboardScreen extends ConsumerWidget {
         return 'Pending';
       case WorkoutAssignmentStatus.accepted:
         return 'In progress';
+      case WorkoutAssignmentStatus.declined:
+        return 'Declined';
       case WorkoutAssignmentStatus.completed:
         return 'Completed';
       case WorkoutAssignmentStatus.canceled:
         return 'Canceled';
     }
+  }
+}
+
+class _CountChip extends StatelessWidget {
+  const _CountChip({
+    required this.label,
+    required this.count,
+    this.isAlert = false,
+  });
+
+  final String label;
+  final int count;
+  final bool isAlert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$count',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: isAlert ? Theme.of(context).colorScheme.error : null,
+          ),
+        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
   }
 }

@@ -22,6 +22,8 @@ class MyAssignmentsScreen extends ConsumerWidget {
         return 'New';
       case WorkoutAssignmentStatus.accepted:
         return 'In progress';
+      case WorkoutAssignmentStatus.declined:
+        return 'Declined';
       case WorkoutAssignmentStatus.completed:
         return 'Completed';
       case WorkoutAssignmentStatus.canceled:
@@ -98,11 +100,27 @@ class MyAssignmentsScreen extends ConsumerWidget {
                                           ).textTheme.titleSmall,
                                         ),
                                         Text(
-                                          _statusLabel(assignment.status),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
+                                          assignment.isOverdue
+                                              ? 'Overdue'
+                                              : _statusLabel(assignment.status),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: assignment.isOverdue
+                                                    ? Theme.of(
+                                                        context,
+                                                      ).colorScheme.error
+                                                    : null,
+                                              ),
                                         ),
+                                        if (assignment.dueAt != null)
+                                          Text(
+                                            'Due ${assignment.dueAt!.toLocal().toString().split(' ').first}',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
                                         if (assignment.note != null)
                                           Text(
                                             assignment.note!,
@@ -117,8 +135,8 @@ class MyAssignmentsScreen extends ConsumerWidget {
                                       WorkoutAssignmentStatus.pending) ...[
                                     TextButton(
                                       onPressed: () =>
-                                          controller.dismiss(assignment.id),
-                                      child: const Text('Dismiss'),
+                                          controller.decline(assignment.id),
+                                      child: const Text('Decline'),
                                     ),
                                     FilledButton(
                                       onPressed: () =>

@@ -94,6 +94,14 @@ export class TrainerGroupsController {
     return this.trainerGroupsService.acceptAssignment(user.id, assignmentId);
   }
 
+  @Post('assignments/:assignmentId/decline')
+  declineAssignment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('assignmentId') assignmentId: string,
+  ) {
+    return this.trainerGroupsService.declineAssignment(user.id, assignmentId);
+  }
+
   @Delete('assignments/:assignmentId')
   @HttpCode(HttpStatus.NO_CONTENT)
   cancelAssignment(

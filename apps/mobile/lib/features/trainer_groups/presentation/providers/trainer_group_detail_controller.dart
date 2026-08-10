@@ -212,6 +212,7 @@ class TrainerGroupDetailController
     required String workoutPlanId,
     required List<String> assigneeUserIds,
     String? note,
+    DateTime? dueAt,
   }) async {
     try {
       final created = await _repository.createAssignments(
@@ -219,6 +220,7 @@ class TrainerGroupDetailController
         workoutPlanId: workoutPlanId,
         assigneeUserIds: assigneeUserIds,
         note: note,
+        dueAt: dueAt,
       );
       state = state.copyWith(assignments: [...created, ...state.assignments]);
       return true;

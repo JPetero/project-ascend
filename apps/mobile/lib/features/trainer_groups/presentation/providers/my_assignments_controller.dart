@@ -78,6 +78,24 @@ class MyAssignmentsController extends StateNotifier<MyAssignmentsState> {
       return false;
     }
   }
+
+  /// Declines a still-pending assignment (Build Session 13 Part 4) —
+  /// replaces it in place with status declined rather than removing it,
+  /// since the server keeps the row for the trainer dashboard's counts.
+  Future<bool> decline(String assignmentId) async {
+    try {
+      final updated = await _repository.declineAssignment(assignmentId);
+      state = state.copyWith(
+        assignments: state.assignments
+            .map((a) => a.id == updated.id ? updated : a)
+            .toList(),
+      );
+      return true;
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+      return false;
+    }
+  }
 }
 
 final myAssignmentsControllerProvider =
