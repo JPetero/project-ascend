@@ -24,6 +24,19 @@ function participant(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function scheduledSession(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'scheduled-1',
+    groupId: 'group-1',
+    createdById: 'host-1',
+    title: 'Sunday session',
+    jointWorkoutSessionId: null,
+    canceledAt: null,
+    participants: [],
+    ...overrides,
+  };
+}
+
 describe('JointWorkoutSessionsService', () => {
   let service: JointWorkoutSessionsService;
   let prisma: {
@@ -43,6 +56,7 @@ describe('JointWorkoutSessionsService', () => {
     };
     jointWorkoutSharedResult: { create: jest.Mock };
     jointWorkoutEvent: { create: jest.Mock };
+    trainerGroupScheduledSession: { findUnique: jest.Mock; update: jest.Mock };
     $transaction: jest.Mock;
   };
   let friendsService: { areFriends: jest.Mock };
@@ -66,6 +80,7 @@ describe('JointWorkoutSessionsService', () => {
       },
       jointWorkoutSharedResult: { create: jest.fn() },
       jointWorkoutEvent: { create: jest.fn().mockResolvedValue({}) },
+      trainerGroupScheduledSession: { findUnique: jest.fn(), update: jest.fn() },
       $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
     };
     friendsService = { areFriends: jest.fn().mockResolvedValue(true) };
@@ -435,6 +450,114 @@ describe('JointWorkoutSessionsService', () => {
 
       await expect(service.getById('someone-else', 'session-1')).rejects.toBeInstanceOf(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('startFromScheduledSession', () => {
+    it('404s when the scheduled session does not exist', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.startFromScheduledSession('host-1', 'scheduled-1'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('rejects starting a canceled booking', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({ canceledAt: new Date() }),
+      );
+
+      await expect(
+        service.startFromScheduledSession('host-1', 'scheduled-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('reuses create’s trainerGroupId path and links the resulting session back to the booking', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+      trainerGroupsService.resolveGroupSessionInvitees.mockResolvedValue(['member-1']);
+      prisma.jointWorkoutSession.create.mockResolvedValue(session());
+
+      await service.startFromScheduledSession('host-1', 'scheduled-1');
+
+      expect(trainerGroupsService.resolveGroupSessionInvitees).toHaveBeenCalledWith(
+        'host-1',
+        'group-1',
+      );
+      expect(prisma.trainerGroupScheduledSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'scheduled-1' },
+          data: { jointWorkoutSessionId: 'session-1' },
+        }),
+      );
+    });
+
+    it('is idempotent: a second start returns the already-linked session without creating a new one', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({ jointWorkoutSessionId: 'session-1' }),
+      );
+
+      const result = await service.startFromScheduledSession('host-1', 'scheduled-1');
+
+      expect(prisma.jointWorkoutSession.create).not.toHaveBeenCalled();
+      expect(prisma.trainerGroupScheduledSession.update).not.toHaveBeenCalled();
+      expect(result).toEqual(expect.objectContaining({ id: 'session-1' }));
+    });
+  });
+
+  describe('joinFromScheduledSession', () => {
+    it('rejects joining a booking that has not started yet', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(scheduledSession());
+
+      await expect(
+        service.joinFromScheduledSession('member-1', 'scheduled-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('403s a member who never RSVP’d Going', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({ jointWorkoutSessionId: 'session-1', participants: [] }),
+      );
+
+      await expect(
+        service.joinFromScheduledSession('member-1', 'scheduled-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('auto-accepts a still-pending invite for a Going member', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({
+          jointWorkoutSessionId: 'session-1',
+          participants: [{ userId: 'member-1', status: 'GOING' }],
+        }),
+      );
+      prisma.jointWorkoutParticipant.findUnique.mockResolvedValue(
+        participant({ userId: 'member-1', status: 'INVITED' }),
+      );
+      prisma.jointWorkoutSession.findUnique.mockResolvedValue(
+        session({ participants: [{ userId: 'member-1', status: 'INVITED' }] }),
+      );
+
+      await service.joinFromScheduledSession('member-1', 'scheduled-1');
+
+      expect(prisma.jointWorkoutParticipant.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'ACCEPTED' }) }),
+      );
+    });
+
+    it('the booking creator can join without an explicit Going RSVP', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(
+        scheduledSession({ jointWorkoutSessionId: 'session-1', createdById: 'host-1' }),
+      );
+      prisma.jointWorkoutParticipant.findUnique.mockResolvedValue(
+        participant({ userId: 'host-1', status: 'ACCEPTED' }),
+      );
+      prisma.jointWorkoutSession.findUnique.mockResolvedValue(
+        session({ participants: [{ userId: 'host-1', status: 'ACCEPTED' }] }),
+      );
+
+      await expect(service.joinFromScheduledSession('host-1', 'scheduled-1')).resolves.toEqual(
+        expect.objectContaining({ id: 'session-1' }),
       );
     });
   });

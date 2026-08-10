@@ -303,6 +303,19 @@ class TrainerGroupsRepository {
         .toList();
   }
 
+  /// Single-session detail fetch (Build Session 13 continuation Part B)
+  /// — the session detail screen's own primary load, independent of
+  /// whatever group-detail state happens to already be in memory.
+  Future<TrainerGroupScheduledSession> getScheduledSession(
+    String sessionId,
+  ) async {
+    final envelope = await _apiClient.get(
+      '/trainer-groups/scheduled-sessions/$sessionId',
+      (data) => data as Map<String, dynamic>,
+    );
+    return TrainerGroupScheduledSession.fromJson(envelope.data!);
+  }
+
   Future<void> cancelScheduledSession(String sessionId) async {
     await _apiClient.delete(
       '/trainer-groups/scheduled-sessions/$sessionId',

@@ -74,6 +74,9 @@ enum NotificationEventType {
   // scheduling a session for the group.
   workoutAssigned,
   groupSessionScheduled,
+  // Build Session 13 Part 3 — the host canceled a booking members had
+  // RSVP'd to or were counting on.
+  groupSessionCanceled,
 
   /// A server-sent type this build of the client doesn't recognize yet
   /// (Build Session 12 Part 1) — e.g. an older app version receiving a
@@ -140,6 +143,8 @@ NotificationEventType? tryParseNotificationEventType(String value) {
       return NotificationEventType.workoutAssigned;
     case 'GROUP_SESSION_SCHEDULED':
       return NotificationEventType.groupSessionScheduled;
+    case 'GROUP_SESSION_CANCELED':
+      return NotificationEventType.groupSessionCanceled;
     default:
       return null;
   }

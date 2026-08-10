@@ -43,6 +43,7 @@ import '../../features/sports/presentation/screens/sport_match_detail_screen.dar
 import '../../features/sports/presentation/screens/sports_matches_screen.dart';
 import '../../features/trainer_groups/presentation/screens/create_trainer_group_screen.dart';
 import '../../features/trainer_groups/presentation/screens/my_assignments_screen.dart';
+import '../../features/trainer_groups/presentation/screens/scheduled_session_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_dashboard_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_group_detail_screen.dart';
 import '../../features/trainer_groups/presentation/screens/trainer_groups_screen.dart';
@@ -419,6 +420,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.trainerGroupDetail,
         builder: (context, state) =>
             TrainerGroupDetailScreen(groupId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: RoutePaths.trainerGroupScheduledSessionDetail,
+        builder: (context, state) => ScheduledSessionDetailScreen(
+          sessionId: state.pathParameters['sessionId']!,
+        ),
       ),
       GoRoute(
         path: RoutePaths.myAssignments,

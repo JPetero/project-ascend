@@ -62,10 +62,15 @@ String? deepLinkPathFor(NotificationEventType type, String? data) {
       // is to send the user.
       return RoutePaths.myAssignments;
     case NotificationEventType.groupSessionScheduled:
-      // [data] is the scheduled session id, not the group id, so it
-      // can't build a group-detail deep link — the groups list is the
-      // most specific place there is to send the user.
-      return RoutePaths.trainerGroups;
+    case NotificationEventType.groupSessionCanceled:
+      // [data] is the scheduled session id (Build Session 13
+      // continuation Part B added a session-detail route) — a canceled
+      // session still resolves there and shows its honest canceled
+      // state, see TrainerGroupsService.getScheduledSession's doc
+      // comment.
+      return data == null
+          ? RoutePaths.trainerGroups
+          : RoutePaths.trainerGroupScheduledSessionDetailPath(data);
     case NotificationEventType.unknown:
       // Deliberately no navigation for a type this client build doesn't
       // recognize — see NotificationEventType.unknown's doc comment.

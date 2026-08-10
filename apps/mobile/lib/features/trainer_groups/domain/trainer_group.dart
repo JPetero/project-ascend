@@ -348,6 +348,7 @@ class TrainerGroupScheduledSession {
     this.description,
     this.workoutPlanId,
     this.workoutPlanName,
+    this.jointWorkoutSessionId,
     this.canceledAt,
     required this.createdAt,
     this.status = ScheduledSessionStatus.upcoming,
@@ -368,6 +369,13 @@ class TrainerGroupScheduledSession {
   final String? description;
   final String? workoutPlanId;
   final String? workoutPlanName;
+
+  /// Set once the host taps "Start" (Build Session 13 continuation Part
+  /// B) — see JointWorkoutSessionsRepository.startFromScheduledSession.
+  /// Non-null means the live session already exists, so the detail
+  /// screen shows "Join session" for eligible Going participants instead
+  /// of "Start".
+  final String? jointWorkoutSessionId;
   final DateTime? canceledAt;
   final DateTime createdAt;
   final ScheduledSessionStatus status;
@@ -389,6 +397,7 @@ class TrainerGroupScheduledSession {
       description: json['description'] as String?,
       workoutPlanId: json['workoutPlanId'] as String?,
       workoutPlanName: json['workoutPlanName'] as String?,
+      jointWorkoutSessionId: json['jointWorkoutSessionId'] as String?,
       canceledAt: json['canceledAt'] != null
           ? DateTime.parse(json['canceledAt'] as String)
           : null,

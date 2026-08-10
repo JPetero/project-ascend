@@ -1087,6 +1087,67 @@ describe('TrainerGroupsService', () => {
     });
   });
 
+  describe('getScheduledSession (Build Session 13 continuation Part B)', () => {
+    it('404s a session that does not exist', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue(null);
+
+      await expect(service.getScheduledSession('member-a', 'missing')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('rejects a caller who is not a member of the group', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        ...scheduledSession(),
+        workoutPlan: null,
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue(null);
+
+      await expect(service.getScheduledSession('stranger', 'session-1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('returns a canceled session’s detail instead of 404ing (a stale link/notification should still resolve)', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        ...scheduledSession({ canceledAt: new Date() }),
+        workoutPlan: null,
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+
+      const result = await service.getScheduledSession('member-a', 'session-1');
+
+      expect(result.status).toBe('CANCELED');
+    });
+
+    it('includes the participant summary and the linked live-session id once started', async () => {
+      prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({
+        ...scheduledSession({ jointWorkoutSessionId: 'joint-1' }),
+        workoutPlan: null,
+      });
+      prisma.trainerGroup.findUnique.mockResolvedValue(group());
+      prisma.trainerGroupMember.findUnique.mockResolvedValue({
+        role: TrainerGroupMemberRole.MEMBER,
+      });
+      prisma.trainerGroupScheduledSessionParticipant.groupBy.mockResolvedValue([
+        { sessionId: 'session-1', status: 'GOING', _count: { _all: 2 } },
+      ]);
+      prisma.trainerGroupScheduledSessionParticipant.findMany.mockResolvedValue([
+        { sessionId: 'session-1', status: 'GOING' },
+      ]);
+
+      const result = await service.getScheduledSession('member-a', 'session-1');
+
+      expect(result.goingCount).toBe(2);
+      expect(result.jointWorkoutSessionId).toBe('joint-1');
+      expect(result.viewerRsvpStatus).toBe('GOING');
+    });
+  });
+
   describe('cancelScheduledSession', () => {
     it('rejects a bystander who neither created it nor owns the group', async () => {
       prisma.trainerGroupScheduledSession.findUnique.mockResolvedValue({

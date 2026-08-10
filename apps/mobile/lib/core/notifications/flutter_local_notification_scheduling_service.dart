@@ -112,6 +112,48 @@ class FlutterLocalNotificationSchedulingService
     }
   }
 
+  /// Distinct id space from [scheduleWeekly]'s `_idFor` (which only ever
+  /// produces `baseId * 10 + weekday`, a small number for this app's
+  /// handful of weekly reminder types) — a one-off reminder's [id] is
+  /// caller-provided and expected to already be a full, unique
+  /// notification id (see ScheduledSessionDetailController).
+  @override
+  Future<void> scheduleOneOff({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime dateTime,
+  }) async {
+    await _ensureInitialized();
+    final scheduled = tz.TZDateTime.from(dateTime, tz.local);
+    if (!scheduled.isAfter(tz.TZDateTime.now(tz.local))) return;
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduled,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          _channelName,
+          channelDescription: _channelDescription,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  @override
+  Future<void> cancelOneOff(int id) async {
+    await _ensureInitialized();
+    await _plugin.cancel(id);
+  }
+
   /// One notification id per (baseId, weekday) pair, distinct enough for
   /// this app's small number of reminder types not to collide.
   int _idFor(int baseId, int weekday) => baseId * 10 + weekday;

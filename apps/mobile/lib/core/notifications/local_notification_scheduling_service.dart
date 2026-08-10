@@ -28,4 +28,17 @@ abstract class LocalNotificationSchedulingService {
   });
 
   Future<void> cancel(int baseId);
+
+  /// A single reminder at an exact date/time rather than a recurring
+  /// weekly slot (Build Session 13 continuation Part B — trainer
+  /// scheduled-session RSVP reminders). [dateTime] in the past never
+  /// fires; callers don't need to check that themselves.
+  Future<void> scheduleOneOff({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime dateTime,
+  });
+
+  Future<void> cancelOneOff(int id);
 }

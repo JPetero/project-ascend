@@ -43,6 +43,15 @@ class FakeJointWorkoutSessionsRepository
   String? lastInvitedUserId;
   String? lastProgressExerciseName;
   String? lastTrainerGroupId;
+  String? lastStartedScheduledSessionId;
+  String? lastJoinedScheduledSessionId;
+
+  /// Overrides the session [startFromScheduledSession]/
+  /// [joinFromScheduledSession] return — tests assert on
+  /// [lastStartedScheduledSessionId]/[lastJoinedScheduledSessionId] for
+  /// which booking triggered the call, and can set this to control the
+  /// returned live session's id (e.g. to verify navigation).
+  JointWorkoutSession? scheduledSessionActionResult;
 
   /// Test fixture standing in for the real backend's
   /// TrainerGroupsService.resolveGroupSessionInvitees — seed a group's
@@ -87,6 +96,27 @@ class FakeJointWorkoutSessionsRepository
   @override
   Future<JointWorkoutSession> getById(String sessionId) async {
     return sessions.firstWhere((s) => s.id == sessionId);
+  }
+
+  @override
+  Future<JointWorkoutSession> startFromScheduledSession(
+    String scheduledSessionId,
+  ) async {
+    lastStartedScheduledSessionId = scheduledSessionId;
+    final session =
+        scheduledSessionActionResult ??
+        sampleJointWorkoutSession(id: 'joint-from-$scheduledSessionId');
+    if (!sessions.any((s) => s.id == session.id)) sessions.add(session);
+    return session;
+  }
+
+  @override
+  Future<JointWorkoutSession> joinFromScheduledSession(
+    String scheduledSessionId,
+  ) async {
+    lastJoinedScheduledSessionId = scheduledSessionId;
+    return scheduledSessionActionResult ??
+        sampleJointWorkoutSession(id: 'joint-from-$scheduledSessionId');
   }
 
   @override
