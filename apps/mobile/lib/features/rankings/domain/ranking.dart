@@ -1,8 +1,9 @@
-/// Rankings scopes — a deliberate MVP simplification of Founder Scenario
-/// 16a's local/city/region/state/national/global granularity down to
-/// three: people you follow, a self-typed coarse region label, and
-/// everyone. See services/api/src/modules/rankings/rankings.service.ts.
-enum RankingScope { friends, region, global }
+/// Rankings scopes — Founder Scenario 16a's full local/city/region/
+/// state/national/global granularity, restored in Build Session 13
+/// continuation Part D from the three-scope (FRIENDS/REGION/GLOBAL)
+/// MVP. See services/api/src/modules/rankings/rankings-locality.util.ts,
+/// which this mirrors.
+enum RankingScope { friends, local, city, region, national, global }
 
 String rankingScopeToJson(RankingScope scope) => scope.name.toUpperCase();
 
@@ -11,6 +12,30 @@ RankingScope rankingScopeFromJson(String value) =>
       (s) => s.name.toUpperCase() == value,
       orElse: () => RankingScope.global,
     );
+
+String rankingScopeLabel(RankingScope scope) => switch (scope) {
+  RankingScope.friends => 'Friends',
+  RankingScope.local => 'Local',
+  RankingScope.city => 'City',
+  RankingScope.region => 'Region',
+  RankingScope.national => 'National',
+  RankingScope.global => 'Global',
+};
+
+/// Locality tiers, broadest to narrowest — mirrors the backend's
+/// LOCALITY_TIER_ORDER exactly. FRIENDS and GLOBAL are not locality
+/// scopes: they need no locality fields and have no tier index.
+const List<RankingScope> localityTierOrder = [
+  RankingScope.national,
+  RankingScope.region,
+  RankingScope.city,
+  RankingScope.local,
+];
+
+/// -1 for FRIENDS/GLOBAL, else 0-3 (NATIONAL through LOCAL).
+int localityTierIndex(RankingScope scope) => localityTierOrder.indexOf(scope);
+
+bool isLocalityScope(RankingScope scope) => localityTierIndex(scope) >= 0;
 
 class RankingSeason {
   const RankingSeason({
@@ -37,13 +62,18 @@ class RankingSeason {
 
 /// The caller's own opt-in state — off (`optedIn: false`) unless the
 /// caller has explicitly opted in, per Scenario 16a's off-by-default
-/// requirement. No exact location is ever included; `regionLabel` is a
-/// user-typed coarse string.
+/// requirement. No exact location is ever included; the locality
+/// fields are user-typed coarse strings, populated from
+/// localityCountry down through whichever tier `scope` requires (see
+/// RankingScope's doc comment).
 class RankingMyStatus {
   const RankingMyStatus({
     required this.optedIn,
     this.scope,
-    this.regionLabel,
+    this.localityCountry,
+    this.localityRegion,
+    this.localityCity,
+    this.localityArea,
     this.season,
     this.points,
     this.activeDays,
@@ -51,7 +81,10 @@ class RankingMyStatus {
 
   final bool optedIn;
   final RankingScope? scope;
-  final String? regionLabel;
+  final String? localityCountry;
+  final String? localityRegion;
+  final String? localityCity;
+  final String? localityArea;
   final RankingSeason? season;
   final int? points;
   final int? activeDays;
@@ -63,7 +96,10 @@ class RankingMyStatus {
     return RankingMyStatus(
       optedIn: true,
       scope: rankingScopeFromJson(json['scope'] as String),
-      regionLabel: json['regionLabel'] as String?,
+      localityCountry: json['localityCountry'] as String?,
+      localityRegion: json['localityRegion'] as String?,
+      localityCity: json['localityCity'] as String?,
+      localityArea: json['localityArea'] as String?,
       season: RankingSeason.fromJson(json['season'] as Map<String, dynamic>),
       points: json['points'] as int,
       activeDays: json['activeDays'] as int,

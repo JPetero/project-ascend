@@ -16,11 +16,20 @@ class FakeRankingsRepository implements RankingsRepository {
   Future<RankingMyStatus> getMyStatus() async => status;
 
   @override
-  Future<void> optIn({required RankingScope scope, String? regionLabel}) async {
+  Future<void> optIn({
+    required RankingScope scope,
+    String? localityCountry,
+    String? localityRegion,
+    String? localityCity,
+    String? localityArea,
+  }) async {
     status = RankingMyStatus(
       optedIn: true,
       scope: scope,
-      regionLabel: regionLabel,
+      localityCountry: localityCountry,
+      localityRegion: localityRegion,
+      localityCity: localityCity,
+      localityArea: localityArea,
       season: RankingSeason(
         id: 'season-1',
         label: 'August 2026',
@@ -43,8 +52,15 @@ class FakeRankingsRepository implements RankingsRepository {
     int page = 1,
     int limit = 20,
   }) async {
-    if (scope == RankingScope.region && status.scope != RankingScope.region) {
-      throw Exception('Opt in with a region to view the regional leaderboard.');
+    if (isLocalityScope(scope)) {
+      final viewerScope = status.scope;
+      if (viewerScope == null ||
+          localityTierIndex(viewerScope) < localityTierIndex(scope)) {
+        throw Exception(
+          'Opt in with a ${rankingScopeLabel(scope).toLowerCase()} locality '
+          '(or narrower) to view this leaderboard.',
+        );
+      }
     }
     final entries = leaderboards[scope] ?? const <LeaderboardEntry>[];
     return LeaderboardPage(entries: entries, total: entries.length);

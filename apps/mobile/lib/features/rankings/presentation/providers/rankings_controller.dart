@@ -97,9 +97,21 @@ class RankingsController extends StateNotifier<RankingsState> {
     }
   }
 
-  Future<bool> optIn({required RankingScope scope, String? regionLabel}) async {
+  Future<bool> optIn({
+    required RankingScope scope,
+    String? localityCountry,
+    String? localityRegion,
+    String? localityCity,
+    String? localityArea,
+  }) async {
     try {
-      await _repository.optIn(scope: scope, regionLabel: regionLabel);
+      await _repository.optIn(
+        scope: scope,
+        localityCountry: localityCountry,
+        localityRegion: localityRegion,
+        localityCity: localityCity,
+        localityArea: localityArea,
+      );
       await refresh();
       return true;
     } catch (error) {

@@ -13,8 +13,8 @@ import '../providers/rankings_controller.dart';
 /// The Rankings tab — opt-in-only leaderboards, per Founder Scenario 16a.
 /// Nothing here is simulated: with no [RankingMyStatus.optedIn], the
 /// screen shows an honest opt-in prompt instead of a leaderboard, and
-/// no exact location is ever collected or shown — only a self-typed
-/// coarse region label.
+/// no exact location is ever collected or shown — only self-typed
+/// coarse locality labels (country/region/city/local area).
 class RankingsScreen extends ConsumerWidget {
   const RankingsScreen({super.key});
 
@@ -95,7 +95,10 @@ class _OptInPrompt extends StatefulWidget {
 
   final Future<bool> Function({
     required RankingScope scope,
-    String? regionLabel,
+    String? localityCountry,
+    String? localityRegion,
+    String? localityCity,
+    String? localityArea,
   })
   onOptIn;
 
@@ -105,12 +108,32 @@ class _OptInPrompt extends StatefulWidget {
 
 class _OptInPromptState extends State<_OptInPrompt> {
   RankingScope _scope = RankingScope.global;
+  final _countryController = TextEditingController();
   final _regionController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _areaController = TextEditingController();
   bool _isSubmitting = false;
+
+  // A given tier requires every field from country down through its
+  // own — see RankingScope's doc comment and the backend's
+  // rankings-locality.util.ts, which this mirrors.
+  bool get _needsCountry => isLocalityScope(_scope);
+  bool get _needsRegion => localityTierIndex(_scope) >= 1;
+  bool get _needsCity => localityTierIndex(_scope) >= 2;
+  bool get _needsArea => localityTierIndex(_scope) >= 3;
+
+  bool get _localityComplete =>
+      (!_needsCountry || _countryController.text.trim().isNotEmpty) &&
+      (!_needsRegion || _regionController.text.trim().isNotEmpty) &&
+      (!_needsCity || _cityController.text.trim().isNotEmpty) &&
+      (!_needsArea || _areaController.text.trim().isNotEmpty);
 
   @override
   void dispose() {
+    _countryController.dispose();
     _regionController.dispose();
+    _cityController.dispose();
+    _areaController.dispose();
     super.dispose();
   }
 
@@ -118,9 +141,10 @@ class _OptInPromptState extends State<_OptInPrompt> {
     setState(() => _isSubmitting = true);
     final ok = await widget.onOptIn(
       scope: _scope,
-      regionLabel: _scope == RankingScope.region
-          ? _regionController.text.trim()
-          : null,
+      localityCountry: _needsCountry ? _countryController.text.trim() : null,
+      localityRegion: _needsRegion ? _regionController.text.trim() : null,
+      localityCity: _needsCity ? _cityController.text.trim() : null,
+      localityArea: _needsArea ? _areaController.text.trim() : null,
     );
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -150,33 +174,55 @@ class _OptInPromptState extends State<_OptInPrompt> {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: AscendSpacing.sm),
-        SegmentedButton<RankingScope>(
-          segments: const [
-            ButtonSegment(value: RankingScope.friends, label: Text('Friends')),
-            ButtonSegment(value: RankingScope.region, label: Text('Region')),
-            ButtonSegment(value: RankingScope.global, label: Text('Global')),
+        Wrap(
+          spacing: AscendSpacing.sm,
+          runSpacing: AscendSpacing.sm,
+          children: [
+            for (final scope in RankingScope.values)
+              ChoiceChip(
+                label: Text(rankingScopeLabel(scope)),
+                selected: _scope == scope,
+                onSelected: (_) => setState(() => _scope = scope),
+              ),
           ],
-          selected: {_scope},
-          onSelectionChanged: (selection) =>
-              setState(() => _scope = selection.first),
         ),
-        if (_scope == RankingScope.region) ...[
+        if (_needsCountry) ...[
+          const SizedBox(height: AscendSpacing.md),
+          AscendTextField(
+            controller: _countryController,
+            label: 'Country',
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+        if (_needsRegion) ...[
           const SizedBox(height: AscendSpacing.md),
           AscendTextField(
             controller: _regionController,
-            label: 'Your region (e.g. a city or state)',
+            label: 'Region or state',
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+        if (_needsCity) ...[
+          const SizedBox(height: AscendSpacing.md),
+          AscendTextField(
+            controller: _cityController,
+            label: 'City',
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+        if (_needsArea) ...[
+          const SizedBox(height: AscendSpacing.md),
+          AscendTextField(
+            controller: _areaController,
+            label: 'Neighborhood or local area',
+            onChanged: (_) => setState(() {}),
           ),
         ],
         const SizedBox(height: AscendSpacing.lg),
         AscendPrimaryButton(
           label: 'Opt in to Rankings',
           isLoading: _isSubmitting,
-          onPressed: _isSubmitting
-              ? null
-              : (_scope == RankingScope.region &&
-                        _regionController.text.trim().isEmpty
-                    ? null
-                    : _submit),
+          onPressed: _isSubmitting || !_localityComplete ? null : _submit,
         ),
       ],
     );
@@ -189,10 +235,15 @@ class _LeaderboardView extends StatelessWidget {
   final RankingsState state;
   final RankingsController controller;
 
+  bool _canView(RankingScope candidate) {
+    if (!isLocalityScope(candidate)) return true;
+    final viewerScope = state.status.scope;
+    if (viewerScope == null) return false;
+    return localityTierIndex(candidate) <= localityTierIndex(viewerScope);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canViewRegion = state.status.scope == RankingScope.region;
-
     return ListView(
       padding: const EdgeInsets.all(AscendSpacing.md),
       children: [
@@ -219,25 +270,19 @@ class _LeaderboardView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AscendSpacing.md),
-        SegmentedButton<RankingScope>(
-          segments: [
-            const ButtonSegment(
-              value: RankingScope.friends,
-              label: Text('Friends'),
-            ),
-            ButtonSegment(
-              value: RankingScope.region,
-              label: const Text('Region'),
-              enabled: canViewRegion,
-            ),
-            const ButtonSegment(
-              value: RankingScope.global,
-              label: Text('Global'),
-            ),
+        Wrap(
+          spacing: AscendSpacing.sm,
+          runSpacing: AscendSpacing.sm,
+          children: [
+            for (final scope in RankingScope.values)
+              ChoiceChip(
+                label: Text(rankingScopeLabel(scope)),
+                selected: state.selectedScope == scope,
+                onSelected: _canView(scope)
+                    ? (_) => controller.selectScope(scope)
+                    : null,
+              ),
           ],
-          selected: {state.selectedScope},
-          onSelectionChanged: (selection) =>
-              controller.selectScope(selection.first),
         ),
         const SizedBox(height: AscendSpacing.md),
         if (state.isLeaderboardLoading)
@@ -296,7 +341,7 @@ class _LeaderboardView extends StatelessWidget {
                               type: ShareContentType.rankingMilestone,
                               title: '#${entry.rank}',
                               subtitle:
-                                  '${_scopeLabel(state.selectedScope)} leaderboard',
+                                  '${rankingScopeLabel(state.selectedScope)} leaderboard',
                               statLines: [
                                 ShareStatLine(
                                   label: 'Points',
@@ -315,9 +360,3 @@ class _LeaderboardView extends StatelessWidget {
     );
   }
 }
-
-String _scopeLabel(RankingScope scope) => switch (scope) {
-  RankingScope.friends => 'Friends',
-  RankingScope.region => 'Regional',
-  RankingScope.global => 'Global',
-};

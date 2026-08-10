@@ -1,18 +1,53 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { RankingScope } from '@prisma/client';
+import { Transform } from 'class-transformer';
 import { IsEnum, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { requiredLocalityFields } from '../rankings-locality.util';
 
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+
+// Each locality field is required exactly when the chosen scope's tier
+// needs it — NATIONAL needs localityCountry only, LOCAL needs all four.
+// See rankings-locality.util.ts for the tier order this mirrors.
 export class OptInRankingsDto {
   @ApiProperty({ enum: RankingScope })
   @IsEnum(RankingScope)
   scope!: RankingScope;
 
-  // Required only for REGION scope — a coarse, user-typed label (e.g.
-  // "Quezon City"), never a coordinate, same pattern as
-  // CardioSession.regionLabel.
+  // A coarse, user-typed label (e.g. "Philippines"), never a
+  // coordinate — same pattern as CardioSession.regionLabel.
   @ApiPropertyOptional()
-  @ValidateIf((dto: OptInRankingsDto) => dto.scope === RankingScope.REGION)
+  @ValidateIf((dto: OptInRankingsDto) =>
+    requiredLocalityFields(dto.scope).includes('localityCountry'),
+  )
   @IsString()
   @MaxLength(100)
-  regionLabel?: string;
+  @Transform(trim)
+  localityCountry?: string;
+
+  // Region/state, e.g. "Metro Manila".
+  @ApiPropertyOptional()
+  @ValidateIf((dto: OptInRankingsDto) =>
+    requiredLocalityFields(dto.scope).includes('localityRegion'),
+  )
+  @IsString()
+  @MaxLength(100)
+  @Transform(trim)
+  localityRegion?: string;
+
+  // City, e.g. "Quezon City".
+  @ApiPropertyOptional()
+  @ValidateIf((dto: OptInRankingsDto) => requiredLocalityFields(dto.scope).includes('localityCity'))
+  @IsString()
+  @MaxLength(100)
+  @Transform(trim)
+  localityCity?: string;
+
+  // A neighborhood or district within the city, e.g. "Diliman".
+  @ApiPropertyOptional()
+  @ValidateIf((dto: OptInRankingsDto) => requiredLocalityFields(dto.scope).includes('localityArea'))
+  @IsString()
+  @MaxLength(100)
+  @Transform(trim)
+  localityArea?: string;
 }

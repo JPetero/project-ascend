@@ -22,6 +22,18 @@ function season(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function optInRow(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    userId: 'user-1',
+    scope: RankingScope.GLOBAL,
+    localityCountry: null,
+    localityRegion: null,
+    localityCity: null,
+    localityArea: null,
+    ...overrides,
+  };
+}
+
 describe('RankingsService', () => {
   let service: RankingsService;
   let prisma: {
@@ -67,16 +79,92 @@ describe('RankingsService', () => {
 
   describe('optIn', () => {
     it('upserts keyed on userId', async () => {
-      prisma.rankingOptIn.upsert.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
-      });
+      prisma.rankingOptIn.upsert.mockResolvedValue(optInRow());
 
       await service.optIn('user-1', { scope: RankingScope.GLOBAL });
 
       expect(prisma.rankingOptIn.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: 'user-1' } }),
+      );
+    });
+
+    it('persists every locality field up through the chosen tier for a LOCAL opt-in', async () => {
+      prisma.rankingOptIn.upsert.mockResolvedValue(
+        optInRow({
+          scope: RankingScope.LOCAL,
+          localityCountry: 'Philippines',
+          localityRegion: 'Metro Manila',
+          localityCity: 'Quezon City',
+          localityArea: 'Diliman',
+        }),
+      );
+
+      await service.optIn('user-1', {
+        scope: RankingScope.LOCAL,
+        localityCountry: 'Philippines',
+        localityRegion: 'Metro Manila',
+        localityCity: 'Quezon City',
+        localityArea: 'Diliman',
+      });
+
+      expect(prisma.rankingOptIn.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: {
+            scope: RankingScope.LOCAL,
+            localityCountry: 'Philippines',
+            localityRegion: 'Metro Manila',
+            localityCity: 'Quezon City',
+            localityArea: 'Diliman',
+          },
+        }),
+      );
+    });
+
+    it('clears every locality field when opting into a non-locality scope, ignoring stale input', async () => {
+      prisma.rankingOptIn.upsert.mockResolvedValue(optInRow());
+
+      await service.optIn('user-1', {
+        scope: RankingScope.GLOBAL,
+        // Stale fields from a previous LOCAL opt-in the caller forgot
+        // to clear — the service must not persist them under GLOBAL.
+        localityCountry: 'Philippines',
+        localityCity: 'Quezon City',
+      });
+
+      expect(prisma.rankingOptIn.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: {
+            scope: RankingScope.GLOBAL,
+            localityCountry: null,
+            localityRegion: null,
+            localityCity: null,
+            localityArea: null,
+          },
+        }),
+      );
+    });
+
+    it('only persists localityCountry for a NATIONAL opt-in, not a supplied region/city', async () => {
+      prisma.rankingOptIn.upsert.mockResolvedValue(
+        optInRow({ scope: RankingScope.NATIONAL, localityCountry: 'Philippines' }),
+      );
+
+      await service.optIn('user-1', {
+        scope: RankingScope.NATIONAL,
+        localityCountry: 'Philippines',
+        localityRegion: 'Metro Manila',
+      });
+
+      expect(prisma.rankingOptIn.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: {
+            scope: RankingScope.NATIONAL,
+            localityCountry: 'Philippines',
+            localityRegion: null,
+            localityCity: null,
+            localityArea: null,
+          },
+        }),
       );
     });
   });
@@ -100,15 +188,32 @@ describe('RankingsService', () => {
     });
 
     it('includes the season score when opted in', async () => {
-      prisma.rankingOptIn.findUnique.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
-      });
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow());
 
       const status = await service.getMyStatus('user-1');
 
       expect(status).toMatchObject({ optedIn: true, points: 4, activeDays: 3 });
+    });
+
+    it('includes the full locality chain when opted in at the CITY tier', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(
+        optInRow({
+          scope: RankingScope.CITY,
+          localityCountry: 'Philippines',
+          localityRegion: 'Metro Manila',
+          localityCity: 'Quezon City',
+        }),
+      );
+
+      const status = await service.getMyStatus('user-1');
+
+      expect(status).toMatchObject({
+        scope: RankingScope.CITY,
+        localityCountry: 'Philippines',
+        localityRegion: 'Metro Manila',
+        localityCity: 'Quezon City',
+        localityArea: null,
+      });
     });
   });
 
@@ -121,24 +226,26 @@ describe('RankingsService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('rejects a REGION request from a viewer who opted in with a different scope', async () => {
-      prisma.rankingOptIn.findUnique.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
-      });
+    it('rejects a REGION request from a viewer who opted in with a broader (non-locality) scope', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
 
       await expect(
         service.getLeaderboard('user-1', RankingScope.REGION, 1, 20),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it('rejects viewing a narrower locality tier than the viewer opted into', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(
+        optInRow({ scope: RankingScope.NATIONAL, localityCountry: 'Philippines' }),
+      );
+
+      await expect(
+        service.getLeaderboard('user-1', RankingScope.LOCAL, 1, 20),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('GLOBAL scope includes every GLOBAL-scoped opted-in user', async () => {
-      prisma.rankingOptIn.findUnique.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
-      });
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
       prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
 
       const result = await service.getLeaderboard('user-1', RankingScope.GLOBAL, 1, 20);
@@ -151,12 +258,56 @@ describe('RankingsService', () => {
       expect(result.data[0].rank).toBe(1);
     });
 
-    it('FRIENDS scope includes followed users who opted in, plus the viewer', async () => {
-      prisma.rankingOptIn.findUnique.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
+    it('REGION scope matches on country+region, case-insensitively', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(
+        optInRow({
+          scope: RankingScope.REGION,
+          localityCountry: 'Philippines',
+          localityRegion: 'Metro Manila',
+        }),
+      );
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
+
+      const result = await service.getLeaderboard('user-1', RankingScope.REGION, 1, 20);
+
+      expect(prisma.rankingOptIn.findMany).toHaveBeenCalledWith({
+        where: {
+          scope: RankingScope.REGION,
+          localityCountry: { equals: 'Philippines', mode: 'insensitive' },
+          localityRegion: { equals: 'Metro Manila', mode: 'insensitive' },
+        },
+        select: { userId: true },
       });
+      expect(result.data).toHaveLength(2);
+    });
+
+    it('a LOCAL opt-in can also view the broader CITY leaderboard for the same place', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(
+        optInRow({
+          scope: RankingScope.LOCAL,
+          localityCountry: 'Philippines',
+          localityRegion: 'Metro Manila',
+          localityCity: 'Quezon City',
+          localityArea: 'Diliman',
+        }),
+      );
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }]);
+
+      await service.getLeaderboard('user-1', RankingScope.CITY, 1, 20);
+
+      expect(prisma.rankingOptIn.findMany).toHaveBeenCalledWith({
+        where: {
+          scope: RankingScope.CITY,
+          localityCountry: { equals: 'Philippines', mode: 'insensitive' },
+          localityRegion: { equals: 'Metro Manila', mode: 'insensitive' },
+          localityCity: { equals: 'Quezon City', mode: 'insensitive' },
+        },
+        select: { userId: true },
+      });
+    });
+
+    it('FRIENDS scope includes followed users who opted in, plus the viewer', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
       prisma.communityFollow.findMany.mockResolvedValue([{ followingId: 'user-2' }]);
       prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
 
@@ -172,11 +323,7 @@ describe('RankingsService', () => {
     });
 
     it('paginates the already-sorted candidate list', async () => {
-      prisma.rankingOptIn.findUnique.mockResolvedValue({
-        userId: 'user-1',
-        scope: RankingScope.GLOBAL,
-        regionLabel: null,
-      });
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
       prisma.rankingOptIn.findMany.mockResolvedValue([
         { userId: 'user-1' },
         { userId: 'user-2' },

@@ -83,11 +83,19 @@ describe('Rankings seasons MVP (e2e)', () => {
       .expect(403);
   });
 
-  it('requires a regionLabel when opting in with REGION scope', async () => {
+  it('requires a locality chain when opting in with REGION scope', async () => {
     await request(app.getHttpServer())
       .put('/rankings/opt-in')
       .set(authA())
       .send({ scope: 'REGION' })
+      .expect(400);
+
+    // Country alone is not enough for REGION — the whole chain up to
+    // and including the requested tier is required.
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authA())
+      .send({ scope: 'REGION', localityCountry: 'Philippines' })
       .expect(400);
   });
 
@@ -142,12 +150,86 @@ describe('Rankings seasons MVP (e2e)', () => {
     expect(raw).not.toMatch(/lat|lng|latitude|longitude/i);
   });
 
-  it('rejects REGION requests from a viewer who did not opt in with a region', async () => {
+  it('rejects REGION requests from a viewer opted in at a broader (non-locality) scope', async () => {
     await request(app.getHttpServer())
       .get('/rankings/leaderboard')
       .query({ scope: 'REGION' })
       .set(authA())
       .expect(400);
+  });
+
+  it('opts A into LOCAL with the full locality chain, and /me reflects every tier', async () => {
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authA())
+      .send({
+        scope: 'LOCAL',
+        localityCountry: 'Philippines',
+        localityRegion: 'Metro Manila',
+        localityCity: 'Quezon City',
+        localityArea: 'Diliman',
+      })
+      .expect(200);
+
+    const status = await request(app.getHttpServer()).get('/rankings/me').set(authA()).expect(200);
+    expect(status.body.data.scope).toBe('LOCAL');
+    expect(status.body.data.localityCountry).toBe('Philippines');
+    expect(status.body.data.localityRegion).toBe('Metro Manila');
+    expect(status.body.data.localityCity).toBe('Quezon City');
+    expect(status.body.data.localityArea).toBe('Diliman');
+  });
+
+  it('a LOCAL opt-in can also view the broader CITY leaderboard, matching case-insensitively', async () => {
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authB())
+      .send({
+        scope: 'CITY',
+        localityCountry: 'philippines',
+        localityRegion: 'metro manila',
+        localityCity: 'quezon city',
+      })
+      .expect(200);
+
+    const leaderboard = await request(app.getHttpServer())
+      .get('/rankings/leaderboard')
+      .query({ scope: 'CITY' })
+      .set(authA())
+      .expect(200);
+
+    const userIds = leaderboard.body.data.data.map((e: { userId: string }) => e.userId);
+    expect(userIds).toContain(userIdB);
+    // A opted in at LOCAL, not CITY, so A's own row is not a CITY entry.
+    expect(userIds).not.toContain(userIdA);
+  });
+
+  it('rejects viewing a narrower locality tier than the viewer opted into', async () => {
+    // B is opted in at CITY; LOCAL is narrower than CITY.
+    await request(app.getHttpServer())
+      .get('/rankings/leaderboard')
+      .query({ scope: 'LOCAL' })
+      .set(authB())
+      .expect(400);
+  });
+
+  it('a REGION leaderboard for a different place never includes a user opted in elsewhere', async () => {
+    await request(app.getHttpServer())
+      .put('/rankings/opt-in')
+      .set(authA())
+      .send({ scope: 'REGION', localityCountry: 'Philippines', localityRegion: 'Cebu' })
+      .expect(200);
+
+    const leaderboard = await request(app.getHttpServer())
+      .get('/rankings/leaderboard')
+      .query({ scope: 'REGION' })
+      .set(authA())
+      .expect(200);
+
+    const userIds = leaderboard.body.data.data.map((e: { userId: string }) => e.userId);
+    expect(userIds).toContain(userIdA);
+    expect(userIds).not.toContain(userIdB);
+    const raw = JSON.stringify(leaderboard.body);
+    expect(raw).not.toMatch(/lat|lng|latitude|longitude/i);
   });
 
   it('the FRIENDS leaderboard only includes people the viewer follows who also opted in', async () => {
