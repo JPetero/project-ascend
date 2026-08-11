@@ -11,7 +11,9 @@ import '../../../../../core/vision/pose/data/ml_kit_pose_detector_adapter.dart';
 import '../../../../../core/vision/pose/data/pose_detector_adapter.dart';
 import '../../../../../core/vision/pose/domain/pose_confidence.dart';
 import '../../../../../core/vision/pose/domain/pose_frame.dart';
+import '../../domain/camera_lens_selection.dart';
 import '../../domain/form_observation.dart';
+import '../../domain/position_guidance.dart';
 import '../../domain/supported_exercise.dart';
 import '../providers/live_vision_session_controller.dart';
 import '../providers/vision_results_controller.dart';
@@ -51,6 +53,8 @@ class _VisionLiveSessionScreenState
   MediaPermissionStatus? _permissionStatus;
   String? _cameraErrorMessage;
   DateTime _sessionStartedAt = DateTime.now();
+  List<CameraDescription> _availableCameras = [];
+  CameraLensDirection _lensDirection = CameraLensDirection.back;
 
   // Throttled well below the camera's native frame rate — Part 28's "do
   // not process ML on every camera frame; throttle intelligently."
@@ -96,29 +100,18 @@ class _VisionLiveSessionScreenState
         );
         return;
       }
-      final camera = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
-      );
-      final controller = CameraController(
-        camera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await controller.initialize();
+      _availableCameras = cameras;
+      await _openCamera(CameraLensDirection.back);
 
       final detector = MlKitPoseDetectorAdapter();
       await detector.initialize();
-
-      await controller.startImageStream(_onCameraImage);
       if (!mounted) {
-        await controller.dispose();
         await detector.dispose();
+        await _teardownCameraController();
         return;
       }
 
       setState(() {
-        _cameraController = controller;
         _poseDetector = detector;
         _sessionStartedAt = DateTime.now();
       });
@@ -128,6 +121,53 @@ class _VisionLiveSessionScreenState
     } catch (error) {
       setState(
         () => _cameraErrorMessage = 'Could not start the camera: $error',
+      );
+    }
+  }
+
+  /// Opens a [CameraController] for the given lens direction, tearing
+  /// down any controller already open first — used both by
+  /// [_startSession] (always [CameraLensDirection.back] first) and
+  /// [_switchCamera] (S13 Part 13-15), which reuses this rather than
+  /// duplicating the initialize/startImageStream sequence. Deliberately
+  /// leaves the pose detector and session state untouched so switching
+  /// cameras mid-session never resets calibration, rep count, or cues.
+  Future<void> _openCamera(CameraLensDirection direction) async {
+    await _teardownCameraController();
+    final camera = selectCameraForLensDirection(_availableCameras, direction);
+    if (camera == null) {
+      throw StateError('No camera is available on this device.');
+    }
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+    await controller.initialize();
+    await controller.startImageStream(_onCameraImage);
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+    setState(() {
+      _cameraController = controller;
+      _lensDirection = direction;
+      // The old camera's frame belonged to a different image size/
+      // orientation — clear it so the skeleton overlay doesn't briefly
+      // flash in the wrong place against the new preview.
+      _latestFrame = null;
+      _latestImageSize = Size.zero;
+    });
+  }
+
+  Future<void> _switchCamera() async {
+    if (!hasBothLensDirections(_availableCameras)) return;
+    try {
+      await _openCamera(oppositeLensDirection(_lensDirection));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't switch cameras: $error")),
       );
     }
   }
@@ -162,19 +202,22 @@ class _VisionLiveSessionScreenState
     }
   }
 
-  Future<void> _teardownCamera() async {
+  Future<void> _teardownCameraController() async {
     final controller = _cameraController;
     _cameraController = null;
-    if (controller != null) {
-      try {
-        if (controller.value.isStreamingImages) {
-          await controller.stopImageStream();
-        }
-      } catch (_) {
-        // Already stopped/disposed — nothing to clean up.
+    if (controller == null) return;
+    try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
       }
-      await controller.dispose();
+    } catch (_) {
+      // Already stopped/disposed — nothing to clean up.
     }
+    await controller.dispose();
+  }
+
+  Future<void> _teardownCamera() async {
+    await _teardownCameraController();
     final detector = _poseDetector;
     _poseDetector = null;
     await detector?.dispose();
@@ -229,6 +272,8 @@ class _VisionLiveSessionScreenState
             latestFrame: _latestFrame,
             imageSize: _latestImageSize,
             progress: state.calibrationProgress,
+            canSwitchCamera: hasBothLensDirections(_availableCameras),
+            onSwitchCamera: _switchCamera,
           ),
           LiveVisionSessionStatus.running ||
           LiveVisionSessionStatus.paused => _LiveSessionBody(
@@ -236,6 +281,8 @@ class _VisionLiveSessionScreenState
             cameraController: _cameraController,
             latestFrame: _latestFrame,
             imageSize: _latestImageSize,
+            canSwitchCamera: hasBothLensDirections(_availableCameras),
+            onSwitchCamera: _switchCamera,
             onPause: () => ref
                 .read(
                   liveVisionSessionControllerProvider(widget.exercise).notifier,
@@ -375,16 +422,30 @@ class _CalibratingBody extends StatelessWidget {
     required this.latestFrame,
     required this.imageSize,
     required this.progress,
+    required this.canSwitchCamera,
+    required this.onSwitchCamera,
   });
 
   final CameraController? cameraController;
   final PoseFrame? latestFrame;
   final Size imageSize;
   final double progress;
+  final bool canSwitchCamera;
+  final VoidCallback onSwitchCamera;
 
   @override
   Widget build(BuildContext context) {
     final controller = cameraController;
+    // S13 Part 13-15's position guide: a specific directional hint when
+    // one applies, falling back to the original generic tip once the
+    // subject is reasonably well-framed.
+    final hint = computePositionGuidance(
+      frame: latestFrame,
+      imageSize: imageSize,
+    );
+    final guidanceText = hint == PositionGuidanceHint.none
+        ? 'Hold still with your full body visible.'
+        : positionGuidanceLabel(hint);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -399,6 +460,12 @@ class _CalibratingBody extends StatelessWidget {
               imageSize: imageSize,
             ),
           ),
+        if (canSwitchCamera)
+          Positioned(
+            top: AscendSpacing.sm,
+            right: AscendSpacing.sm,
+            child: _CameraSwitchButton(onPressed: onSwitchCamera),
+          ),
         Positioned(
           left: AscendSpacing.md,
           right: AscendSpacing.md,
@@ -412,10 +479,7 @@ class _CalibratingBody extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: AscendSpacing.xs),
-                const Text(
-                  'Hold still with your full body visible.',
-                  textAlign: TextAlign.center,
-                ),
+                Text(guidanceText, textAlign: TextAlign.center),
                 const SizedBox(height: AscendSpacing.sm),
                 LinearProgressIndicator(value: progress <= 0 ? null : progress),
               ],
@@ -427,12 +491,39 @@ class _CalibratingBody extends StatelessWidget {
   }
 }
 
+/// A small circular flip-camera control overlaid on the live camera
+/// preview (S13 Part 13-15) — reused by both the calibrating and
+/// running/paused bodies. Only ever shown when
+/// [hasBothLensDirections] is true for the device's cameras.
+class _CameraSwitchButton extends StatelessWidget {
+  const _CameraSwitchButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.black54,
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.cameraswitch_outlined, color: Colors.white),
+        tooltip: 'Switch camera',
+        onPressed: onPressed,
+      ),
+    );
+  }
+}
+
 class _LiveSessionBody extends StatelessWidget {
   const _LiveSessionBody({
     required this.state,
     required this.cameraController,
     required this.latestFrame,
     required this.imageSize,
+    required this.canSwitchCamera,
+    required this.onSwitchCamera,
     required this.onPause,
     required this.onResume,
     required this.onStop,
@@ -442,6 +533,8 @@ class _LiveSessionBody extends StatelessWidget {
   final CameraController? cameraController;
   final PoseFrame? latestFrame;
   final Size imageSize;
+  final bool canSwitchCamera;
+  final VoidCallback onSwitchCamera;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onStop;
@@ -470,7 +563,11 @@ class _LiveSessionBody extends StatelessWidget {
                 top: AscendSpacing.sm,
                 left: AscendSpacing.sm,
                 right: AscendSpacing.sm,
-                child: _StatusOverlay(state: state),
+                child: _StatusOverlay(
+                  state: state,
+                  canSwitchCamera: canSwitchCamera,
+                  onSwitchCamera: onSwitchCamera,
+                ),
               ),
               if (state.latestCue != null)
                 Positioned(
@@ -509,9 +606,15 @@ class _LiveSessionBody extends StatelessWidget {
 }
 
 class _StatusOverlay extends StatelessWidget {
-  const _StatusOverlay({required this.state});
+  const _StatusOverlay({
+    required this.state,
+    required this.canSwitchCamera,
+    required this.onSwitchCamera,
+  });
 
   final LiveVisionSessionState state;
+  final bool canSwitchCamera;
+  final VoidCallback onSwitchCamera;
 
   @override
   Widget build(BuildContext context) {
@@ -546,6 +649,18 @@ class _StatusOverlay extends StatelessWidget {
               '$minutes:$seconds',
               style: const TextStyle(color: Colors.white),
             ),
+            if (canSwitchCamera)
+              IconButton(
+                icon: const Icon(
+                  Icons.cameraswitch_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                tooltip: 'Switch camera',
+                onPressed: onSwitchCamera,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
           ],
         ),
       ),
@@ -654,6 +769,13 @@ class _SessionSummary extends StatelessWidget {
                   ),
                 ),
               ],
+              const SizedBox(height: AscendSpacing.xs),
+              Center(
+                child: Text(
+                  'Tracking quality: ${poseConfidenceLabel(poseConfidenceFromValue(state.sessionQualityScore))}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             ],
           ),
         ),
