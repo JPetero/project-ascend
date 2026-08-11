@@ -52,6 +52,14 @@ COPY --from=build /workspace/out/package.json ./package.json
 RUN chown -R ascend:ascend /app
 USER ascend
 EXPOSE 3000
+# S14 Part 6 — /readyz (checks the database), not /livez: a single
+# Docker container with no separate load-balancer-level readiness gate
+# genuinely wants Docker to consider it unhealthy (and restart it) if
+# the database becomes unreachable, matching this HEALTHCHECK's
+# pre-existing behavior when it pointed at /health. See
+# health.controller.ts for why /livez is a distinct, DB-independent
+# endpoint used elsewhere (e.g. a Kubernetes liveness probe, where
+# conflating the two causes restart storms during a database blip).
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
-  CMD node -e "require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+  CMD node -e "require('http').get('http://127.0.0.1:3000/readyz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 CMD ["node", "dist/main.js"]
