@@ -84,6 +84,21 @@ export function ReleaseReadinessPage() {
             </tbody>
           </table>
 
+          <h3>Database migrations</h3>
+          <p>
+            <StatusBadge ok={readiness.migrations.upToDate} />{' '}
+            {readiness.migrations.upToDate
+              ? 'Up to date'
+              : `${readiness.migrations.pending.length} pending`}
+          </p>
+          {readiness.migrations.pending.length > 0 && (
+            <ul>
+              {readiness.migrations.pending.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ul>
+          )}
+
           <h3>Feature flags</h3>
           <p>
             {readiness.featureFlags.enabled} of {readiness.featureFlags.total} enabled

@@ -18,6 +18,13 @@ together, [`packages/docs/security.md`](packages/docs/security.md) for current c
 known gaps, [`packages/docs/wearables.md`](packages/docs/wearables.md) for the device-integration
 strategy, and [`packages/docs/roadmap.md`](packages/docs/roadmap.md) for what's next.
 
+Preparing an actual release? See
+[`packages/docs/founder-setup-checklist.md`](packages/docs/founder-setup-checklist.md) for every
+external credential/account this app needs, [`packages/docs/staging-deployment.md`](packages/docs/staging-deployment.md)
+for how to stand up a staging environment, and
+[`packages/docs/beta-blockers.md`](packages/docs/beta-blockers.md) for the current, honest list of
+what's still blocking a real beta.
+
 > **Before implementing product behavior**, read the Project Ascend product documents in
 > [`packages/docs/product/`](packages/docs/product/) (start with `founder-vision-bible.md`). They
 > override unstated implementation assumptions but do not override security, law, platform policy,

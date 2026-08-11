@@ -27,6 +27,7 @@ const sampleReadiness = {
     appleIap: false,
     googleIap: true,
   },
+  migrations: { upToDate: false, pending: ['20260101000000_example'] },
   featureFlags: { total: 4, enabled: 2 },
 };
 
@@ -49,6 +50,22 @@ describe('ReleaseReadinessPage', () => {
     await waitFor(() => expect(screen.getByText('production')).toBeInTheDocument());
     expect(screen.getByText('2 of 4 enabled')).toBeInTheDocument();
     expect(screen.getByText('appleSignIn')).toBeInTheDocument();
+    expect(screen.getByText('1 pending')).toBeInTheDocument();
+    expect(screen.getByText('20260101000000_example')).toBeInTheDocument();
+  });
+
+  it('shows "Up to date" with no pending list when every migration is applied', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        data: { ...sampleReadiness, migrations: { upToDate: true, pending: [] } },
+        meta: {},
+        error: null,
+      }),
+    );
+
+    render(<ReleaseReadinessPage />);
+
+    await waitFor(() => expect(screen.getByText('Up to date')).toBeInTheDocument());
   });
 
   it('shows an error state on failure', async () => {
