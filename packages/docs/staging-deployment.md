@@ -69,6 +69,13 @@ same device — see `apps/mobile/android/app/build.gradle.kts`'s
 (`EnvironmentBanner`) is the at-a-glance confirmation a tester is running
 the right build; a `prod`-flavor build never shows any ribbon.
 
+## Admin app
+
+`apps/admin` isn't covered by the Backend/Mobile sections above — see
+[admin-deployment.md](admin-deployment.md) (S14 Part 28-29) for its own
+Docker image, security headers, and the network-level access
+restriction it needs beyond application-level RBAC.
+
 ## What staging is for (and isn't)
 
 Staging is for exercising the real backend/integration surface — auth,

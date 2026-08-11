@@ -34,5 +34,13 @@ jobs:
       - name: Tests
         run: pnpm admin:test
 
+      # S14 Part 28 — a production `vite build` now refuses to start
+      # without a real VITE_API_BASE_URL (see
+      # apps/admin/src/config/apiConfigValidation.ts), so CI needs one to
+      # prove the build pipeline itself works. This is a CI-only
+      # placeholder, not a real deployment target — see
+      # staging-deployment.md for what a real admin deploy needs.
       - name: Build
+        env:
+          VITE_API_BASE_URL: https://ci-placeholder.invalid
         run: pnpm admin:build
