@@ -7,6 +7,7 @@ class FakeSubscriptionsRepository implements SubscriptionsRepository {
   FakeSubscriptionsRepository({
     List<PricingPoint>? pricing,
     SubscriptionStatus? status,
+    this.shouldFail = false,
   }) : pricing =
            pricing ??
            const [
@@ -25,12 +26,19 @@ class FakeSubscriptionsRepository implements SubscriptionsRepository {
 
   final List<PricingPoint> pricing;
   SubscriptionStatus status;
+  bool shouldFail;
 
   @override
-  Future<List<PricingPoint>> getPricing() async => pricing;
+  Future<List<PricingPoint>> getPricing() async {
+    if (shouldFail) throw Exception('Network error');
+    return pricing;
+  }
 
   @override
-  Future<SubscriptionStatus> getMyStatus() async => status;
+  Future<SubscriptionStatus> getMyStatus() async {
+    if (shouldFail) throw Exception('Network error');
+    return status;
+  }
 
   @override
   Future<EligibilityStatus> applyForEligibility({

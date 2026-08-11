@@ -35,16 +35,51 @@ class SubscriptionScreen extends ConsumerWidget {
       }
     });
 
+    final failedToLoad = state.status == null && state.error != null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Membership')),
       body: SafeArea(
         child: state.isLoading
             ? const AscendLoadingIndicator()
+            : failedToLoad
+            ? AscendEmptyState(
+                icon: Icons.error_outline,
+                title: "Couldn't load your membership",
+                message: state.error!,
+                actionLabel: 'Try again',
+                onAction: controller.refresh,
+              )
             : RefreshIndicator(
                 onRefresh: controller.refresh,
                 child: ListView(
                   padding: const EdgeInsets.all(AscendSpacing.md),
                   children: [
+                    // A refresh failed but earlier data is still on
+                    // screen — show it alongside a way to retry rather
+                    // than silently discarding what's already loaded.
+                    if (state.error != null) ...[
+                      AscendCard(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            const SizedBox(width: AscendSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                state.error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AscendSpacing.md),
+                    ],
                     AscendCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,6 +126,9 @@ class SubscriptionScreen extends ConsumerWidget {
                           onBuy: (product) => ref
                               .read(purchaseControllerProvider.notifier)
                               .buy(product),
+                          onRestore: () => ref
+                              .read(purchaseControllerProvider.notifier)
+                              .restore(),
                         )
                       else
                         const Text(
@@ -162,11 +200,13 @@ class _UpgradeSection extends StatelessWidget {
     required this.purchaseState,
     required this.isEligible,
     required this.onBuy,
+    required this.onRestore,
   });
 
   final PurchaseState purchaseState;
   final bool isEligible;
   final void Function(StoreProduct product) onBuy;
+  final VoidCallback onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -195,9 +235,19 @@ class _UpgradeSection extends StatelessWidget {
         : purchaseState.products.first;
 
     if (product == null) {
-      return const Text(
-        'No Premium product is configured in the store yet.',
-        style: TextStyle(fontSize: 12),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'No Premium product is configured in the store yet.',
+            style: TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: AscendSpacing.sm),
+          _RestoreButton(
+            isRestoring: purchaseState.isRestoring,
+            onPressed: onRestore,
+          ),
+        ],
       );
     }
 
@@ -223,6 +273,11 @@ class _UpgradeSection extends StatelessWidget {
           isLoading: isPurchasing,
           onPressed: isPurchasing ? null : () => onBuy(product!),
         ),
+        const SizedBox(height: AscendSpacing.sm),
+        _RestoreButton(
+          isRestoring: purchaseState.isRestoring,
+          onPressed: onRestore,
+        ),
         if (purchaseState.error != null) ...[
           const SizedBox(height: AscendSpacing.sm),
           Text(
@@ -234,6 +289,26 @@ class _UpgradeSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Required by App Store guidelines whenever a paywall exists — replays
+/// purchases the signed-in Store account already owns, for a reinstall
+/// or new device where Premium was already bought (S13 Part 33-49). A
+/// secondary/ghost-styled action deliberately: this is a recovery path
+/// for existing owners, not the primary call to action above it.
+class _RestoreButton extends StatelessWidget {
+  const _RestoreButton({required this.isRestoring, required this.onPressed});
+
+  final bool isRestoring;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AscendGhostButton(
+      label: isRestoring ? 'Restoring…' : 'Restore Purchases',
+      onPressed: isRestoring ? null : onPressed,
     );
   }
 }

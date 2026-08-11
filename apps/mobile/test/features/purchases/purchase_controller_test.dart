@@ -167,6 +167,78 @@ void main() {
   );
 
   test(
+    'restore() delegates to the platform purchase service and reports it is in progress',
+    () async {
+      final service = FakePurchaseService(available: true);
+      final container = await createTestContainer(purchaseService: service);
+      addTearDown(container.dispose);
+      container.read(purchaseControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      final future = container
+          .read(purchaseControllerProvider.notifier)
+          .restore();
+
+      expect(container.read(purchaseControllerProvider).isRestoring, isTrue);
+      await future;
+
+      expect(service.restoreCallCount, 1);
+      expect(container.read(purchaseControllerProvider).isRestoring, isFalse);
+    },
+  );
+
+  test(
+    'restore() surfaces an error and clears isRestoring when the store call itself fails',
+    () async {
+      final service = FakePurchaseService(available: true)
+        ..restoreError = Exception('No store connection');
+      final container = await createTestContainer(purchaseService: service);
+      addTearDown(container.dispose);
+      container.read(purchaseControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      await container.read(purchaseControllerProvider.notifier).restore();
+
+      final state = container.read(purchaseControllerProvider);
+      expect(state.isRestoring, isFalse);
+      expect(state.error, contains('No store connection'));
+    },
+  );
+
+  test(
+    'a restored update verifies with the backend and unlocks Premium, same as a fresh purchase',
+    () async {
+      final service = FakePurchaseService(
+        available: true,
+        products: const [_product],
+      );
+      final repository = FakePurchasesRepository();
+      final container = await createTestContainer(
+        purchaseService: service,
+        purchasesRepository: repository,
+      );
+      addTearDown(container.dispose);
+      container.read(purchaseControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+
+      service.emit(
+        const PurchaseUpdate(
+          productId: PurchaseProductIds.premiumStandard,
+          status: PurchaseUpdateStatus.restored,
+          receiptData: 'receipt-blob',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.verifyCallCount, 1);
+      expect(
+        container.read(purchaseControllerProvider).justUnlockedPremium,
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'a failed backend verification surfaces an error instead of unlocking Premium',
     () async {
       final service = FakePurchaseService(

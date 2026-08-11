@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 import { requestLoggingMiddleware } from './common/middleware/request-logging.middleware';
+import { buildHelmetOptions } from './common/middleware/security-headers';
 import { AppConfig } from './config/configuration';
 
 async function bootstrap() {
@@ -16,7 +17,7 @@ async function bootstrap() {
   const appConfig = configService.get<AppConfig>('app')!;
 
   app.use(requestLoggingMiddleware);
-  app.use(helmet());
+  app.use(helmet(buildHelmetOptions()));
   // A wildcard CORS_ORIGIN reflects any request's Origin header back
   // (NestJS/cors' `origin: true`) rather than actually disabling CORS —
   // combined with credentials, that lets any site make credentialed

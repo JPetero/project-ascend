@@ -29,6 +29,7 @@ class PurchaseState {
     this.isLoadingProducts = true,
     this.products = const [],
     this.purchasingProductId,
+    this.isRestoring = false,
     this.error,
     this.justUnlockedPremium = false,
   });
@@ -37,6 +38,7 @@ class PurchaseState {
   final bool isLoadingProducts;
   final List<StoreProduct> products;
   final String? purchasingProductId;
+  final bool isRestoring;
   final String? error;
   final bool justUnlockedPremium;
 
@@ -46,6 +48,7 @@ class PurchaseState {
     List<StoreProduct>? products,
     String? purchasingProductId,
     bool clearPurchasingProductId = false,
+    bool? isRestoring,
     String? error,
     bool clearError = false,
     bool? justUnlockedPremium,
@@ -57,6 +60,7 @@ class PurchaseState {
       purchasingProductId: clearPurchasingProductId
           ? null
           : (purchasingProductId ?? this.purchasingProductId),
+      isRestoring: isRestoring ?? this.isRestoring,
       error: clearError ? null : (error ?? this.error),
       justUnlockedPremium: justUnlockedPremium ?? this.justUnlockedPremium,
     );
@@ -116,6 +120,25 @@ class PurchaseController extends StateNotifier<PurchaseState> {
         clearPurchasingProductId: true,
         error: error.toString(),
       );
+    }
+  }
+
+  /// Replays every purchase the signed-in Store account already owns —
+  /// the required "Restore Purchases" affordance for a reinstall or a
+  /// new device where Premium was already bought. This method only
+  /// triggers the platform replay and reports whether the *request*
+  /// itself failed (e.g. no store connection); a successfully replayed
+  /// purchase arrives via [PurchaseService.purchaseUpdates] and is
+  /// handled by [_handleUpdate] exactly like a fresh purchase, including
+  /// backend verification before Premium unlocks.
+  Future<void> restore() async {
+    state = state.copyWith(isRestoring: true, clearError: true);
+    try {
+      await _purchaseService.restorePurchases();
+    } catch (error) {
+      state = state.copyWith(error: error.toString());
+    } finally {
+      state = state.copyWith(isRestoring: false);
     }
   }
 
