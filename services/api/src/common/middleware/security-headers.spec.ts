@@ -1,7 +1,7 @@
 import { buildHelmetOptions } from './security-headers';
 
 describe('buildHelmetOptions', () => {
-  it('keeps every one of Helmet\'s own default CSP directives, none dropped', () => {
+  it("keeps every one of Helmet's own default CSP directives, none dropped", () => {
     const options = buildHelmetOptions();
     const directives = (options.contentSecurityPolicy as { directives: Record<string, unknown> })
       .directives;

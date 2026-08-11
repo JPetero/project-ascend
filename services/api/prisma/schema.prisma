@@ -3120,6 +3120,12 @@ enum NotificationType {
   // the booking without telling anyone who had RSVP'd or been counting
   // on it.
   GROUP_SESSION_CANCELED
+  // S13 Part 33-49 — RetentionService's win-back job (see its own doc
+  // comment). Routed through the same NotificationsService.notify()
+  // opt-out enforcement as every other type; falls into the
+  // socialNotifications catch-all preference since there is no
+  // dedicated retention preference column.
+  RE_ENGAGEMENT
 }
 
 model NotificationPreference {
