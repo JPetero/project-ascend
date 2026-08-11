@@ -35,6 +35,7 @@ class FakeNotificationsRepository implements NotificationsRepository {
              mealReminders: true,
              achievementNotifications: true,
              socialNotifications: true,
+             reEngagementReminders: false,
            ),
        events = events ?? [];
 
@@ -57,6 +58,7 @@ class FakeNotificationsRepository implements NotificationsRepository {
       mealReminders: patch['mealReminders'],
       achievementNotifications: patch['achievementNotifications'],
       socialNotifications: patch['socialNotifications'],
+      reEngagementReminders: patch['reEngagementReminders'],
     );
     return preferences;
   }

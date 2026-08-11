@@ -174,6 +174,13 @@ void main() {
         );
       },
     );
+
+    test('reEngagement has no deep link — same as a reminder (S14 Part 8)', () {
+      expect(
+        deepLinkPathFor(NotificationEventType.reEngagement, 'irrelevant'),
+        isNull,
+      );
+    });
   });
 
   group('notificationEventTypeFromJson fails closed', () {
@@ -219,5 +226,12 @@ void main() {
         );
       },
     );
+
+    test('RE_ENGAGEMENT parses to the real reEngagement type', () {
+      expect(
+        notificationEventTypeFromJson('RE_ENGAGEMENT'),
+        NotificationEventType.reEngagement,
+      );
+    });
   });
 }

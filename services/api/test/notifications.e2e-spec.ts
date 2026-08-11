@@ -67,13 +67,27 @@ describe('Notifications (e2e)', () => {
   const authA = () => authFor(tokenA);
   const authB = () => authFor(tokenB);
 
-  it('returns default preferences with everything enabled', async () => {
+  it('returns default preferences with everything enabled, except the opt-in re-engagement reminder', async () => {
     const res = await request(app.getHttpServer())
       .get('/notifications/preferences')
       .set(authA())
       .expect(200);
 
     expect(res.body.data.workoutReminders).toBe(true);
+    expect(res.body.data.socialNotifications).toBe(true);
+    // S14 Part 8 — the one preference here that defaults to false: a
+    // "come back to Ascend" nudge needs affirmative opt-in.
+    expect(res.body.data.reEngagementReminders).toBe(false);
+  });
+
+  it('can opt in to re-engagement reminders independently of every other preference', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/notifications/preferences')
+      .set(authA())
+      .send({ reEngagementReminders: true })
+      .expect(200);
+
+    expect(res.body.data.reEngagementReminders).toBe(true);
     expect(res.body.data.socialNotifications).toBe(true);
   });
 

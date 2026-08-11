@@ -25,10 +25,42 @@ const _profileWithSchedule = ProfileModel(
 );
 
 void main() {
-  testWidgets('shows the six categories, each defaulting to on', (
+  testWidgets(
+    'shows the six always-on-by-default categories plus the opt-in come-back reminder',
+    (tester) async {
+      final container = await createTestContainer(signedIn: true);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: NotificationPreferencesScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Workout reminders'), findsOneWidget);
+      expect(find.text('Social'), findsOneWidget);
+      expect(find.text('Come-back reminders'), findsOneWidget);
+      final switches = tester
+          .widgetList<SwitchListTile>(find.byType(SwitchListTile))
+          .toList();
+      expect(switches, hasLength(7));
+      // S14 Part 8 — every category defaults to on except the last one
+      // (come-back reminders), which is opt-in.
+      expect(switches.take(6).every((s) => s.value), isTrue);
+      expect(switches.last.value, isFalse);
+    },
+  );
+
+  testWidgets('opting in to come-back reminders updates the repository', (
     tester,
   ) async {
-    final container = await createTestContainer(signedIn: true);
+    final repository = FakeNotificationsRepository();
+    final container = await createTestContainer(
+      signedIn: true,
+      notificationsRepository: repository,
+    );
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
@@ -39,13 +71,22 @@ void main() {
     );
     await pumpForAsyncSettle(tester);
 
-    expect(find.text('Workout reminders'), findsOneWidget);
-    expect(find.text('Social'), findsOneWidget);
-    final switches = tester
-        .widgetList<SwitchListTile>(find.byType(SwitchListTile))
-        .toList();
-    expect(switches, hasLength(6));
-    expect(switches.every((s) => s.value), isTrue);
+    expect(repository.preferences.reEngagementReminders, isFalse);
+
+    final comeBackSwitch = find.widgetWithText(
+      SwitchListTile,
+      'Come-back reminders',
+    );
+    await tester.scrollUntilVisible(
+      comeBackSwitch,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpForAsyncSettle(tester);
+    await tester.tap(comeBackSwitch);
+    await pumpForAsyncSettle(tester);
+
+    expect(repository.preferences.reEngagementReminders, isTrue);
   });
 
   testWidgets('toggling a switch updates the repository', (tester) async {

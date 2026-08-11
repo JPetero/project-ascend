@@ -71,6 +71,10 @@ String? deepLinkPathFor(NotificationEventType type, String? data) {
       return data == null
           ? RoutePaths.trainerGroups
           : RoutePaths.trainerGroupScheduledSessionDetailPath(data);
+    case NotificationEventType.reEngagement:
+      // Same as the reminder types above — there's nowhere more
+      // specific to send the user than the app they just opened.
+      return null;
     case NotificationEventType.unknown:
       // Deliberately no navigation for a type this client build doesn't
       // recognize — see NotificationEventType.unknown's doc comment.

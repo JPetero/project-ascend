@@ -50,6 +50,8 @@ IconData _iconFor(NotificationEventType type) {
       return Icons.event_available_outlined;
     case NotificationEventType.groupSessionCanceled:
       return Icons.event_busy_outlined;
+    case NotificationEventType.reEngagement:
+      return Icons.waving_hand_outlined;
     case NotificationEventType.unknown:
       return Icons.notifications_outlined;
   }

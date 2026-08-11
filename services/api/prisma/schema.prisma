@@ -3122,9 +3122,12 @@ enum NotificationType {
   GROUP_SESSION_CANCELED
   // S13 Part 33-49 — RetentionService's win-back job (see its own doc
   // comment). Routed through the same NotificationsService.notify()
-  // opt-out enforcement as every other type; falls into the
-  // socialNotifications catch-all preference since there is no
-  // dedicated retention preference column.
+  // opt-out enforcement as every other type. S14 Part 8: gated by its
+  // own dedicated `reEngagementReminders` preference below, not the
+  // socialNotifications catch-all — a "come back to Ascend" nudge is a
+  // different kind of message than a friend request, and defaults to
+  // off (opt-in) rather than on, since it exists purely to bring back a
+  // user who already stopped opening the app.
   RE_ENGAGEMENT
 }
 
@@ -3137,6 +3140,14 @@ model NotificationPreference {
   mealReminders            Boolean  @default(true)
   achievementNotifications Boolean  @default(true)
   socialNotifications      Boolean  @default(true)
+  // S14 Part 8 — deliberately defaults to false, unlike every other
+  // category here. Ascend's non-manipulative philosophy (see
+  // RetentionService's doc comment) means a "come back" nudge needs
+  // affirmative opt-in, not an opt-out someone has to discover; every
+  // other preference here defaults on because it supports something
+  // the user already asked to do (log a workout, log water, hear about
+  // a friend request), not to draw an inactive user back in.
+  reEngagementReminders    Boolean  @default(false)
   updatedAt                DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
