@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './common/audit/audit.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
@@ -44,6 +45,7 @@ import { ProfilesModule } from './modules/profiles/profiles.module';
 import { PromoteModule } from './modules/promote/promote.module';
 import { PurchasesModule } from './modules/purchases/purchases.module';
 import { ResearchModule } from './modules/research/research.module';
+import { RetentionModule } from './modules/retention/retention.module';
 import { SavedMealsModule } from './modules/saved-meals/saved-meals.module';
 import { SportsModule } from './modules/sports/sports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
@@ -71,6 +73,7 @@ import { PrismaModule } from './prisma/prisma.module';
         limit: 100,
       },
     ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuditModule,
     IdempotencyModule,
@@ -123,6 +126,7 @@ import { PrismaModule } from './prisma/prisma.module';
     VisionModule,
     ResearchModule,
     FeatureFlagsModule,
+    RetentionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
