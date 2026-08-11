@@ -21,9 +21,14 @@ export const WIN_BACK_COOLDOWN_DAYS = 14;
  * null/inaccurate for every existing user until their next login.
  *
  * Every notification goes through `NotificationsService.notify`, never
- * a direct Prisma write, so the master notification switch and
- * per-category opt-out preferences are enforced exactly the same way
- * they are for every other notification type in the app.
+ * a direct Prisma write, so the master notification switch is enforced
+ * exactly the same way it is for every other notification type in the
+ * app. Unlike every other category, though, `RE_ENGAGEMENT` is gated by
+ * an opt-**in** preference (`NotificationPreference.reEngagementReminders`,
+ * default false) rather than an opt-out one — S14 Part 8 — so this job
+ * only ever reaches a user who affirmatively asked to hear "come back
+ * whenever you're ready." No guilt-based copy ("you're losing your
+ * streak," "we need you back") is used here or should ever be added.
  */
 @Injectable()
 export class RetentionService {
@@ -41,8 +46,8 @@ export class RetentionService {
       await this.notifications.notify(
         userId,
         NotificationType.RE_ENGAGEMENT,
-        'We miss you at Ascend',
-        "Your goals are still here whenever you're ready — come back and pick up where you left off.",
+        "Ascend is here whenever you're ready",
+        "Your workouts and progress are still available whenever you'd like to continue.",
       );
     }
     this.logger.log(`Retention win-back: notified ${candidateUserIds.length} inactive user(s).`);

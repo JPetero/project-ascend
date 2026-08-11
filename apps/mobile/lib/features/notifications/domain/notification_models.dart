@@ -10,6 +10,7 @@ class NotificationPreferences {
     required this.mealReminders,
     required this.achievementNotifications,
     required this.socialNotifications,
+    required this.reEngagementReminders,
   });
 
   final bool workoutReminders;
@@ -18,6 +19,12 @@ class NotificationPreferences {
   final bool mealReminders;
   final bool achievementNotifications;
   final bool socialNotifications;
+
+  /// S14 Part 8 — unlike every field above, this defaults to `false`
+  /// both here and on the server (`NotificationPreference.reEngagementReminders`):
+  /// a "come back to Ascend" nudge needs affirmative opt-in, not an
+  /// opt-out someone has to discover.
+  final bool reEngagementReminders;
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
     return NotificationPreferences(
@@ -28,6 +35,7 @@ class NotificationPreferences {
       achievementNotifications:
           json['achievementNotifications'] as bool? ?? true,
       socialNotifications: json['socialNotifications'] as bool? ?? true,
+      reEngagementReminders: json['reEngagementReminders'] as bool? ?? false,
     );
   }
 
@@ -38,6 +46,7 @@ class NotificationPreferences {
     bool? mealReminders,
     bool? achievementNotifications,
     bool? socialNotifications,
+    bool? reEngagementReminders,
   }) {
     return NotificationPreferences(
       workoutReminders: workoutReminders ?? this.workoutReminders,
@@ -47,6 +56,8 @@ class NotificationPreferences {
       achievementNotifications:
           achievementNotifications ?? this.achievementNotifications,
       socialNotifications: socialNotifications ?? this.socialNotifications,
+      reEngagementReminders:
+          reEngagementReminders ?? this.reEngagementReminders,
     );
   }
 }
@@ -77,6 +88,11 @@ enum NotificationEventType {
   // Build Session 13 Part 3 — the host canceled a booking members had
   // RSVP'd to or were counting on.
   groupSessionCanceled,
+  // S14 Part 8 — RetentionService's opt-in "come back whenever you're
+  // ready" win-back nudge. Gated server-side by its own dedicated
+  // reEngagementReminders preference (off by default), never the
+  // socialNotifications catch-all.
+  reEngagement,
 
   /// A server-sent type this build of the client doesn't recognize yet
   /// (Build Session 12 Part 1) — e.g. an older app version receiving a
@@ -145,6 +161,8 @@ NotificationEventType? tryParseNotificationEventType(String value) {
       return NotificationEventType.groupSessionScheduled;
     case 'GROUP_SESSION_CANCELED':
       return NotificationEventType.groupSessionCanceled;
+    case 'RE_ENGAGEMENT':
+      return NotificationEventType.reEngagement;
     default:
       return null;
   }

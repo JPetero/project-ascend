@@ -45,6 +45,7 @@ class NotificationPreferencesController
           mealReminders: patch['mealReminders'],
           achievementNotifications: patch['achievementNotifications'],
           socialNotifications: patch['socialNotifications'],
+          reEngagementReminders: patch['reEngagementReminders'],
         ),
       );
     }

@@ -193,6 +193,19 @@ class _NotificationPreferencesScreenState
                       onChanged: (value) =>
                           controller.update({'socialNotifications': value}),
                     ),
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Come-back reminders'),
+                      subtitle: const Text(
+                        "Off by default. If you turn this on, Ascend may "
+                        "occasionally let you know it's here after a while "
+                        "away — no streaks, no guilt, just a door left open.",
+                      ),
+                      value: preferences.reEngagementReminders,
+                      onChanged: (value) =>
+                          controller.update({'reEngagementReminders': value}),
+                    ),
                   ],
                 ),
               ),

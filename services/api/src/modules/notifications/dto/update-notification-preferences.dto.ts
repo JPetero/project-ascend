@@ -31,4 +31,9 @@ export class UpdateNotificationPreferencesDto {
   @IsOptional()
   @IsBoolean()
   socialNotifications?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  reEngagementReminders?: boolean;
 }

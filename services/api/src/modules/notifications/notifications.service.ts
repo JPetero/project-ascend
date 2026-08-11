@@ -142,6 +142,12 @@ export class NotificationsService {
         return preference.mealReminders;
       case NotificationType.ACHIEVEMENT_UNLOCKED:
         return preference.achievementNotifications;
+      // S14 Part 8 — its own opt-in preference, not the social
+      // catch-all below: see NotificationPreference.reEngagementReminders'
+      // doc comment for why a "come back" nudge needs affirmative
+      // consent rather than inheriting an always-on default.
+      case NotificationType.RE_ENGAGEMENT:
+        return preference.reEngagementReminders;
       // Support/moderation/promote/eligibility updates (Build Session 12
       // Part 2) share the same catch-all bucket every other non-reminder
       // category already uses (friend requests, DMs, group invites,

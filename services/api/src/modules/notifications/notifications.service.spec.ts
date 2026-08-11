@@ -63,6 +63,7 @@ describe('NotificationsService', () => {
       mealReminders: true,
       achievementNotifications: true,
       socialNotifications: true,
+      reEngagementReminders: true,
     });
   });
 
@@ -132,6 +133,41 @@ describe('NotificationsService', () => {
 
       expect(pushProvider.send).toHaveBeenCalled();
       expect(localProvider.schedule).not.toHaveBeenCalled();
+    });
+
+    it('creates no event for RE_ENGAGEMENT when reEngagementReminders is off (S14 Part 8 default)', async () => {
+      prisma.notificationPreference.findUnique.mockResolvedValue({
+        userId: 'user-1',
+        workoutReminders: true,
+        restDayReminders: true,
+        waterReminders: true,
+        mealReminders: true,
+        achievementNotifications: true,
+        socialNotifications: true,
+        reEngagementReminders: false,
+      });
+
+      await service.notify('user-1', NotificationType.RE_ENGAGEMENT, 'Title', 'Body');
+
+      expect(prisma.notificationEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('creates an event for RE_ENGAGEMENT once the user opts in, gated by its own preference not socialNotifications', async () => {
+      prisma.notificationEvent.create.mockResolvedValue({ id: 'event-1' });
+      prisma.notificationPreference.findUnique.mockResolvedValue({
+        userId: 'user-1',
+        workoutReminders: true,
+        restDayReminders: true,
+        waterReminders: true,
+        mealReminders: true,
+        achievementNotifications: true,
+        socialNotifications: false,
+        reEngagementReminders: true,
+      });
+
+      await service.notify('user-1', NotificationType.RE_ENGAGEMENT, 'Title', 'Body');
+
+      expect(prisma.notificationEvent.create).toHaveBeenCalled();
     });
   });
 
