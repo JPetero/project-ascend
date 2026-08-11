@@ -136,7 +136,13 @@ export default (): {
     smtpPassword: process.env.SMTP_PASSWORD,
     fromAddress: process.env.EMAIL_FROM_ADDRESS,
     fromName: process.env.EMAIL_FROM_NAME,
-    appPublicUrl: process.env.APP_PUBLIC_URL ?? 'https://app.projectascend.com',
+    // S14 Part 12 — no fabricated fallback domain: that used to let a
+    // production deploy silently ship password-reset/email-verification
+    // links pointing at a domain nobody owns. env.validation.ts's
+    // validateEnv hard-requires a real value here in production; local
+    // dev/test only ever see the console email provider, which is fine
+    // with an empty prefix.
+    appPublicUrl: process.env.APP_PUBLIC_URL ?? '',
   },
   socialAuth: {
     googleClientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
