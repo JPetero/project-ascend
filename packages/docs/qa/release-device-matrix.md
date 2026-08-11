@@ -115,7 +115,7 @@ list.
 |---|---|---|---|
 | 26 | Deep link from a push notification, a shared Ascend link, and an OS-level universal/app link all open the correct in-app screen | NOT_RUN | |
 | 27 | App update from the previous released version preserves login session and local data (no forced re-onboarding) | NOT_RUN | Requires a previously-released build to update from |
-| 28 | Release build (not debug) — obfuscation/signing configured, no debug banners or `flutter run` dev tooling visible | NOT_RUN | See `android/app/build.gradle.kts`'s release-signing TODO — confirm it's actually resolved before this row can pass |
+| 28 | Release build (not debug) — obfuscation/signing configured, no debug banners or `flutter run` dev tooling visible | NOT_RUN | S13 Part 16-27 wired a real `key.properties`-driven signing config into `android/app/build.gradle.kts` (see `android/key.properties.example`), but it still falls back to debug signing whenever `key.properties` is absent — as it is everywhere this app has been built so far, including CI. This row can't pass until a real upload keystore is generated and `key.properties` is populated (Founder setup checklist), and the resulting `prod`-flavor release build is confirmed signingConfig != debug. |
 
 ## Known gap: this session has never run any row in this matrix
 

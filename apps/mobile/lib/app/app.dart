@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/config/app_config.dart';
 import '../core/design_system/ascend_theme.dart';
 import '../core/routing/app_router.dart';
+import '../core/widgets/environment_banner.dart';
 import '../features/achievements/presentation/widgets/achievement_celebration_overlay.dart';
 import '../features/feature_flags/presentation/providers/feature_flags_provider.dart';
 import '../features/notifications/presentation/providers/push_registration_controller.dart';
@@ -58,8 +60,10 @@ class AscendApp extends ConsumerWidget {
         // own BuildContext is inside the GoRouter/Navigator — see
         // AchievementCelebrationOverlay's doc comment for why that's
         // required, and why AppShell wouldn't be a wide-enough mount point.
-        builder: (context, child) =>
-            AchievementCelebrationOverlay(child: child!),
+        builder: (context, child) => EnvironmentBanner(
+          environment: AppConfig.environment,
+          child: AchievementCelebrationOverlay(child: child!),
+        ),
       ),
     );
   }

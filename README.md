@@ -139,17 +139,29 @@ With the API running, launch an emulator/simulator or connect a device, then:
 
 ```bash
 cd apps/mobile
-flutter run
+flutter run --flavor dev --dart-define=ENVIRONMENT=dev
 ```
+
+`--flavor` is required on Android as of S13 Part 16-27, which added `dev`/`staging`/`prod` product
+flavors (see `apps/mobile/android/app/build.gradle.kts`) so all three can be installed side by
+side on one device without overwriting each other. `--dart-define=ENVIRONMENT=...` is the Dart-side
+counterpart — it drives the small "DEV"/"STAGING" corner banner (`AppConfig.environment`,
+`EnvironmentBanner`) so a tester can tell at a glance which build they're running; a production
+build shows no banner. Neither flag exists/matters on iOS, which has no flavors yet.
 
 By default the app targets `http://10.0.2.2:3000` (the Android emulator's alias for your
 machine's `localhost` — see the troubleshooting note below). To point at a different host, e.g.
 an iOS simulator or a physical device on your network:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:3000       # iOS simulator
-flutter run --dart-define=API_BASE_URL=http://192.168.1.23:3000    # physical device
+flutter run --flavor dev --dart-define=ENVIRONMENT=dev --dart-define=API_BASE_URL=http://localhost:3000       # iOS simulator
+flutter run --flavor dev --dart-define=ENVIRONMENT=dev --dart-define=API_BASE_URL=http://192.168.1.23:3000    # physical device
 ```
+
+`API_BASE_URL` has no built-in default for `staging`/`prod` — see `AppConfig`'s doc comment for
+why a real host is never guessed at. A staging/prod build must always pass its real API host
+explicitly, e.g. `flutter build apk --release --flavor staging --dart-define=ENVIRONMENT=staging
+--dart-define=API_BASE_URL=https://staging-api.example.com`.
 
 ## 9. Running tests
 
