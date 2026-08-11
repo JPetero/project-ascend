@@ -20,7 +20,7 @@ ready for a real beta candidate build; it is not there yet.
 
 | # | Blocker | Status | Why it blocks beta |
 |---|---|---|---|
-| 1 | No real Android upload keystore | IN PROGRESS | S13 Part 16-27 wired the signing mechanism (`android/key.properties`-driven), but every build today — including the CI artifact — still falls back to debug signing. A debug-signed build cannot be uploaded to the Play Store. |
+| 1 | No real Android upload keystore | IN PROGRESS | S13 Part 16-27 wired the signing mechanism (`android/key.properties`-driven); S14 Part 1 made the `prod` flavor hard-fail its release/bundle build rather than silently falling back to debug signing, so this gap can no longer produce a mislabeled "prod" artifact — but a real upload keystore still needs to be generated and provided (locally or via `ASCEND_KEYSTORE_BASE64`+friends in CI, see `founder-setup-checklist.md`) before any `prod` build succeeds at all. |
 | 2 | No Apple Developer Program membership | OPEN | Blocks iOS TestFlight/App Store distribution entirely, and blocks real APNs push delivery (`UIBackgroundModes: remote-notification` in `Info.plist` has nothing to receive from without it) — see `build-session-11.md`. |
 | 3 | No Firebase project configured | OPEN | `FCM_SERVICE_ACCOUNT_JSON`/`FCM_PROJECT_ID` unset — remote push notifications have never been exercised against a real device, only the local-notification/deep-link plumbing around them. |
 | 4 | No Google/Apple OAuth clients | OPEN | Social sign-in buttons render but fail honestly (`GoogleAuthProvider`/Apple equivalent throw "not configured" rather than pretending to work) — email/password is the only auth path that's been exercised end-to-end. |
@@ -42,7 +42,7 @@ ready for a real beta candidate build; it is not there yet.
 |---|---|---|---|
 | 11 | Full device/OS QA matrix never run | OPEN | Every row in `qa/release-device-matrix.md` is `NOT_RUN` — this sandbox has no Android SDK, no Xcode, no physical or virtual device. |
 | 12 | Vision camera pipeline never run on real hardware | OPEN | `qa/vision-physical-device-checklist.md` — pose detection, rep counting, and the new front/rear camera switching/position guidance (S13 Part 13-15) are unit- and widget-tested with synthetic frames only, never against a live camera feed. |
-| 13 | Android CI build artifact never exercised in a live GitHub Actions run | IN PROGRESS | The `.github/workflows/mobile.yml` `android-build` job (S13 Part 16-27) follows the standard, documented `flutter build apk` pattern, but this session has no way to trigger and observe an actual Actions run — first real push to `main`/a PR will be the first live signal. |
+| 13 | Android CI build artifact never exercised in a live GitHub Actions run | IN PROGRESS | S14 Part 3 redesigned `.github/workflows/mobile.yml` into three honestly-labeled jobs (`analyze-test`, `staging-or-dev-build`, guarded `production-build`) following standard, documented `flutter build`/Gradle patterns, but real execution status depends on whether this session could observe an actual run — see `build-session-14.md`'s CI section for the exact outcome, `VERIFIED` or `NOT_RUN`/`BLOCKED`. |
 
 ## Not a blocker (explicitly, so it isn't re-litigated)
 
