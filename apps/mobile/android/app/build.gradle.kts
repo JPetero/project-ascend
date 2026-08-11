@@ -82,7 +82,15 @@ android {
         applicationId = "com.projectascend.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // S14 Part 4 — overridden above Flutter's own default. Confirmed
+        // via a real GitHub Actions run: the `health` plugin (Health
+        // Connect/HealthKit integration) declares its own AndroidManifest
+        // minSdkVersion 26, and manifest merging hard-fails if the app's
+        // minSdk is lower. Health Connect itself requires Android 8.0
+        // (API 26) on the OS side, so this isn't a regression — the app
+        // was never actually installable below API 26 once Health
+        // Connect support was added, this just makes Gradle agree.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
