@@ -44,6 +44,14 @@ ready for a real beta candidate build; it is not there yet.
 | 12 | Vision camera pipeline never run on real hardware | OPEN | `qa/vision-physical-device-checklist.md` — pose detection, rep counting, and the new front/rear camera switching/position guidance (S13 Part 13-15) are unit- and widget-tested with synthetic frames only, never against a live camera feed. |
 | 13 | Android CI build artifact never exercised in a live GitHub Actions run | IN PROGRESS | S14 Part 3 redesigned `.github/workflows/mobile.yml` into three honestly-labeled jobs (`analyze-test`, `staging-or-dev-build`, guarded `production-build`) following standard, documented `flutter build`/Gradle patterns, but real execution status depends on whether this session could observe an actual run — see `build-session-14.md`'s CI section for the exact outcome, `VERIFIED` or `NOT_RUN`/`BLOCKED`. |
 
+## Beta feature profile
+
+`beta/beta-feature-profile.md` (S14 Part 34-35) defines exactly what
+should be ON/conditional/OFF for the first internal beta and documents
+the demo-data audit (conclusion: nothing to remove — `prisma/seed.ts` is
+already reference-data-only). Not itself a blocker; referenced here so
+it's discoverable alongside the rest of the beta-readiness docs.
+
 ## Not a blocker (explicitly, so it isn't re-litigated)
 
 - **Backend test coverage**: extensive (1000+ unit tests, 300+ e2e tests, all passing against a real Postgres instance) — this is the one layer that has been thoroughly, repeatedly verified in this sandbox.
