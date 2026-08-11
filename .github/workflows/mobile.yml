@@ -108,7 +108,16 @@ jobs:
   production-build:
     runs-on: ubuntu-latest
     needs: analyze-test
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.ASCEND_KEYSTORE_BASE64 != '' && secrets.ASCEND_KEYSTORE_PASSWORD != '' && secrets.ASCEND_KEY_ALIAS != '' && secrets.ASCEND_KEY_PASSWORD != '' && secrets.PROD_API_BASE_URL != '' }}
+    # Job-level `if:` cannot reference the `secrets` context (only
+    # `github`/`needs`/`vars`/`inputs` are valid there — `secrets` is
+    # only available in step-level `if:`/`env:` and job-level `env:`).
+    # Referencing secrets here made GitHub Actions reject the entire
+    # workflow file at parse time (every job, not just this one) —
+    # confirmed via a real failed run (mcp__github__actions_list showed
+    # zero jobs scheduled at all). The secret-presence check below is
+    # done via job `env:` (secrets ARE valid there) plus a step-level
+    # `if:` on every step that needs them instead.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     defaults:
       run:
         working-directory: apps/mobile
@@ -117,33 +126,41 @@ jobs:
       ASCEND_KEYSTORE_PASSWORD: ${{ secrets.ASCEND_KEYSTORE_PASSWORD }}
       ASCEND_KEY_ALIAS: ${{ secrets.ASCEND_KEY_ALIAS }}
       ASCEND_KEY_PASSWORD: ${{ secrets.ASCEND_KEY_PASSWORD }}
+      HAS_PRODUCTION_SECRETS: ${{ secrets.ASCEND_KEYSTORE_BASE64 != '' && secrets.ASCEND_KEYSTORE_PASSWORD != '' && secrets.ASCEND_KEY_ALIAS != '' && secrets.ASCEND_KEY_PASSWORD != '' && secrets.PROD_API_BASE_URL != '' }}
 
     steps:
       - uses: actions/checkout@v4
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
 
       - uses: subosito/flutter-action@v2
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         with:
           flutter-version: "3.44.8"
           channel: "stable"
 
       - uses: actions/setup-java@v4
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         with:
           distribution: "temurin"
           java-version: "17"
 
       - name: Install dependencies
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         run: flutter pub get
 
       - name: Decode upload keystore
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         run: echo "${{ secrets.ASCEND_KEYSTORE_BASE64 }}" | base64 -d > "$ASCEND_KEYSTORE_PATH"
 
       - name: Build signed production AAB (Play upload-ready)
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         run: >
           flutter build appbundle --release --flavor prod
           --dart-define=ENVIRONMENT=prod
           --dart-define=API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
 
       - name: Build signed production APK (manual QA)
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         run: >
           flutter build apk --release --flavor prod
           --dart-define=ENVIRONMENT=prod
@@ -154,12 +171,14 @@ jobs:
         run: rm -f "$ASCEND_KEYSTORE_PATH"
 
       - uses: actions/upload-artifact@v4
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         with:
           name: ascend-prod-signed-aab
           path: apps/mobile/build/app/outputs/bundle/prodRelease/app-prod-release.aab
           retention-days: 30
 
       - uses: actions/upload-artifact@v4
+        if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
         with:
           name: ascend-prod-signed-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-prod-release.apk
