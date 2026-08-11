@@ -263,6 +263,12 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  // S14 Part 9 — RetentionService.findWinBackCandidates groups by userId
+  // to find each user's most recent token; the plain [userId] index above
+  // still requires reading every row per user to compute that max. This
+  // composite index lets Postgres satisfy the grouping via an index scan
+  // instead of a full-table hash aggregate.
+  @@index([userId, createdAt])
   @@index([expiresAt])
   @@index([familyId])
   @@map("refresh_tokens")
@@ -3420,4 +3426,23 @@ model FeatureFlag {
   updatedAt         DateTime @updatedAt
 
   @@map("feature_flags")
+}
+
+// S14 Part 9 — a minimal lease-based lock so a `@Cron` job (currently
+// only RetentionService's win-back check) runs on just one instance
+// when the API is deployed with multiple replicas, instead of every
+// replica independently firing the same job on the same schedule. Not
+// a general-purpose job queue — one row per job name. Deliberately a
+// lease (claimed via `lockedUntil`), not a session-pinned Postgres
+// advisory lock: RetentionService.acquireLock/releaseLock work through
+// Prisma's normal (pooled) query interface, and if the instance
+// holding the lease crashes mid-run, the lease simply expires instead
+// of wedging every future run indefinitely.
+model ScheduledJobLock {
+  jobName     String   @id
+  lockedUntil DateTime
+  lockedBy    String
+  updatedAt   DateTime @updatedAt
+
+  @@map("scheduled_job_locks")
 }
