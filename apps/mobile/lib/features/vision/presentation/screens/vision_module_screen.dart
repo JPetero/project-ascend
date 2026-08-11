@@ -144,12 +144,22 @@ class VisionModuleScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(info.title),
         actions: [
-          if (hasLiveAnalysis)
+          if (hasLiveAnalysis) ...[
             IconButton(
               icon: const Icon(Icons.history_outlined),
               tooltip: 'Session history',
               onPressed: () => context.push(RoutePaths.visionResultsHistory),
             ),
+            // Vision release diagnostics (S14 Part 19) — a QA tool for
+            // filling out qa/vision-physical-device-checklist.md and bug
+            // reports, not a user-facing feature. Placed here since this
+            // is the screen offering live camera analysis.
+            IconButton(
+              icon: const Icon(Icons.bug_report_outlined),
+              tooltip: 'Diagnostics',
+              onPressed: () => context.push(RoutePaths.visionDiagnostics),
+            ),
+          ],
         ],
       ),
       body: SafeArea(

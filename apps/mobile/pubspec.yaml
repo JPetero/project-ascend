@@ -98,6 +98,14 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
 
+  # Vision release diagnostics screen (S14 Part 19) — app version/build
+  # number and device model/OS version, surfaced for QA testers filling
+  # out qa/vision-physical-device-checklist.md and for bug reports. Both
+  # were already present as transitive deps; promoted to direct here
+  # since core/diagnostics now imports them directly.
+  package_info_plus: ^9.0.1
+  device_info_plus: ^12.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

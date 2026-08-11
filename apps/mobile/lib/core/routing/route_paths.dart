@@ -111,6 +111,11 @@ abstract final class RoutePaths {
   static String visionLiveSessionPath(String exercise) =>
       '/vision/live/$exercise';
   static const visionResultsHistory = '/vision/history';
+  // Vision release diagnostics screen (S14 Part 19) — a QA tool, not a
+  // user-facing feature: device/build identity, camera hardware, and a
+  // real camera + on-device pose detector self-test, reachable from
+  // VisionModuleScreen's app bar for a mode with live analysis.
+  static const visionDiagnostics = '/vision/diagnostics';
 
   // Support — Founder Scenario 27, free on every tier, reachable from
   // the profile/dashboard screen.

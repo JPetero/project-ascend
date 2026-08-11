@@ -76,6 +76,7 @@ import '../../features/vision/pose_analysis/domain/supported_exercise.dart';
 import '../../features/vision/pose_analysis/presentation/screens/vision_live_session_screen.dart';
 import '../../features/vision/pose_analysis/presentation/screens/vision_results_history_screen.dart';
 import '../../features/vision/presentation/screens/progress_comparison_screen.dart';
+import '../../features/vision/diagnostics/presentation/screens/vision_diagnostics_screen.dart';
 import '../../features/vision/presentation/screens/vision_module_screen.dart';
 import '../../features/vision/presentation/screens/vision_screen.dart';
 import '../../features/wearables/presentation/screens/connected_health_screen.dart';
@@ -261,6 +262,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.visionResultsHistory,
         builder: (context, state) => const VisionResultsHistoryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.visionDiagnostics,
+        builder: (context, state) => const VisionDiagnosticsScreen(),
       ),
       GoRoute(
         path: RoutePaths.notificationsInbox,
