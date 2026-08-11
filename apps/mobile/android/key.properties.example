@@ -1,0 +1,16 @@
+# Copy this file to android/key.properties (that exact path — NOT
+# committed, see android/.gitignore) and fill in real values before
+# building a signed release. See https://flutter.dev/to/reference-keystore
+# for how to generate the upload keystore itself, e.g.:
+#
+#   keytool -genkey -v -keystore ~/upload-keystore.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Until this file exists at android/key.properties, release builds fall
+# back to debug signing (see app/build.gradle.kts) so
+# `flutter build apk --release` still works in development/CI without
+# real signing secrets.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=upload
+storeFile=/absolute/path/to/upload-keystore.jks
