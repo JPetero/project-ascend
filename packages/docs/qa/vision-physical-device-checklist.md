@@ -21,6 +21,16 @@ without having actually run the check:
 - `BLOCKED` — cannot be attempted right now (e.g. no device available,
   needs a signed build).
 
+## Before you start: the diagnostics screen
+
+S14 Part 19 added a Vision release diagnostics screen — tap the bug icon
+in the app bar of any Vision mode with live camera analysis (Form Coach/
+Rep Counter). It shows exactly the device/build identity to note against
+each row below, plus a one-tap self-test that opens the camera and runs
+one frame through the real on-device pose detector — run it first; a
+failure there explains most of the rows below failing too, rather than
+each needing separate diagnosis.
+
 ## Prerequisites
 
 - A physical Android device (API 26+, camera-equipped) or iOS device

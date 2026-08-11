@@ -31,9 +31,19 @@ class PoseFrame {
 /// analyzes a single subject, so this wraps "no person detected" as
 /// `frame == null` rather than an empty list the caller must re-check.
 class PoseDetectorResult {
-  const PoseDetectorResult({required this.frame});
+  const PoseDetectorResult({required this.frame, this.error});
 
   final PoseFrame? frame;
+
+  /// Set only when the underlying detector call itself failed (e.g. a
+  /// platform exception because the on-device model isn't available) —
+  /// distinct from `frame == null`, which is the normal "nobody in view"
+  /// case. Every existing caller ignores this field, so its addition (S14
+  /// Part 19, for the Vision release diagnostics self-test) changes no
+  /// existing rep-counting/cue behavior; only the diagnostics screen
+  /// reads it, since it's the one place that needs to tell a genuine
+  /// detector failure apart from an empty frame.
+  final String? error;
 
   bool get hasPose => frame != null;
 }

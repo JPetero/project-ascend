@@ -79,11 +79,15 @@ class MlKitPoseDetectorAdapter implements PoseDetectorAdapter {
       return PoseDetectorResult(
         frame: PoseFrame(timestamp: DateTime.now(), landmarks: landmarks),
       );
-    } catch (_) {
+    } catch (error) {
       // ML Kit can throw on a malformed/partial frame (e.g. during camera
-      // reconfiguration) — treat exactly like "no pose detected" rather
-      // than crashing the session.
-      return const PoseDetectorResult(frame: null);
+      // reconfiguration) — treat exactly like "no pose detected" for
+      // every rep-counting caller (LiveVisionSessionController never
+      // reads `error`), but still surface what happened for the Vision
+      // diagnostics self-test (S14 Part 19), which is the one caller
+      // that needs to tell "nobody in frame" apart from "the detector
+      // itself failed" (e.g. the on-device model isn't available).
+      return PoseDetectorResult(frame: null, error: error.toString());
     }
   }
 
