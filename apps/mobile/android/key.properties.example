@@ -6,10 +6,16 @@
 #   keytool -genkey -v -keystore ~/upload-keystore.jks \
 #     -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 #
-# Until this file exists at android/key.properties, release builds fall
-# back to debug signing (see app/build.gradle.kts) so
-# `flutter build apk --release` still works in development/CI without
-# real signing secrets.
+# dev/staging release builds fall back to debug signing without this
+# file (see app/build.gradle.kts), which is fine for local development
+# and internal test builds. The `prod` flavor is different: since S14
+# Part 1, `assembleProdRelease`/`bundleProdRelease` FAIL the build
+# outright when neither this file nor the ASCEND_KEYSTORE_PATH /
+# ASCEND_KEYSTORE_PASSWORD / ASCEND_KEY_ALIAS / ASCEND_KEY_PASSWORD
+# environment variables (the CI equivalent — see
+# .github/workflows/mobile.yml's production job, which never commits a
+# keystore file) are set — a prod release binary must never silently
+# ship signed with the well-known Flutter debug key.
 storePassword=REPLACE_ME
 keyPassword=REPLACE_ME
 keyAlias=upload

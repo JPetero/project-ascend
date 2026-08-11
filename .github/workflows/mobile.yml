@@ -38,17 +38,17 @@ jobs:
       - name: Test
         run: flutter test
 
-  android-build:
-    # S13 Part 16-27 — a real installable artifact from every push/PR
-    # touching the mobile app, not just analyze/test. Builds the "prod"
-    # flavor's release APK; with no key.properties in this repo (real
-    # signing secrets are never committed — see
-    # apps/mobile/android/key.properties.example), this signs with the
-    # debug keystore, same honest fallback
-    # apps/mobile/android/app/build.gradle.kts uses locally. That's fine
-    # for a CI-downloadable test build, but it is NOT a Play
-    # Store-ready artifact until a real key.properties is provisioned
-    # (see the Founder setup checklist).
+  # S14 Part 3 — replaces the old "ascend-prod-release-apk" job, which
+  # silently debug-signed a binary named like a production artifact and
+  # never passed a production API URL. Every push/PR now gets an
+  # honestly-labeled test build instead: the `staging` flavor pointed at
+  # STAGING_API_BASE_URL when that repo variable is configured, or the
+  # `dev` flavor's genuinely-safe emulator-only default when it isn't —
+  # never something that pretends to be production-ready. This build is
+  # test-signed on purpose (see build.gradle.kts's S14 Part 1 comment);
+  # only `production-build` below produces a real release-signed
+  # artifact, and only when guarded secrets are actually present.
+  staging-or-dev-build:
     runs-on: ubuntu-latest
     needs: analyze-test
     defaults:
@@ -71,13 +71,100 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build prod release APK
+      - name: Build staging APK
+        if: ${{ vars.STAGING_API_BASE_URL != '' }}
+        run: >
+          flutter build apk --release --flavor staging
+          --dart-define=ENVIRONMENT=staging
+          --dart-define=API_BASE_URL=${{ vars.STAGING_API_BASE_URL }}
+
+      - name: Upload staging/internal APK
+        if: ${{ vars.STAGING_API_BASE_URL != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascend-staging-internal
+          path: apps/mobile/build/app/outputs/flutter-apk/app-staging-release.apk
+          retention-days: 14
+
+      - name: Build development-sideload APK (no staging backend configured yet)
+        if: ${{ vars.STAGING_API_BASE_URL == '' }}
+        run: flutter build apk --release --flavor dev --dart-define=ENVIRONMENT=dev
+
+      - name: Upload development-sideload APK
+        if: ${{ vars.STAGING_API_BASE_URL == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascend-development-sideload
+          path: apps/mobile/build/app/outputs/flutter-apk/app-dev-release.apk
+          retention-days: 14
+
+  # Guarded — only runs on push to main, and only once real production
+  # signing + a real production API host are configured as repo
+  # secrets. Never fires for pull requests (forked PRs never get
+  # secrets, and production artifacts have no reason to build per-PR
+  # anyway). Produces a real release-signed AAB (Play upload-ready) and,
+  # for manual QA convenience, the equivalent signed APK — never
+  # auto-published anywhere.
+  production-build:
+    runs-on: ubuntu-latest
+    needs: analyze-test
+    if: >
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      secrets.ASCEND_KEYSTORE_BASE64 != '' && secrets.ASCEND_KEYSTORE_PASSWORD != '' &&
+      secrets.ASCEND_KEY_ALIAS != '' && secrets.ASCEND_KEY_PASSWORD != '' &&
+      secrets.PROD_API_BASE_URL != ''
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      ASCEND_KEYSTORE_PATH: ${{ github.workspace }}/ascend-upload-keystore.jks
+      ASCEND_KEYSTORE_PASSWORD: ${{ secrets.ASCEND_KEYSTORE_PASSWORD }}
+      ASCEND_KEY_ALIAS: ${{ secrets.ASCEND_KEY_ALIAS }}
+      ASCEND_KEY_PASSWORD: ${{ secrets.ASCEND_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+          channel: "stable"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Decode upload keystore
+        run: echo "${{ secrets.ASCEND_KEYSTORE_BASE64 }}" | base64 -d > "$ASCEND_KEYSTORE_PATH"
+
+      - name: Build signed production AAB (Play upload-ready)
+        run: >
+          flutter build appbundle --release --flavor prod
+          --dart-define=ENVIRONMENT=prod
+          --dart-define=API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
+
+      - name: Build signed production APK (manual QA)
         run: >
           flutter build apk --release --flavor prod
           --dart-define=ENVIRONMENT=prod
+          --dart-define=API_BASE_URL=${{ secrets.PROD_API_BASE_URL }}
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "$ASCEND_KEYSTORE_PATH"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ascend-prod-release-apk
+          name: ascend-prod-signed-aab
+          path: apps/mobile/build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ascend-prod-signed-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-prod-release.apk
-          retention-days: 14
+          retention-days: 30

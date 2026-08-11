@@ -53,10 +53,29 @@ values themselves.
 | 15 | Populate `android/key.properties` | Copy `apps/mobile/android/key.properties.example` to `apps/mobile/android/key.properties` (never committed — see `apps/mobile/android/.gitignore`) and fill in the real `storePassword`/`keyPassword`/`keyAlias`/`storeFile` |
 | 16 | Confirm the release build is actually signed with it, not the debug keystore | Build `flutter build apk --release --flavor prod`, then `keytool -printcert -jarfile build/app/outputs/flutter-apk/app-prod-release.apk` and confirm the certificate is your real upload key, not the Flutter debug keystore — see `qa/release-device-matrix.md` row 28 |
 
-Until step 15 is done, every release build (including the CI artifact
-from `.github/workflows/mobile.yml`) is signed with the debug keystore —
-installable for internal testing, but not something the Play Store will
-accept as an upload.
+Until step 15 is done, `flutter build apk --release --flavor prod` and
+`--flavor staging`/`--flavor dev` release builds all still work locally
+(signed with the debug keystore) — but as of S14 Part 1,
+`assembleProdRelease`/`bundleProdRelease` (the `prod` flavor specifically)
+now **fails the build outright** rather than silently shipping a
+debug-signed binary. Populate `android/key.properties` (local builds) or
+the CI secrets below before attempting a real `prod` build.
+
+## GitHub Actions secrets/variables (`.github/workflows/mobile.yml`, S14 Part 3)
+
+| # | What | Type | Where used |
+|---|---|---|---|
+| 17 | `STAGING_API_BASE_URL` | Repository **variable** (not secret — it's just a hostname, e.g. `https://staging-api.example.com`) | `staging-or-dev-build` job. Unset → CI builds a `dev`-flavor "development-sideload" APK instead (see `packages/docs/beta/android-sideload-beta.md`), never a fake staging URL. |
+| 18 | `ASCEND_KEYSTORE_BASE64` | Repository **secret** — `base64 -w0 upload-keystore.jks` (never commit the raw `.jks`) | `production-build` job, decoded to a temp file and fed to `ASCEND_KEYSTORE_PATH` |
+| 19 | `ASCEND_KEYSTORE_PASSWORD`, `ASCEND_KEY_ALIAS`, `ASCEND_KEY_PASSWORD` | Repository **secrets** | Same job — mirrors `android/key.properties`'s fields exactly |
+| 20 | `PROD_API_BASE_URL` | Repository **secret** (treated as sensitive alongside signing, even though the URL itself isn't secret, for one consistent "production" secret group) | `production-build` job's `--dart-define=API_BASE_URL=...` |
+
+`production-build` is a guarded job: it only runs on a push to `main`,
+and only when every one of secrets #18-20 above is set — until then it's
+simply skipped, not failed, so CI stays green while production remains
+unconfigured. Once all four exist, every push to `main` produces a real
+release-signed `ascend-prod-signed-aab`/`ascend-prod-signed-apk` — never
+auto-published to the Play Store.
 
 ## iOS (out of scope for this sandbox entirely)
 
