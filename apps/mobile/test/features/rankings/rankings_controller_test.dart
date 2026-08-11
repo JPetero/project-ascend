@@ -74,4 +74,41 @@ void main() {
       expect(controller.state.leaderboard, isEmpty);
     },
   );
+
+  test('defaults to the OVERALL category', () async {
+    final repository = FakeRankingsRepository(
+      status: const RankingMyStatus(optedIn: true, scope: RankingScope.global),
+    );
+    final controller = RankingsController(repository: repository);
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.selectedCategory, RankingCategory.overall);
+  });
+
+  test('selectCategory updates state and reloads the leaderboard', () async {
+    final repository = FakeRankingsRepository(
+      status: const RankingMyStatus(optedIn: true, scope: RankingScope.global),
+      leaderboards: {
+        RankingScope.global: [
+          const LeaderboardEntry(
+            rank: 1,
+            userId: 'user-1',
+            points: 4,
+            activeDays: 2,
+            isViewer: true,
+            strengthDays: 3,
+          ),
+        ],
+      },
+    );
+    final controller = RankingsController(repository: repository);
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(Duration.zero);
+
+    await controller.selectCategory(RankingCategory.strength);
+
+    expect(controller.state.selectedCategory, RankingCategory.strength);
+    expect(controller.state.leaderboard.single.strengthDays, 3);
+  });
 }

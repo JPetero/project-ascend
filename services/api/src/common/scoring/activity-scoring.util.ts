@@ -1,4 +1,4 @@
-import { WorkoutSessionStatus } from '@prisma/client';
+import { CardioSessionSource, WorkoutSessionStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export interface ActivitySummary {
@@ -15,10 +15,36 @@ export interface ActivitySummary {
    * large, can dominate the score.
    */
   points: number;
+  /**
+   * S13 Part 8 — the per-domain breakdown `points` blends away, kept
+   * alongside it so a leaderboard entry is never "an unexplained number
+   * that mixes unrelated metrics" (design-bible.md's Rankings
+   * requirement that ranking criteria be genuinely transparent, not a
+   * black box). Also what a category-filtered leaderboard sorts by:
+   * a single-domain view has no cross-domain bonus to apply, so its
+   * score is just that domain's active-day count.
+   */
+  strengthDays: number;
+  cardioDays: number;
+  nutritionDays: number;
+  /**
+   * Of `cardioDays`, how many had at least one session recorded via
+   * `CardioSessionSource.LIVE_GPS` or `WEARABLE` rather than typed in
+   * manually — the provenance half of Part 8. Extends the same
+   * distinction `CardioSession.source` already makes (see its own doc
+   * comment in schema.prisma) into Rankings instead of inventing a new
+   * verification concept; `WorkoutSession`/`MealEntry` have no
+   * analogous source field yet, so this signal exists for cardio only.
+   */
+  verifiedCardioDays: number;
 }
 
 function utcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function isVerifiedSource(source: CardioSessionSource): boolean {
+  return source !== CardioSessionSource.MANUAL;
 }
 
 /**
@@ -43,7 +69,7 @@ export async function computeActivitySummary(
     }),
     prisma.cardioSession.findMany({
       where: { userId, startedAt: { gte: from, lte: to } },
-      select: { startedAt: true },
+      select: { startedAt: true, source: true },
     }),
     prisma.mealEntry.findMany({
       where: { userId, date: { gte: from, lte: to } },
@@ -54,6 +80,9 @@ export async function computeActivitySummary(
   const workoutDays = new Set(workoutSessions.map((s) => utcDateKey(s.completedAt as Date)));
   const cardioDays = new Set(cardioSessions.map((s) => utcDateKey(s.startedAt)));
   const nutritionDays = new Set(mealEntries.map((m) => utcDateKey(m.date)));
+  const verifiedCardioDays = new Set(
+    cardioSessions.filter((s) => isVerifiedSource(s.source)).map((s) => utcDateKey(s.startedAt)),
+  );
 
   const allDays = new Set([...workoutDays, ...cardioDays, ...nutritionDays]);
 
@@ -64,7 +93,14 @@ export async function computeActivitySummary(
     points += domainsLogged >= 2 ? 2 : 1;
   }
 
-  return { activeDays: allDays.size, points };
+  return {
+    activeDays: allDays.size,
+    points,
+    strengthDays: workoutDays.size,
+    cardioDays: cardioDays.size,
+    nutritionDays: nutritionDays.size,
+    verifiedCardioDays: verifiedCardioDays.size,
+  };
 }
 
 /**
@@ -94,7 +130,7 @@ export async function computeActivitySummaries(
     }),
     prisma.cardioSession.findMany({
       where: { userId: { in: userIds }, startedAt: { gte: from, lte: to } },
-      select: { userId: true, startedAt: true },
+      select: { userId: true, startedAt: true, source: true },
     }),
     prisma.mealEntry.findMany({
       where: { userId: { in: userIds }, date: { gte: from, lte: to } },
@@ -105,12 +141,17 @@ export async function computeActivitySummaries(
   const workoutDaysByUser = groupDayKeysByUser(workoutSessions, (s) => s.completedAt as Date);
   const cardioDaysByUser = groupDayKeysByUser(cardioSessions, (s) => s.startedAt);
   const nutritionDaysByUser = groupDayKeysByUser(mealEntries, (m) => m.date);
+  const verifiedCardioDaysByUser = groupDayKeysByUser(
+    cardioSessions.filter((s) => isVerifiedSource(s.source)),
+    (s) => s.startedAt,
+  );
 
   const result = new Map<string, ActivitySummary>();
   for (const userId of userIds) {
     const workoutDays = workoutDaysByUser.get(userId) ?? new Set<string>();
     const cardioDays = cardioDaysByUser.get(userId) ?? new Set<string>();
     const nutritionDays = nutritionDaysByUser.get(userId) ?? new Set<string>();
+    const verifiedCardioDays = verifiedCardioDaysByUser.get(userId) ?? new Set<string>();
     const allDays = new Set([...workoutDays, ...cardioDays, ...nutritionDays]);
 
     let points = 0;
@@ -119,7 +160,14 @@ export async function computeActivitySummaries(
         Number(workoutDays.has(day)) + Number(cardioDays.has(day)) + Number(nutritionDays.has(day));
       points += domainsLogged >= 2 ? 2 : 1;
     }
-    result.set(userId, { activeDays: allDays.size, points });
+    result.set(userId, {
+      activeDays: allDays.size,
+      points,
+      strengthDays: workoutDays.size,
+      cardioDays: cardioDays.size,
+      nutritionDays: nutritionDays.size,
+      verifiedCardioDays: verifiedCardioDays.size,
+    });
   }
   return result;
 }

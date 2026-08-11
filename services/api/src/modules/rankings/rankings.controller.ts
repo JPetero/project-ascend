@@ -30,6 +30,12 @@ export class RankingsController {
 
   @Get('leaderboard')
   getLeaderboard(@CurrentUser() user: AuthenticatedUser, @Query() query: QueryLeaderboardDto) {
-    return this.rankingsService.getLeaderboard(user.id, query.scope, query.page, query.limit);
+    return this.rankingsService.getLeaderboard(
+      user.id,
+      query.scope,
+      query.page,
+      query.limit,
+      query.category,
+    );
   }
 }

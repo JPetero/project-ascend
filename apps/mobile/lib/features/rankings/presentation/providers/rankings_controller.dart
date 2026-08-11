@@ -12,6 +12,7 @@ class RankingsState {
   const RankingsState({
     this.status = const RankingMyStatus(optedIn: false),
     this.selectedScope = RankingScope.global,
+    this.selectedCategory = RankingCategory.overall,
     this.leaderboard = const [],
     this.isLoading = true,
     this.isLeaderboardLoading = false,
@@ -20,6 +21,7 @@ class RankingsState {
 
   final RankingMyStatus status;
   final RankingScope selectedScope;
+  final RankingCategory selectedCategory;
   final List<LeaderboardEntry> leaderboard;
   final bool isLoading;
   final bool isLeaderboardLoading;
@@ -28,6 +30,7 @@ class RankingsState {
   RankingsState copyWith({
     RankingMyStatus? status,
     RankingScope? selectedScope,
+    RankingCategory? selectedCategory,
     List<LeaderboardEntry>? leaderboard,
     bool? isLoading,
     bool? isLeaderboardLoading,
@@ -37,6 +40,7 @@ class RankingsState {
     return RankingsState(
       status: status ?? this.status,
       selectedScope: selectedScope ?? this.selectedScope,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
       leaderboard: leaderboard ?? this.leaderboard,
       isLoading: isLoading ?? this.isLoading,
       isLeaderboardLoading: isLeaderboardLoading ?? this.isLeaderboardLoading,
@@ -68,7 +72,7 @@ class RankingsController extends StateNotifier<RankingsState> {
         isLoading: false,
       );
       if (status.optedIn) {
-        await _loadLeaderboard(state.selectedScope);
+        await _loadLeaderboard(state.selectedScope, state.selectedCategory);
       }
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
@@ -77,13 +81,24 @@ class RankingsController extends StateNotifier<RankingsState> {
 
   Future<void> selectScope(RankingScope scope) async {
     state = state.copyWith(selectedScope: scope);
-    await _loadLeaderboard(scope);
+    await _loadLeaderboard(scope, state.selectedCategory);
   }
 
-  Future<void> _loadLeaderboard(RankingScope scope) async {
+  Future<void> selectCategory(RankingCategory category) async {
+    state = state.copyWith(selectedCategory: category);
+    await _loadLeaderboard(state.selectedScope, category);
+  }
+
+  Future<void> _loadLeaderboard(
+    RankingScope scope,
+    RankingCategory category,
+  ) async {
     state = state.copyWith(isLeaderboardLoading: true, clearError: true);
     try {
-      final page = await _repository.getLeaderboard(scope: scope);
+      final page = await _repository.getLeaderboard(
+        scope: scope,
+        category: category,
+      );
       state = state.copyWith(
         leaderboard: page.entries,
         isLeaderboardLoading: false,

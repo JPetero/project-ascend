@@ -172,6 +172,98 @@ void main() {
   );
 
   testWidgets(
+    'shows the per-domain provenance breakdown so a score is never a black box',
+    (tester) async {
+      final repository = FakeRankingsRepository(
+        status: const RankingMyStatus(
+          optedIn: true,
+          scope: RankingScope.global,
+        ),
+        leaderboards: {
+          RankingScope.global: [
+            const LeaderboardEntry(
+              rank: 1,
+              userId: 'user-1',
+              displayName: 'Ada',
+              points: 6,
+              activeDays: 3,
+              isViewer: true,
+              strengthDays: 2,
+              cardioDays: 1,
+              nutritionDays: 3,
+              verifiedCardioDays: 1,
+            ),
+          ],
+        },
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        rankingsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: RankingsScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.textContaining('2 strength days'), findsOneWidget);
+      expect(find.textContaining('1 cardio day'), findsOneWidget);
+      expect(find.textContaining('1 verified'), findsOneWidget);
+      expect(find.textContaining('3 meal days'), findsOneWidget);
+    },
+  );
+
+  testWidgets('offers a category selector that ranks by a single domain', (
+    tester,
+  ) async {
+    final repository = FakeRankingsRepository(
+      status: const RankingMyStatus(optedIn: true, scope: RankingScope.global),
+      leaderboards: {
+        RankingScope.global: [
+          const LeaderboardEntry(
+            rank: 1,
+            userId: 'user-1',
+            displayName: 'Ada',
+            points: 4,
+            activeDays: 2,
+            isViewer: true,
+          ),
+        ],
+      },
+    );
+    final container = await createTestContainer(
+      signedIn: true,
+      rankingsRepository: repository,
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: RankingsScreen()),
+      ),
+    );
+    await pumpForAsyncSettle(tester);
+
+    expect(find.widgetWithText(ChoiceChip, 'Overall'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Strength'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Cardio'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Nutrition'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Cardio'));
+    await pumpForAsyncSettle(tester);
+
+    final cardioChip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, 'Cardio'),
+    );
+    expect(cardioChip.selected, isTrue);
+  });
+
+  testWidgets(
     'a NATIONAL opt-in cannot select the narrower CITY leaderboard chip',
     (tester) async {
       final repository = FakeRankingsRepository(

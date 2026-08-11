@@ -37,6 +37,29 @@ int localityTierIndex(RankingScope scope) => localityTierOrder.indexOf(scope);
 
 bool isLocalityScope(RankingScope scope) => localityTierIndex(scope) >= 0;
 
+/// S13 Part 8 — which single domain a leaderboard is scored by, mirroring
+/// services/api/src/common/scoring/ranking-category.ts exactly. OVERALL
+/// keeps the pre-existing blended score; the other three isolate one of
+/// the domains a [LeaderboardEntry]'s provenance breakdown already
+/// reports for every entry, regardless of which category is selected.
+enum RankingCategory { overall, strength, cardio, nutrition }
+
+String rankingCategoryToJson(RankingCategory category) =>
+    category.name.toUpperCase();
+
+RankingCategory rankingCategoryFromJson(String value) =>
+    RankingCategory.values.firstWhere(
+      (c) => c.name.toUpperCase() == value,
+      orElse: () => RankingCategory.overall,
+    );
+
+String rankingCategoryLabel(RankingCategory category) => switch (category) {
+  RankingCategory.overall => 'Overall',
+  RankingCategory.strength => 'Strength',
+  RankingCategory.cardio => 'Cardio',
+  RankingCategory.nutrition => 'Nutrition',
+};
+
 class RankingSeason {
   const RankingSeason({
     required this.id,
@@ -77,6 +100,10 @@ class RankingMyStatus {
     this.season,
     this.points,
     this.activeDays,
+    this.strengthDays,
+    this.cardioDays,
+    this.nutritionDays,
+    this.verifiedCardioDays,
   });
 
   final bool optedIn;
@@ -88,6 +115,10 @@ class RankingMyStatus {
   final RankingSeason? season;
   final int? points;
   final int? activeDays;
+  final int? strengthDays;
+  final int? cardioDays;
+  final int? nutritionDays;
+  final int? verifiedCardioDays;
 
   factory RankingMyStatus.fromJson(Map<String, dynamic> json) {
     if (json['optedIn'] != true) {
@@ -103,6 +134,10 @@ class RankingMyStatus {
       season: RankingSeason.fromJson(json['season'] as Map<String, dynamic>),
       points: json['points'] as int,
       activeDays: json['activeDays'] as int,
+      strengthDays: json['strengthDays'] as int?,
+      cardioDays: json['cardioDays'] as int?,
+      nutritionDays: json['nutritionDays'] as int?,
+      verifiedCardioDays: json['verifiedCardioDays'] as int?,
     );
   }
 }
@@ -116,6 +151,10 @@ class LeaderboardEntry {
     required this.points,
     required this.activeDays,
     required this.isViewer,
+    this.strengthDays = 0,
+    this.cardioDays = 0,
+    this.nutritionDays = 0,
+    this.verifiedCardioDays = 0,
   });
 
   final int rank;
@@ -125,6 +164,15 @@ class LeaderboardEntry {
   final int points;
   final int activeDays;
   final bool isViewer;
+  // Provenance breakdown (S13 Part 8) — always present regardless of
+  // which category the leaderboard is currently sorted by, so a
+  // ranking is never a black-box number. verifiedCardioDays is the
+  // subset of cardioDays recorded via LIVE_GPS/WEARABLE rather than
+  // typed in manually.
+  final int strengthDays;
+  final int cardioDays;
+  final int nutritionDays;
+  final int verifiedCardioDays;
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
     return LeaderboardEntry(
@@ -135,15 +183,24 @@ class LeaderboardEntry {
       points: json['points'] as int,
       activeDays: json['activeDays'] as int,
       isViewer: json['isViewer'] as bool,
+      strengthDays: json['strengthDays'] as int? ?? 0,
+      cardioDays: json['cardioDays'] as int? ?? 0,
+      nutritionDays: json['nutritionDays'] as int? ?? 0,
+      verifiedCardioDays: json['verifiedCardioDays'] as int? ?? 0,
     );
   }
 }
 
 class LeaderboardPage {
-  const LeaderboardPage({required this.entries, required this.total});
+  const LeaderboardPage({
+    required this.entries,
+    required this.total,
+    required this.category,
+  });
 
   final List<LeaderboardEntry> entries;
   final int total;
+  final RankingCategory category;
 
   factory LeaderboardPage.fromJson(Map<String, dynamic> json) {
     final items = json['data'] as List<dynamic>;
@@ -153,6 +210,9 @@ class LeaderboardPage {
           .map((e) => LeaderboardEntry.fromJson(e as Map<String, dynamic>))
           .toList(),
       total: meta['total'] as int,
+      category: meta['category'] != null
+          ? rankingCategoryFromJson(meta['category'] as String)
+          : RankingCategory.overall,
     );
   }
 }

@@ -2,15 +2,29 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { RankingScope } from '@prisma/client';
 import {
+  ActivitySummary,
   computeActivitySummaries,
   computeActivitySummary,
 } from '../../common/scoring/activity-scoring.util';
+import { RankingCategory } from '../../common/scoring/ranking-category';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RankingsService } from './rankings.service';
 
 jest.mock('../../common/scoring/activity-scoring.util');
 const mockedComputeActivitySummary = computeActivitySummary as jest.Mock;
 const mockedComputeActivitySummaries = computeActivitySummaries as jest.Mock;
+
+function summary(overrides: Partial<ActivitySummary> = {}): ActivitySummary {
+  return {
+    activeDays: 3,
+    points: 4,
+    strengthDays: 0,
+    cardioDays: 0,
+    nutritionDays: 0,
+    verifiedCardioDays: 0,
+    ...overrides,
+  };
+}
 
 function season(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -50,11 +64,10 @@ describe('RankingsService', () => {
 
   beforeEach(async () => {
     mockedComputeActivitySummary.mockReset();
-    mockedComputeActivitySummary.mockResolvedValue({ activeDays: 3, points: 4 });
+    mockedComputeActivitySummary.mockResolvedValue(summary());
     mockedComputeActivitySummaries.mockReset();
     mockedComputeActivitySummaries.mockImplementation(
-      async (_prisma: unknown, userIds: string[]) =>
-        new Map(userIds.map((id) => [id, { activeDays: 3, points: 4 }])),
+      async (_prisma: unknown, userIds: string[]) => new Map(userIds.map((id) => [id, summary()])),
     );
 
     prisma = {
@@ -193,6 +206,22 @@ describe('RankingsService', () => {
       const status = await service.getMyStatus('user-1');
 
       expect(status).toMatchObject({ optedIn: true, points: 4, activeDays: 3 });
+    });
+
+    it('includes the per-domain provenance breakdown alongside the blended score', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow());
+      mockedComputeActivitySummary.mockResolvedValue(
+        summary({ strengthDays: 2, cardioDays: 1, nutritionDays: 3, verifiedCardioDays: 1 }),
+      );
+
+      const status = await service.getMyStatus('user-1');
+
+      expect(status).toMatchObject({
+        strengthDays: 2,
+        cardioDays: 1,
+        nutritionDays: 3,
+        verifiedCardioDays: 1,
+      });
     });
 
     it('includes the full locality chain when opted in at the CITY tier', async () => {
@@ -335,6 +364,74 @@ describe('RankingsService', () => {
       expect(result.data).toHaveLength(1);
       expect(result.data[0].rank).toBe(2);
       expect(result.meta.total).toBe(3);
+    });
+
+    it('defaults to OVERALL and sorts by the existing blended points, unchanged', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
+      mockedComputeActivitySummaries.mockResolvedValue(
+        new Map([
+          ['user-1', summary({ points: 2, strengthDays: 5 })],
+          ['user-2', summary({ points: 6, strengthDays: 0 })],
+        ]),
+      );
+
+      const result = await service.getLeaderboard('user-1', RankingScope.GLOBAL, 1, 20);
+
+      expect(result.meta.category).toBe('OVERALL');
+      expect(result.data.map((d) => d.userId)).toEqual(['user-2', 'user-1']);
+    });
+
+    it('a STRENGTH category request ranks by strengthDays instead of blended points', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
+      mockedComputeActivitySummaries.mockResolvedValue(
+        new Map([
+          // user-1 leads on blended points but trails on strengthDays —
+          // a STRENGTH-category leaderboard must reorder around that.
+          ['user-1', summary({ points: 6, strengthDays: 1 })],
+          ['user-2', summary({ points: 2, strengthDays: 5 })],
+        ]),
+      );
+
+      const result = await service.getLeaderboard(
+        'user-1',
+        RankingScope.GLOBAL,
+        1,
+        20,
+        RankingCategory.STRENGTH,
+      );
+
+      expect(result.meta.category).toBe('STRENGTH');
+      expect(result.data.map((d) => d.userId)).toEqual(['user-2', 'user-1']);
+    });
+
+    it('every entry always carries the full provenance breakdown, regardless of category', async () => {
+      prisma.rankingOptIn.findUnique.mockResolvedValue(optInRow({ scope: RankingScope.GLOBAL }));
+      prisma.rankingOptIn.findMany.mockResolvedValue([{ userId: 'user-1' }]);
+      mockedComputeActivitySummaries.mockResolvedValue(
+        new Map([
+          [
+            'user-1',
+            summary({ strengthDays: 2, cardioDays: 3, nutritionDays: 1, verifiedCardioDays: 2 }),
+          ],
+        ]),
+      );
+
+      const result = await service.getLeaderboard(
+        'user-1',
+        RankingScope.GLOBAL,
+        1,
+        20,
+        RankingCategory.CARDIO,
+      );
+
+      expect(result.data[0]).toMatchObject({
+        strengthDays: 2,
+        cardioDays: 3,
+        nutritionDays: 1,
+        verifiedCardioDays: 2,
+      });
     });
   });
 });
