@@ -27,60 +27,101 @@ class SupportScreen extends ConsumerWidget {
         child: const Icon(Icons.add),
       ),
       body: SafeArea(
-        child: state.isLoading
-            ? const AscendLoadingIndicator()
-            : RefreshIndicator(
-                onRefresh: controller.refresh,
-                child: state.tickets.isEmpty
-                    ? ListView(
-                        children: const [
-                          AscendEmptyState(
-                            icon: Icons.support_agent_outlined,
-                            title: 'No support tickets yet',
-                            message:
-                                'Need help, want to report a bug or safety concern, or have a '
-                                'billing question? Start a ticket — it is always free.',
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AscendSpacing.md,
+                AscendSpacing.md,
+                AscendSpacing.md,
+                0,
+              ),
+              child: AscendCard(
+                onTap: () => context.push(RoutePaths.helpCenter),
+                child: Row(
+                  children: [
+                    const Icon(Icons.help_outline),
+                    const SizedBox(width: AscendSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Help Center',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          Text(
+                            'Browse answers before filing a ticket',
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.all(AscendSpacing.md),
-                        children: [
-                          for (final ticket in state.tickets)
-                            AscendCard(
-                              onTap: () => context.push(
-                                RoutePaths.supportTicketDetailPath(ticket.id),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: state.isLoading
+                  ? const AscendLoadingIndicator()
+                  : RefreshIndicator(
+                      onRefresh: controller.refresh,
+                      child: state.tickets.isEmpty
+                          ? ListView(
+                              children: const [
+                                AscendEmptyState(
+                                  icon: Icons.support_agent_outlined,
+                                  title: 'No support tickets yet',
+                                  message:
+                                      'Need help, want to report a bug or safety concern, or have a '
+                                      'billing question? Start a ticket — it is always free.',
+                                ),
+                              ],
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.all(AscendSpacing.md),
+                              children: [
+                                for (final ticket in state.tickets)
+                                  AscendCard(
+                                    onTap: () => context.push(
+                                      RoutePaths.supportTicketDetailPath(
+                                        ticket.id,
+                                      ),
+                                    ),
+                                    child: Row(
                                       children: [
-                                        Text(
-                                          ticket.subject,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleSmall,
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                ticket.subject,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.titleSmall,
+                                              ),
+                                              Text(
+                                                '${supportCategoryLabel(ticket.category)} · '
+                                                '${supportTicketStatusLabel(ticket.status)}',
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall,
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        Text(
-                                          '${supportCategoryLabel(ticket.category)} · '
-                                          '${supportTicketStatusLabel(ticket.status)}',
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
-                                        ),
+                                        const Icon(Icons.chevron_right),
                                       ],
                                     ),
                                   ),
-                                  const Icon(Icons.chevron_right),
-                                ],
-                              ),
+                              ],
                             ),
-                        ],
-                      ),
-              ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -68,6 +68,7 @@ import '../../features/promote/presentation/screens/create_campaign_screen.dart'
 import '../../features/promote/presentation/screens/promote_screen.dart';
 import '../../features/subscriptions/presentation/screens/subscription_screen.dart';
 import '../../features/support/presentation/screens/create_ticket_screen.dart';
+import '../../features/support/presentation/screens/help_center_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/support/presentation/screens/support_ticket_detail_screen.dart';
 import '../../features/vision/domain/vision_module.dart';
@@ -225,6 +226,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.supportTicketCreate,
         builder: (context, state) => const CreateTicketScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.helpCenter,
+        builder: (context, state) => const HelpCenterScreen(),
       ),
       GoRoute(
         path: RoutePaths.supportTicketDetail,

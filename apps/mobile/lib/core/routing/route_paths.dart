@@ -118,6 +118,9 @@ abstract final class RoutePaths {
   static const supportTicketCreate = '/support/new';
   static const supportTicketDetail = '/support/:id';
   static String supportTicketDetailPath(String id) => '/support/$id';
+  // Static self-serve FAQ content (S13 Part 33-49) — reachable from
+  // SupportScreen, ahead of filing a ticket.
+  static const helpCenter = '/support/help';
 
   // Ascend Promote — Founder Scenario 23, reachable from the Community
   // tab. Creating a campaign requires Premium
