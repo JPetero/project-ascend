@@ -57,6 +57,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // S14 Part 4 — required for the per-flavor resValue("string",
+    // "app_name", ...) calls below. Confirmed via a real GitHub Actions
+    // run (not guessed): without this, AGP fails configuration with
+    // "Product Flavor dev contains custom resource values, but the
+    // feature is disabled" — resValues defaults to off in current AGP
+    // versions. This is why the CI Android build job has never actually
+    // succeeded since flavors were introduced, undetected until this
+    // session could observe a real run (no Android SDK exists in the
+    // sandbox that wrote the original flavor config).
+    buildFeatures {
+        resValues = true
+    }
+
     defaultConfig {
         applicationId = "com.projectascend.mobile"
         // You can update the following values to match your application needs.
