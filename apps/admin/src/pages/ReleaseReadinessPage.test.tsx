@@ -29,6 +29,29 @@ const sampleReadiness = {
   },
   migrations: { upToDate: false, pending: ['20260101000000_example'] },
   featureFlags: { total: 4, enabled: 2 },
+  items: [
+    {
+      key: 'database',
+      label: 'Database',
+      category: 'infrastructure',
+      status: 'READY',
+      detail: 'This check ran, which itself required a live database connection.',
+    },
+    {
+      key: 'visionPhysicalDeviceQa',
+      label: 'Vision physical-device QA',
+      category: 'device-qa',
+      status: 'DEVICE_QA_REQUIRED',
+      detail: 'Run qa/vision-physical-device-checklist.md on real devices.',
+    },
+    {
+      key: 'liveAi',
+      label: 'Live Ascend AI',
+      category: 'integrations',
+      status: 'DISABLED',
+      detail: 'LIVE_AI feature flag is off.',
+    },
+  ],
 };
 
 describe('ReleaseReadinessPage', () => {
@@ -52,6 +75,22 @@ describe('ReleaseReadinessPage', () => {
     expect(screen.getByText('appleSignIn')).toBeInTheDocument();
     expect(screen.getByText('1 pending')).toBeInTheDocument();
     expect(screen.getByText('20260101000000_example')).toBeInTheDocument();
+  });
+
+  it('renders the beta readiness checklist items with status and detail (S14 Part 7)', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ data: sampleReadiness, meta: {}, error: null }),
+    );
+
+    render(<ReleaseReadinessPage />);
+
+    await waitFor(() => expect(screen.getByText('Beta readiness checklist')).toBeInTheDocument());
+    expect(screen.getByText('Vision physical-device QA')).toBeInTheDocument();
+    expect(screen.getByText('DEVICE_QA_REQUIRED')).toBeInTheDocument();
+    expect(
+      screen.getByText('Run qa/vision-physical-device-checklist.md on real devices.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('DISABLED')).toBeInTheDocument();
   });
 
   it('shows "Up to date" with no pending list when every migration is applied', async () => {

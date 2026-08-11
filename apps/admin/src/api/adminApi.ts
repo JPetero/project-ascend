@@ -143,6 +143,30 @@ export interface ReleaseReadiness {
     total: number;
     enabled: number;
   };
+  // S14 Part 7 (V3) — every entry the beta-readiness directive
+  // explicitly asked for, each with the status vocabulary below and an
+  // actionable `detail`. Additive to the fields above, not a
+  // replacement.
+  items: ReleaseReadinessItem[];
+}
+
+export type ReleaseReadinessStatus =
+  | 'READY'
+  | 'CODE_READY'
+  | 'CONFIG_REQUIRED'
+  | 'CREDENTIALS_REQUIRED'
+  | 'STORE_SETUP_REQUIRED'
+  | 'DEVICE_QA_REQUIRED'
+  | 'BLOCKED'
+  | 'DISABLED'
+  | 'ERROR';
+
+export interface ReleaseReadinessItem {
+  key: string;
+  label: string;
+  category: string;
+  status: ReleaseReadinessStatus;
+  detail: string;
 }
 
 // Trainer verification — Build Session 12 Part 25-26. Distinct from
