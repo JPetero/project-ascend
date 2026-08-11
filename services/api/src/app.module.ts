@@ -59,6 +59,7 @@ import { WorkoutPlansModule } from './modules/workout-plans/workout-plans.module
 import { WorkoutSessionsModule } from './modules/workout-sessions/workout-sessions.module';
 import { WorkoutsModule } from './modules/workouts/workouts.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { SchedulingModule } from './common/scheduling/scheduling.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ]),
     ScheduleModule.forRoot(),
     PrismaModule,
+    SchedulingModule,
     AuditModule,
     IdempotencyModule,
     EntitlementsModule,

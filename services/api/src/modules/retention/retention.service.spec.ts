@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { NotificationType } from '@prisma/client';
+import { SchedulerLockService } from '../../common/scheduling/scheduler-lock.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -14,10 +15,9 @@ describe('RetentionService', () => {
   let prisma: {
     refreshToken: { groupBy: jest.Mock };
     notificationEvent: { findMany: jest.Mock };
-    scheduledJobLock: { updateMany: jest.Mock };
-    $executeRaw: jest.Mock;
   };
   let notifications: { notify: jest.Mock };
+  let schedulerLock: { runExclusive: jest.Mock };
 
   const now = new Date('2026-08-11T12:00:00.000Z');
   const daysAgo = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
@@ -26,19 +26,25 @@ describe('RetentionService', () => {
     prisma = {
       refreshToken: { groupBy: jest.fn().mockResolvedValue([]) },
       notificationEvent: { findMany: jest.fn().mockResolvedValue([]) },
-      scheduledJobLock: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
-      // Defaults to "lock acquired" (1 row affected) so every
-      // pre-existing test below still exercises the real job body
-      // without having to know about locking.
-      $executeRaw: jest.fn().mockResolvedValue(1),
     };
     notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    // Defaults to "lock acquired" so every pre-existing test below
+    // still exercises the real job body without knowing about
+    // locking — SchedulerLockService's own tests cover the raw
+    // acquire/release mechanics.
+    schedulerLock = {
+      runExclusive: jest.fn(async (_name: string, job: () => Promise<unknown>) => ({
+        ran: true,
+        result: await job(),
+      })),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         RetentionService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: SchedulerLockService, useValue: schedulerLock },
       ],
     }).compile();
 
@@ -135,74 +141,22 @@ describe('RetentionService', () => {
   });
 
   describe('single-execution safety across instances (S14 Part 9)', () => {
-    it('claims the lock via an INSERT ... ON CONFLICT ... WHERE targeting the job-lock row', async () => {
+    it('runs the job body through SchedulerLockService, keyed by RETENTION_LOCK_NAME', async () => {
       await service.runWinBackCheck();
 
-      expect(prisma.$executeRaw).toHaveBeenCalled();
-      // A tagged-template call to $executeRaw is invoked as
-      // $executeRaw(stringsArray, ...interpolatedValues) — the first
-      // argument is the literal template segments.
-      const [stringsArray] = prisma.$executeRaw.mock.calls[0] as [readonly string[]];
-      const sql = stringsArray.join('?');
-      expect(sql).toContain('scheduled_job_locks');
-      expect(sql).toContain('ON CONFLICT');
-      expect(sql).toContain('WHERE');
+      expect(schedulerLock.runExclusive).toHaveBeenCalledWith(
+        RETENTION_LOCK_NAME,
+        expect.any(Function),
+      );
     });
 
-    it('skips the candidate search entirely when the lock cannot be acquired', async () => {
-      prisma.$executeRaw.mockResolvedValue(0);
+    it('never queries candidates when the lock cannot be acquired', async () => {
+      schedulerLock.runExclusive.mockResolvedValue({ ran: false });
 
       await service.runWinBackCheck();
 
       expect(prisma.refreshToken.groupBy).not.toHaveBeenCalled();
       expect(notifications.notify).not.toHaveBeenCalled();
-    });
-
-    it('releases the lock scoped to this instance after a successful run', async () => {
-      await service.runWinBackCheck();
-
-      expect(prisma.scheduledJobLock.updateMany).toHaveBeenCalledWith({
-        where: { jobName: RETENTION_LOCK_NAME, lockedBy: expect.any(String) },
-        data: { lockedUntil: new Date(0) },
-      });
-    });
-
-    it('releases the lock even when notifying a candidate throws', async () => {
-      prisma.refreshToken.groupBy.mockResolvedValue([
-        { userId: 'user-1', _max: { createdAt: daysAgo(INACTIVITY_THRESHOLD_DAYS + 1) } },
-      ]);
-      notifications.notify.mockRejectedValueOnce(new Error('push provider down'));
-
-      await expect(service.runWinBackCheck()).rejects.toThrow('push provider down');
-
-      expect(prisma.scheduledJobLock.updateMany).toHaveBeenCalled();
-    });
-
-    it('does not attempt to release the lock when it was never acquired', async () => {
-      prisma.$executeRaw.mockResolvedValue(0);
-
-      await service.runWinBackCheck();
-
-      expect(prisma.scheduledJobLock.updateMany).not.toHaveBeenCalled();
-    });
-
-    it('runs the job on only one of two concurrent scheduler attempts, sending no duplicate reminder', async () => {
-      prisma.refreshToken.groupBy.mockResolvedValue([
-        { userId: 'user-1', _max: { createdAt: daysAgo(INACTIVITY_THRESHOLD_DAYS + 1) } },
-      ]);
-      // Simulates two instances racing acquireLock at the same moment:
-      // the real Postgres query would let exactly one INSERT ... ON
-      // CONFLICT ... WHERE succeed — here that's the first call.
-      prisma.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
-
-      const otherInstance = new RetentionService(
-        prisma as unknown as PrismaService,
-        notifications as unknown as NotificationsService,
-      );
-
-      await Promise.all([service.runWinBackCheck(), otherInstance.runWinBackCheck()]);
-
-      expect(notifications.notify).toHaveBeenCalledTimes(1);
     });
   });
 });
