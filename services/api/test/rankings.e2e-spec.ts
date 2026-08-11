@@ -248,6 +248,61 @@ describe('Rankings seasons MVP (e2e)', () => {
     expect(userIds).toEqual(expect.arrayContaining([userIdA, userIdB]));
   });
 
+  it('a CARDIO category leaderboard ranks by cardio days, and every entry carries its provenance breakdown', async () => {
+    // A device-sourced (not manually typed) cardio session, so
+    // verifiedCardioDays — the provenance half of this Part — has
+    // something real to count. A already has FRIENDS access to B from
+    // the previous test; B has never logged a cardio session.
+    await request(app.getHttpServer())
+      .post('/cardio-sessions')
+      .set(authA())
+      .send({
+        activityType: 'RUN',
+        source: 'LIVE_GPS',
+        startedAt: new Date().toISOString(),
+        durationSeconds: 900,
+      })
+      .expect(201);
+
+    const leaderboard = await request(app.getHttpServer())
+      .get('/rankings/leaderboard')
+      .query({ scope: 'FRIENDS', category: 'CARDIO' })
+      .set(authA())
+      .expect(200);
+
+    expect(leaderboard.body.data.meta.category).toBe('CARDIO');
+    const entries = leaderboard.body.data.data as Array<{
+      userId: string;
+      cardioDays: number;
+      verifiedCardioDays: number;
+      strengthDays: number;
+      nutritionDays: number;
+    }>;
+    const entryA = entries.find((e) => e.userId === userIdA);
+    const entryB = entries.find((e) => e.userId === userIdB);
+    expect(entryA).toBeDefined();
+    expect(entryB).toBeDefined();
+    // A has a real cardio day today; B has none — A must outrank B on
+    // the CARDIO board even though the FRIENDS list order isn't fixed.
+    expect(entries.indexOf(entryA!)).toBeLessThan(entries.indexOf(entryB!));
+    expect(entryA!.cardioDays).toBeGreaterThanOrEqual(1);
+    expect(entryA!.verifiedCardioDays).toBeGreaterThanOrEqual(1);
+    // Provenance breakdown present on every entry regardless of which
+    // category was requested — never a black-box number.
+    expect(entryB!.strengthDays).toBeGreaterThanOrEqual(0);
+    expect(entryB!.nutritionDays).toBeGreaterThanOrEqual(0);
+  });
+
+  it('defaults to the OVERALL category when none is requested, unchanged from before this Part', async () => {
+    const leaderboard = await request(app.getHttpServer())
+      .get('/rankings/leaderboard')
+      .query({ scope: 'FRIENDS' })
+      .set(authA())
+      .expect(200);
+
+    expect(leaderboard.body.data.meta.category).toBe('OVERALL');
+  });
+
   it('opting out removes access to the leaderboard again', async () => {
     await request(app.getHttpServer()).delete('/rankings/opt-in').set(authA()).expect(204);
 

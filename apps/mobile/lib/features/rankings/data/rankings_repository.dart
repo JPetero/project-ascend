@@ -43,13 +43,19 @@ class RankingsRepository {
 
   Future<LeaderboardPage> getLeaderboard({
     required RankingScope scope,
+    RankingCategory category = RankingCategory.overall,
     int page = 1,
     int limit = 20,
   }) async {
     final envelope = await _apiClient.get(
       '/rankings/leaderboard',
       (data) => data as Map<String, dynamic>,
-      query: {'scope': rankingScopeToJson(scope), 'page': page, 'limit': limit},
+      query: {
+        'scope': rankingScopeToJson(scope),
+        'category': rankingCategoryToJson(category),
+        'page': page,
+        'limit': limit,
+      },
     );
     return LeaderboardPage.fromJson(envelope.data!);
   }

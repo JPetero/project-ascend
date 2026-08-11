@@ -49,6 +49,7 @@ class FakeRankingsRepository implements RankingsRepository {
   @override
   Future<LeaderboardPage> getLeaderboard({
     required RankingScope scope,
+    RankingCategory category = RankingCategory.overall,
     int page = 1,
     int limit = 20,
   }) async {
@@ -63,6 +64,10 @@ class FakeRankingsRepository implements RankingsRepository {
       }
     }
     final entries = leaderboards[scope] ?? const <LeaderboardEntry>[];
-    return LeaderboardPage(entries: entries, total: entries.length);
+    return LeaderboardPage(
+      entries: entries,
+      total: entries.length,
+      category: category,
+    );
   }
 }

@@ -242,6 +242,33 @@ class _LeaderboardView extends StatelessWidget {
     return localityTierIndex(candidate) <= localityTierIndex(viewerScope);
   }
 
+  // S13 Part 8 — a ranking is never a black-box number (design-bible.md's
+  // Rankings transparency requirement): this is what a score is actually
+  // made of, always shown regardless of the selected category.
+  String _provenanceSummary(LeaderboardEntry entry) {
+    final parts = <String>[];
+    if (entry.strengthDays > 0) {
+      parts.add(
+        '${entry.strengthDays} strength ${entry.strengthDays == 1 ? 'day' : 'days'}',
+      );
+    }
+    if (entry.cardioDays > 0) {
+      final verified = entry.verifiedCardioDays > 0
+          ? ', ${entry.verifiedCardioDays} verified'
+          : '';
+      parts.add(
+        '${entry.cardioDays} cardio ${entry.cardioDays == 1 ? 'day' : 'days'}$verified',
+      );
+    }
+    if (entry.nutritionDays > 0) {
+      parts.add(
+        '${entry.nutritionDays} meal ${entry.nutritionDays == 1 ? 'day' : 'days'}',
+      );
+    }
+    if (parts.isEmpty) return 'No logged activity yet this season';
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -284,6 +311,21 @@ class _LeaderboardView extends StatelessWidget {
               ),
           ],
         ),
+        const SizedBox(height: AscendSpacing.sm),
+        Text('Ranked by', style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(height: AscendSpacing.xs),
+        Wrap(
+          spacing: AscendSpacing.sm,
+          runSpacing: AscendSpacing.sm,
+          children: [
+            for (final category in RankingCategory.values)
+              ChoiceChip(
+                label: Text(rankingCategoryLabel(category)),
+                selected: state.selectedCategory == category,
+                onSelected: (_) => controller.selectCategory(category),
+              ),
+          ],
+        ),
         const SizedBox(height: AscendSpacing.md),
         if (state.isLeaderboardLoading)
           const Padding(
@@ -319,11 +361,20 @@ class _LeaderboardView extends StatelessWidget {
                   ),
                   const SizedBox(width: AscendSpacing.sm),
                   Expanded(
-                    child: Text(
-                      entry.isViewer
-                          ? '${entry.displayName ?? 'You'} (you)'
-                          : (entry.displayName ?? 'Ascend member'),
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.isViewer
+                              ? '${entry.displayName ?? 'You'} (you)'
+                              : (entry.displayName ?? 'Ascend member'),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          _provenanceSummary(entry),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                   ),
                   Text(

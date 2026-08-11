@@ -10,11 +10,33 @@ import {
   resolveLocalityCandidateIds,
 } from '../../common/rankings/resolve-scope-candidates.util';
 import {
+  ActivitySummary,
   computeActivitySummaries,
   computeActivitySummary,
 } from '../../common/scoring/activity-scoring.util';
+import { RankingCategory } from '../../common/scoring/ranking-category';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OptInRankingsDto } from './dto/opt-in-rankings.dto';
+
+/**
+ * What a leaderboard actually sorts by for the requested category —
+ * OVERALL keeps the existing blended `points` (with its cross-domain
+ * bonus) untouched; a single-domain category has no bonus to apply, so
+ * its score is just that domain's active-day count.
+ */
+function categoryScore(summary: ActivitySummary, category: RankingCategory): number {
+  switch (category) {
+    case RankingCategory.STRENGTH:
+      return summary.strengthDays;
+    case RankingCategory.CARDIO:
+      return summary.cardioDays;
+    case RankingCategory.NUTRITION:
+      return summary.nutritionDays;
+    case RankingCategory.OVERALL:
+    default:
+      return summary.points;
+  }
+}
 
 type OptInRow = {
   userId: string;
@@ -81,10 +103,20 @@ export class RankingsService {
       season: this.serializeSeason(season),
       points: summary.points,
       activeDays: summary.activeDays,
+      strengthDays: summary.strengthDays,
+      cardioDays: summary.cardioDays,
+      nutritionDays: summary.nutritionDays,
+      verifiedCardioDays: summary.verifiedCardioDays,
     };
   }
 
-  async getLeaderboard(viewerId: string, scope: RankingScope, page: number, limit: number) {
+  async getLeaderboard(
+    viewerId: string,
+    scope: RankingScope,
+    page: number,
+    limit: number,
+    category: RankingCategory = RankingCategory.OVERALL,
+  ) {
     const viewerOptIn = await this.prisma.rankingOptIn.findUnique({ where: { userId: viewerId } });
     if (!viewerOptIn) {
       throw new ForbiddenException('Opt in to Rankings to view a leaderboard.');
@@ -101,14 +133,24 @@ export class RankingsService {
       season.startsAt,
       season.endsAt,
     );
+    const emptySummary: ActivitySummary = {
+      activeDays: 0,
+      points: 0,
+      strengthDays: 0,
+      cardioDays: 0,
+      nutritionDays: 0,
+      verifiedCardioDays: 0,
+    };
     const scored = candidateIds.map((userId) => ({
       userId,
-      ...(summaryByUser.get(userId) ?? { activeDays: 0, points: 0 }),
+      ...(summaryByUser.get(userId) ?? emptySummary),
     }));
 
     scored.sort(
       (a, b) =>
-        b.points - a.points || b.activeDays - a.activeDays || a.userId.localeCompare(b.userId),
+        categoryScore(b, category) - categoryScore(a, category) ||
+        b.activeDays - a.activeDays ||
+        a.userId.localeCompare(b.userId),
     );
 
     const userIds = scored.map((s) => s.userId);
@@ -126,12 +168,26 @@ export class RankingsService {
       avatarUrl: profileByUser.get(entry.userId)?.avatarUrl ?? null,
       points: entry.points,
       activeDays: entry.activeDays,
+      // Always present regardless of which category is selected — a
+      // ranking is never a black-box number (design-bible.md's Rankings
+      // transparency requirement); this is what it's actually made of.
+      strengthDays: entry.strengthDays,
+      cardioDays: entry.cardioDays,
+      nutritionDays: entry.nutritionDays,
+      verifiedCardioDays: entry.verifiedCardioDays,
       isViewer: entry.userId === viewerId,
     }));
 
     return {
       data: page_,
-      meta: { page, limit, total: scored.length, season: this.serializeSeason(season), scope },
+      meta: {
+        page,
+        limit,
+        total: scored.length,
+        season: this.serializeSeason(season),
+        scope,
+        category,
+      },
     };
   }
 
