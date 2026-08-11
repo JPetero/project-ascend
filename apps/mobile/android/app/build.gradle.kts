@@ -55,6 +55,14 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // S14 Part 4 — flutter_local_notifications requires core library
+        // desugaring. Confirmed via a real GitHub Actions run: without
+        // this, AGP's checkDevReleaseAarMetadata task fails with
+        // "Dependency ':flutter_local_notifications' requires core
+        // library desugaring to be enabled for :app." The
+        // coreLibraryDesugaring dependency below is required alongside
+        // this flag — one without the other still fails.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     // S14 Part 4 — required for the per-flavor resValue("string",
@@ -170,6 +178,13 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+// Pairs with compileOptions.isCoreLibraryDesugaringEnabled above — both
+// are required together for flutter_local_notifications' AAR metadata
+// check to pass.
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {
