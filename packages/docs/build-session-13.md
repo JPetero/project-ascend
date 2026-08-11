@@ -19,8 +19,8 @@ unit+e2e, mobile analyze+format+test, admin lint+test+build where
 touched) → committed → pushed to the feature branch → merged `--no-ff`
 into `main` → **re-verified in full on the merged `main`** → pushed to
 `main` → fast-forwarded back onto the feature branch. No step was
-skipped for any merged part; the merge history on `main` (16 individual
-merge commits, `d627ce2..54a2b57`) is the audit trail, and the order of
+skipped for any merged part; the merge history on `main` (17 individual
+merge commits, `d627ce2..5263273`) is the audit trail, and the order of
 Parts below matches that real chronological merge order rather than a
 reconstructed numbering.
 
@@ -30,11 +30,14 @@ autonomous directive rather than starting over, and every part cited
 below was implemented, tested, and merged with full command output
 observed at each step — none of it reconstructed from memory.
 
-One item from the original priority list, **"S13 Part 8: Ranking
-categories + provenance,"** remains explicitly **DEFERRED** — it was
-superseded in scope by Part 6-7's locality hierarchy and expanded scopes
-work below, and never separately started this session. It is not hidden;
-it is carried forward as the one open item.
+**Update:** this report was originally written and merged (commit
+`9326055`) with "S13 Part 8: Ranking categories + provenance" listed as
+deferred. The session continued afterward and actually implemented it —
+see Part 8 below, appended after Part 33-49 in the order it was really
+built rather than backdated into its numbered position above. Every
+count and blocker elsewhere in this document (test totals, the
+remaining-blockers list) reflects that final state, not the mid-session
+snapshot.
 
 ## Part 1 — Feature flag registry redesign + real wiring
 
@@ -114,8 +117,8 @@ specified to support. Migration:
 `20260810170000_rankings_locality_hierarchy`.
 
 **Note:** the separately-tracked "Part 8: Ranking categories +
-provenance" item was not started as part of this Part or this session —
-see Summary above.
+provenance" item was not started as part of this Part — it was picked up
+later in the session; see Part 8 below (appended after Part 33-49).
 
 ## Part 9 — Sports Rankings integration
 
@@ -233,6 +236,41 @@ existing `NotificationEvent` rows) stops the daily cron from renotifying
 the same inactive user on every run. Migration:
 `20260811113220_add_re_engagement_notification_type`.
 
+## Part 8 — Ranking categories + provenance
+
+**Status: IMPLEMENTED, VERIFIED** (commit `5263273` merge). Picked up
+after the rest of this report was originally written and merged — see
+the Update note in the Summary above.
+
+No Founder-level spec for this exact backlog phrase exists anywhere in
+`packages/docs/product/` (checked directly); the closest real
+requirement is `design-bible.md`'s Rankings section: "Ranking criteria
+shown to the user must be genuinely transparent (what's being measured,
+not a black-box score)." Scoped from that plus the domains
+`common/scoring/activity-scoring.util.ts` already tracked separately
+before blending them into one number:
+
+- **Categories** — `GET /rankings/leaderboard` accepts a new `category`
+  query param (`RankingCategory`: `OVERALL`/`STRENGTH`/`CARDIO`/
+  `NUTRITION`, default `OVERALL`). A single-category leaderboard sorts
+  by that domain's active-day count directly — no cross-domain variety
+  bonus to apply, since there's only one domain. `OVERALL`'s existing
+  blended score, bonus, and sort order (`points` then `activeDays` then
+  `userId`) are byte-for-byte unchanged; every pre-existing rankings
+  test still passes against the same assertions.
+- **Provenance** — every leaderboard entry (and `/rankings/me`) now
+  always includes `strengthDays`/`cardioDays`/`nutritionDays` regardless
+  of which category is selected, plus `verifiedCardioDays` — the subset
+  of cardio days recorded via `CardioSession.source` being `LIVE_GPS` or
+  `WEARABLE` rather than typed in manually, extending a distinction the
+  schema already made (see its own doc comment) rather than inventing a
+  new verification concept. Mobile shows this as a per-entry breakdown
+  line ("2 strength days · 1 cardio day, 1 verified · 3 meal days") and
+  a "Ranked by" category chip row above the leaderboard.
+- No new migration: `RankingCategory` is a query-time filter with
+  nothing to persist, and `CardioSession.source` already existed from
+  an earlier session.
+
 ## Migrations (this session, chronological)
 
 1. `20260810132227_add_trainer_group_session_rsvp` (Part 3)
@@ -242,6 +280,8 @@ the same inactive user on every run. Migration:
 5. `20260810170000_rankings_locality_hierarchy` (Part 6-7)
 6. `20260811113220_add_re_engagement_notification_type` (Part 33-49 — retention)
 
+Part 8 added no migration — see its own section above.
+
 ## New dependencies
 
 - `@nestjs/schedule: ^6.1.3` (backend, Part 33-49) — powers
@@ -250,16 +290,16 @@ the same inactive user on every run. Migration:
 
 No new mobile or admin dependencies this session.
 
-## Test results (final, on merged `main`, commit `54a2b57`)
+## Test results (final, on merged `main`, commit `5263273`)
 
-- Backend unit: **1130 passed**, 78 suites (1040 at session start — +90).
-- Backend e2e: **369 passed**, 40 suites (349 at session start — +20).
+- Backend unit: **1138 passed**, 78 suites (1040 at session start — +98).
+- Backend e2e: **371 passed**, 40 suites (349 at session start — +22).
 - Backend lint (`eslint --max-warnings=0`): clean.
 - Backend build (`nest build`): clean.
 - Mobile `flutter analyze`: clean, 0 issues.
 - Mobile `dart format --set-exit-if-changed`: clean, 0 files changed
   (609 files checked).
-- Mobile `flutter test`: **885 passed** (799 at session start — +86).
+- Mobile `flutter test`: **889 passed** (799 at session start — +90).
 - Admin `tsc --noEmit`: clean.
 - Admin `eslint`: clean (one pre-existing
   `react-refresh/only-export-components` warning in `AuthContext.tsx`,
@@ -330,23 +370,27 @@ Carried forward, updated for what this session actually closed:
 1. No live push delivery, Vision-on-camera, Android/iOS release build,
    or any device-matrix row has ever been verified on real hardware —
    unchanged from every prior session's disclosure.
-2. "Ranking categories + provenance" (the original Part 8 item) remains
-   unstarted — see Summary above.
-3. Camera-assisted sport score suggestions remain deliberately deferred,
+2. Camera-assisted sport score suggestions remain deliberately deferred,
    unchanged from Build Session 12 — no pose/ball-tracking infrastructure
    exists.
-4. The admin app has no deployment or security-header story at all
+3. The admin app has no deployment or security-header story at all
    (Part 33-49) — documented explicitly in `security.md` rather than
    papered over with a CSP `<meta>` tag that could break real
    cross-origin deployments.
-5. `RetentionService`'s scheduled job has not been load-tested or run
+4. `RetentionService`'s scheduled job has not been load-tested or run
    against production-scale data — the query shape (`groupBy` over every
    `RefreshToken` row) is reasonable at this sprint's scale but has not
    been proven at real user-base scale.
-6. No automated backup schedule is wired up anywhere (Build Session 12's
+5. No automated backup schedule is wired up anywhere (Build Session 12's
    runbook documents the procedure; scheduling it against a real
    production database remains deployment-specific and out of this
    sandbox's reach) — unchanged.
+6. Rankings' `RankingCategory` split (Part 8) covers only the three
+   domains `activity-scoring.util.ts` already tracked (strength/cardio/
+   nutrition) — Sports' separate Elo-style per-`SportCode` ratings were
+   deliberately not merged into this same filterable list, since unifying
+   a day-count score with an Elo rating would need real normalization
+   design work, not a mechanical extension.
 
 None of the above are new regressions from this session's work — all are
 either pre-existing, explicitly scoped out, or newly *disclosed* (not
