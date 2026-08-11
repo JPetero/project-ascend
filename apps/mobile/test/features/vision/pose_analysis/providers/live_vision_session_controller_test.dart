@@ -307,5 +307,50 @@ void main() {
         expect(controller.state.autoRepCount, 0);
       },
     );
+
+    test(
+      'sessionQualityScore is zero before any running frame is processed',
+      () {
+        final controller = LiveVisionSessionController(
+          exercise: SupportedExercise.bodyweightSquat,
+        );
+        controller.start();
+
+        expect(controller.state.sessionQualityScore, 0);
+      },
+    );
+
+    test(
+      'sessionQualityScore averages overallConfidence across running frames, not calibration frames',
+      () {
+        final controller = LiveVisionSessionController(
+          exercise: SupportedExercise.bodyweightSquat,
+        );
+        controller.start();
+        // squatFrame() defaults every landmark to confidence 0.9, so the
+        // 5 calibration frames would skew the average toward 0.9 if they
+        // were wrongly counted — this test only passes if they are not.
+        _calibrate(controller);
+
+        controller.processFrame(squatFrame(170, confidence: 1.0));
+        controller.processFrame(squatFrame(170, confidence: 0.5));
+
+        expect(controller.state.sessionQualityScore, closeTo(0.75, 0.001));
+      },
+    );
+
+    test('sessionQualityScore resets to zero on a fresh start()', () {
+      final controller = LiveVisionSessionController(
+        exercise: SupportedExercise.bodyweightSquat,
+      );
+      controller.start();
+      _calibrate(controller);
+      controller.processFrame(squatFrame(170, confidence: 1.0));
+      expect(controller.state.sessionQualityScore, greaterThan(0));
+
+      controller.start();
+
+      expect(controller.state.sessionQualityScore, 0);
+    });
   });
 }

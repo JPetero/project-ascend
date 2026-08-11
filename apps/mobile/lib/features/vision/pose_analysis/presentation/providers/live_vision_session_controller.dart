@@ -22,6 +22,7 @@ class LiveVisionSessionState {
     this.cues = const [],
     this.elapsed = Duration.zero,
     this.calibrationProgress = 0,
+    this.sessionQualityScore = 0,
   });
 
   final SupportedExercise exercise;
@@ -38,6 +39,14 @@ class LiveVisionSessionState {
   /// [LiveVisionSessionController._processCalibrationFrame]) — only
   /// meaningful while [status] is [LiveVisionSessionStatus.calibrating].
   final double calibrationProgress;
+
+  /// 0.0-1.0 average [PoseFrame.overallConfidence] across every frame
+  /// processed while `running` (S13 Part 13-15) — a session-level
+  /// "capture quality" signal distinct from [confidence]'s single-frame
+  /// snapshot, shown in the summary via [poseConfidenceLabel] once the
+  /// session ends so the user knows how reliable their tracked reps
+  /// likely were. Zero until at least one running frame is processed.
+  final double sessionQualityScore;
 
   /// Never negative — a manual "-1" can correct the auto-detected count
   /// down, but the displayed count always floors at zero rather than
@@ -58,6 +67,7 @@ class LiveVisionSessionState {
     List<FormObservation>? cues,
     Duration? elapsed,
     double? calibrationProgress,
+    double? sessionQualityScore,
   }) {
     return LiveVisionSessionState(
       exercise: exercise,
@@ -70,6 +80,7 @@ class LiveVisionSessionState {
       cues: cues ?? this.cues,
       elapsed: elapsed ?? this.elapsed,
       calibrationProgress: calibrationProgress ?? this.calibrationProgress,
+      sessionQualityScore: sessionQualityScore ?? this.sessionQualityScore,
     );
   }
 }
@@ -99,6 +110,8 @@ class LiveVisionSessionController
   DateTime? _pausedAt;
   Duration _totalPaused = Duration.zero;
   int _calibrationStreak = 0;
+  double _qualityConfidenceSum = 0;
+  int _qualityFrameCount = 0;
 
   /// Consecutive frames with acceptable overall visibility required before
   /// rep counting begins (Build Session 11 Part 7) — catches "camera
@@ -111,9 +124,12 @@ class LiveVisionSessionController
     _totalPaused = Duration.zero;
     _pausedAt = null;
     _calibrationStreak = 0;
+    _qualityConfidenceSum = 0;
+    _qualityFrameCount = 0;
     state = state.copyWith(
       status: LiveVisionSessionStatus.calibrating,
       calibrationProgress: 0,
+      sessionQualityScore: 0,
     );
   }
 
@@ -152,6 +168,9 @@ class LiveVisionSessionController
     }
     if (state.status != LiveVisionSessionStatus.running) return;
 
+    _qualityConfidenceSum += frame.overallConfidence;
+    _qualityFrameCount += 1;
+
     final update = _analyzer.onFrame(frame);
     state = state.copyWith(
       phase: update.phase,
@@ -162,6 +181,7 @@ class LiveVisionSessionController
           ? state.cues
           : [...state.cues, ...update.observations],
       elapsed: _elapsedNow(),
+      sessionQualityScore: _qualityConfidenceSum / _qualityFrameCount,
     );
   }
 
