@@ -338,26 +338,26 @@ model Profile {
 }
 
 model Preference {
-  id                         String        @id @default(uuid())
-  userId                     String        @unique
-  companion                  Companion     @default(ATLAS)
-  companionMode              CompanionMode @default(STANDARD)
+  id                             String              @id @default(uuid())
+  userId                         String              @unique
+  companion                      Companion           @default(ATLAS)
+  companionMode                  CompanionMode       @default(STANDARD)
   // Independent of `companion` by design — see
   // packages/docs/product/atlas-nova-bible.md. Neither Atlas nor Nova is
   // "for" a given coaching style.
-  coachingStyle              CoachingStyle @default(BALANCED)
+  coachingStyle                  CoachingStyle       @default(BALANCED)
   // 1 (softest) - 5 (most intense) delivery of the selected coachingStyle.
   // Never changes what's safe to recommend, only how it's phrased.
-  toneIntensity              Int           @default(3)
-  themeMode                  ThemeMode     @default(SYSTEM)
-  reducedMotion              Boolean       @default(false)
-  notificationsEnabled       Boolean       @default(true)
+  toneIntensity                  Int                 @default(3)
+  themeMode                      ThemeMode           @default(SYSTEM)
+  reducedMotion                  Boolean             @default(false)
+  notificationsEnabled           Boolean             @default(true)
   // Build Session 11 Part 4 — defaults OFF (was ON): durable
   // conversational memory is opt-in now that the extractor's category
   // allowlist exists, matching the directive's "default privacy-
   // conscious" guidance. A user who wants Atlas/Nova to remember
   // preferences across conversations turns this on explicitly.
-  aiMemoryEnabled            Boolean       @default(false)
+  aiMemoryEnabled                Boolean             @default(false)
   // Build Session 12 Part 8 — deliberately separate from
   // `aiMemoryEnabled`: this controls whether the raw back-and-forth chat
   // transcript is saved (so a conversation can be reopened later), not
@@ -368,7 +368,7 @@ model Preference {
   // expectations. Turning it off does not delete existing conversations;
   // it only stops new ones from being saved (see
   // CompanionConversationsService).
-  conversationHistoryEnabled Boolean       @default(true)
+  conversationHistoryEnabled     Boolean             @default(true)
   // Build Session 12 Part 12-14 (Accessibility Center) — a linear text
   // scale multiplier applied on top of the OS's own accessibility text
   // size, since Flutter's `MediaQuery.textScaler` composes rather than
@@ -376,7 +376,7 @@ model Preference {
   // a small fixed set (0.9/1.0/1.15/1.3), enforced by
   // UpdatePreferencesDto's range rather than an enum, so future in-
   // between values remain possible without a migration.
-  textScale                  Float         @default(1.0)
+  textScale                      Float               @default(1.0)
   // Build Session 13 continuation Part C (Privacy Center) — the
   // fallback CommunityService.createPost uses whenever a post's own
   // `visibility` is omitted, so "post publicly by default" becomes a
@@ -386,27 +386,27 @@ model Preference {
   // mediaType VIDEO (see CommunityPostMediaType) sharing this same
   // `visibility` column — there is no separate Reel-visibility concept
   // to default independently.
-  defaultPostVisibility      CommunityVisibility @default(PUBLIC)
+  defaultPostVisibility          CommunityVisibility @default(PUBLIC)
   // Mirrors GalleryAlbum.visibility's own PRIVATE default (Gallery is
   // private-by-default, unlike Community) — lets a user who always
   // wants SHARED albums stop re-selecting it every time, without
   // changing the per-album Prisma default new API clients still get if
   // they omit it entirely.
-  defaultGalleryVisibility      GalleryVisibility @default(PRIVATE)
+  defaultGalleryVisibility       GalleryVisibility   @default(PRIVATE)
   // Deliberately separate from `defaultGalleryVisibility`: progress
   // photos are inherently more sensitive (body/fitness images) than a
   // general workout-selfie album, so this can be tightened independently
   // even though both currently default to the same PRIVATE value.
-  progressPhotoDefaultVisibility GalleryVisibility @default(PRIVATE)
+  progressPhotoDefaultVisibility GalleryVisibility   @default(PRIVATE)
   // The pre-filled state of the single "share my route" toggle on the
   // cardio session logging screens — see CardioSession.hideRoute's
   // schema comment for why one flag already drives hideRoute,
   // hideStartLocation, and hideEndLocation together client-side. True
   // (hidden) by default, matching every one of those three columns'
   // own Prisma default.
-  defaultHideCardioRoute     Boolean       @default(true)
-  createdAt                  DateTime      @default(now())
-  updatedAt                  DateTime      @updatedAt
+  defaultHideCardioRoute         Boolean             @default(true)
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1813,26 +1813,26 @@ model WorkoutAssignment {
 // eligible Going member's "Join") converges on the same live session
 // instead of creating a new one every time.
 model TrainerGroupScheduledSession {
-  id                  String    @id @default(uuid())
-  groupId             String
-  createdById         String
-  title               String?
-  scheduledAt         DateTime
-  durationMinutes     Int?
-  location            String?
-  videoLink           String?
-  description         String?
-  workoutPlanId       String?
-  jointWorkoutSessionId String? @unique
-  canceledAt          DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                    String    @id @default(uuid())
+  groupId               String
+  createdById           String
+  title                 String?
+  scheduledAt           DateTime
+  durationMinutes       Int?
+  location              String?
+  videoLink             String?
+  description           String?
+  workoutPlanId         String?
+  jointWorkoutSessionId String?   @unique
+  canceledAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  group              TrainerGroup                              @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdBy          User                                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  workoutPlan        WorkoutPlan?                              @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
-  jointWorkoutSession JointWorkoutSession?                     @relation(fields: [jointWorkoutSessionId], references: [id], onDelete: SetNull)
-  participants       TrainerGroupScheduledSessionParticipant[]
+  group               TrainerGroup                              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy           User                                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  workoutPlan         WorkoutPlan?                              @relation(fields: [workoutPlanId], references: [id], onDelete: SetNull)
+  jointWorkoutSession JointWorkoutSession?                      @relation(fields: [jointWorkoutSessionId], references: [id], onDelete: SetNull)
+  participants        TrainerGroupScheduledSessionParticipant[]
 
   @@index([groupId, scheduledAt])
   @@map("trainer_group_scheduled_sessions")
