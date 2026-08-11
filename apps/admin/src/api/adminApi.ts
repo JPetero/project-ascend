@@ -133,6 +133,12 @@ export interface ReleaseReadiness {
     appleIap: boolean;
     googleIap: boolean;
   };
+  // S13 Part 16-27 (V2) — compares prisma/migrations/ on disk against
+  // the deployed database's own _prisma_migrations bookkeeping.
+  migrations: {
+    upToDate: boolean;
+    pending: string[];
+  };
   featureFlags: {
     total: number;
     enabled: number;

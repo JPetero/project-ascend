@@ -1,11 +1,22 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
+import { readdirSync, statSync } from 'fs';
+import { join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ReleaseReadinessService } from './release-readiness.service';
 
+// Enumerates the same real prisma/migrations/ directory the service
+// itself reads — used to build a "everything is applied" $queryRaw mock
+// by default, without hardcoding actual migration names here (which
+// would go stale every time a migration is added).
+function realMigrationNames(): string[] {
+  const dir = join(__dirname, '../../../prisma/migrations');
+  return readdirSync(dir).filter((entry) => statSync(join(dir, entry)).isDirectory());
+}
+
 describe('ReleaseReadinessService', () => {
   let service: ReleaseReadinessService;
-  let prisma: { featureFlag: { count: jest.Mock } };
+  let prisma: { featureFlag: { count: jest.Mock }; $queryRaw: jest.Mock };
   let configValues: Record<string, unknown>;
 
   function buildConfigService(): { get: jest.Mock } {
@@ -13,7 +24,12 @@ describe('ReleaseReadinessService', () => {
   }
 
   beforeEach(async () => {
-    prisma = { featureFlag: { count: jest.fn().mockResolvedValue(0) } };
+    prisma = {
+      featureFlag: { count: jest.fn().mockResolvedValue(0) },
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValue(realMigrationNames().map((name) => ({ migration_name: name }))),
+    };
     configValues = {
       app: {
         nodeEnv: 'development',
@@ -104,5 +120,33 @@ describe('ReleaseReadinessService', () => {
     const result = await service.check();
 
     expect(result.featureFlags).toEqual({ total: 5, enabled: 3 });
+  });
+
+  describe('migrations', () => {
+    it('reports upToDate=true when every on-disk migration is recorded as applied', async () => {
+      const result = await service.check();
+
+      expect(result.migrations).toEqual({ upToDate: true, pending: [] });
+    });
+
+    it('reports a pending migration when a directory exists on disk but was never applied', async () => {
+      const allNames = realMigrationNames();
+      const [missing, ...stillApplied] = allNames;
+      prisma.$queryRaw.mockResolvedValue(stillApplied.map((name) => ({ migration_name: name })));
+
+      const result = await service.check();
+
+      expect(result.migrations.upToDate).toBe(false);
+      expect(result.migrations.pending).toEqual([missing]);
+    });
+
+    it('never reports upToDate=true when the applied set is empty but migrations exist on disk', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      const result = await service.check();
+
+      expect(result.migrations.upToDate).toBe(false);
+      expect(result.migrations.pending.length).toBe(realMigrationNames().length);
+    });
   });
 });

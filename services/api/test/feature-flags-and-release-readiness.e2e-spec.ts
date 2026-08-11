@@ -219,6 +219,12 @@ describe('Feature Flags and Release Readiness (e2e)', () => {
     expect(res.body.data).toHaveProperty('integrations.aiProvider');
     expect(res.body.data).toHaveProperty('featureFlags.total');
     expect(JSON.stringify(res.body.data)).not.toMatch(/sk-|AIza|-----BEGIN/);
+
+    // Real check against the real test database — every migration this
+    // repo commits was actually applied by the e2e setup's `prisma
+    // migrate deploy`, so this proves the on-disk-vs-`_prisma_migrations`
+    // comparison itself is correct, not just mocked.
+    expect(res.body.data.migrations).toEqual({ upToDate: true, pending: [] });
   });
 
   it('echoes a correlation id header on every response', async () => {
