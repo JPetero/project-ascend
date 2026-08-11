@@ -1,0 +1,9 @@
+# S14 Part 28 — this is an internal admin tool, never a public surface.
+# It should never appear in search results, and (per
+# staging-deployment.md / production hardening notes) shouldn't be
+# reachable at all without an additional network-level restriction
+# (VPN, IP allowlist, or SSO in front) — this file is defense in depth
+# alongside the X-Robots-Tag response header and the <meta name="robots">
+# tag in index.html, not a substitute for that restriction.
+User-agent: *
+Disallow: /

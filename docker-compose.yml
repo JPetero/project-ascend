@@ -33,6 +33,16 @@ services:
     environment:
       DATABASE_URL: postgresql://ascend:ascend_dev_password@postgres:5432/ascend_dev?schema=public
     restart: "no"
+    # S14 Part 29 — a plain `prisma migrate deploy` process needs no
+    # Linux capabilities at all; safe to drop every one rather than
+    # inherit Docker's (already-reduced, but non-empty) default set.
+    # Not applied to postgres/pgadmin below: those official images'
+    # entrypoints need specific capabilities (CHOWN/SETUID/SETGID/
+    # DAC_OVERRIDE) to fix data-directory ownership on first boot, and
+    # this sandbox has no Docker daemon to verify a change there
+    # wouldn't break `docker compose up` — see admin-deployment.md.
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
 
   api:
     build:
@@ -57,6 +67,9 @@ services:
       CORS_ORIGIN: "*"
     ports:
       - "3000:3000"
+    # S14 Part 29 — same rationale as the migrate service above.
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
 
   pgadmin:
     image: dpage/pgadmin4:latest

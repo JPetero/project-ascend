@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- S14 Part 28 — internal admin tool, never a public surface; see
+         public/robots.txt for the crawl-level equivalent and
+         infrastructure/docker/nginx-admin.conf's X-Robots-Tag header. -->
+    <meta name="robots" content="noindex, nofollow" />
     <title>Ascend Admin</title>
   </head>
   <body>

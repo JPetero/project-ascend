@@ -1,0 +1,27 @@
+# S14 Part 29 — every Dockerfile in this repo (infrastructure/docker/)
+# builds with the repo root as its context; without this file that
+# context includes .git history, every workspace's node_modules, build
+# output, and any local .env file a developer has sitting around. None
+# of that should ever be sent to the Docker daemon or be copyable into
+# an image layer, even by an accidental future `COPY . .`.
+
+.git
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/.turbo
+**/*.log
+
+# Local-only secrets — every Dockerfile takes its configuration via
+# `environment:`/`--build-arg`, never by reading a checked-out .env file.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editor/OS cruft, not needed in any build context.
+.vscode
+.idea
+.DS_Store
