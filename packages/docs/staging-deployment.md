@@ -31,10 +31,13 @@ been run end-to-end in this session.
    reports each one honestly rather than pretending.
 3. Run `pnpm prisma:deploy` against the staging database before first
    boot, and after every subsequent deploy that adds a migration.
-4. Confirm `GET /health` returns `{ "status": "ok" }` and
-   `GET /admin/release-readiness` (as a `MANAGE_PLATFORM` admin) shows
-   `migrations.upToDate: true` and every integration you configured as
-   green.
+4. Confirm `GET /livez` (process alive, no database check) and
+   `GET /readyz` (database-aware — S14 Part 6 split these apart; the
+   older `GET /health` still exists as an alias identical to `/readyz`,
+   kept only for anything already pointed at it) both return
+   `{ "status": "ok" }`, and `GET /admin/release-readiness` (as a
+   `MANAGE_PLATFORM` admin) shows `migrations.upToDate: true` and every
+   integration you configured as green.
 
 ## Mobile
 
