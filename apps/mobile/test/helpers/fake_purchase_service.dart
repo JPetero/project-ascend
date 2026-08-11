@@ -17,7 +17,9 @@ class FakePurchaseService implements PurchaseService {
   int buyCallCount = 0;
   int acknowledgeCallCount = 0;
   int disposeCallCount = 0;
+  int restoreCallCount = 0;
   String? lastAcknowledgedProductId;
+  Object? restoreError;
 
   @override
   Future<bool> isAvailable() async => available;
@@ -41,6 +43,12 @@ class FakePurchaseService implements PurchaseService {
   Future<void> acknowledgePurchase(String productId) async {
     acknowledgeCallCount++;
     lastAcknowledgedProductId = productId;
+  }
+
+  @override
+  Future<void> restorePurchases() async {
+    restoreCallCount++;
+    if (restoreError != null) throw restoreError!;
   }
 
   @override

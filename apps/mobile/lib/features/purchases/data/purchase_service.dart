@@ -47,6 +47,15 @@ abstract class PurchaseService {
   /// indefinitely. A no-op if this product has no pending purchase.
   Future<void> acknowledgePurchase(String productId);
 
+  /// Asks the store to replay every non-consumable purchase the signed-in
+  /// account already owns — required by App Store guidelines whenever a
+  /// paywall exists, for a reinstall or a new device where Premium was
+  /// already bought. Replayed purchases arrive on [purchaseUpdates] as
+  /// [PurchaseUpdateStatus.restored], same as any other update; this
+  /// method only triggers that replay, it never resolves with the
+  /// purchases themselves.
+  Future<void> restorePurchases();
+
   void dispose();
 }
 
@@ -124,6 +133,9 @@ class PluginPurchaseService implements PurchaseService {
       await _iap.completePurchase(details);
     }
   }
+
+  @override
+  Future<void> restorePurchases() => _iap.restorePurchases();
 
   @override
   void dispose() {}

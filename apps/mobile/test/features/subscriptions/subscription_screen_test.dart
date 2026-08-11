@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:mobile/core/entitlements/capability.dart';
 import 'package:mobile/features/purchases/data/purchase_service.dart';
 import 'package:mobile/features/purchases/domain/store_product.dart';
 import 'package:mobile/features/subscriptions/domain/subscription_status.dart';
+import 'package:mobile/features/subscriptions/presentation/providers/subscription_controller.dart';
 import 'package:mobile/features/subscriptions/presentation/screens/subscription_screen.dart';
 
 import '../../helpers/fake_feature_flags_repository.dart';
@@ -226,6 +229,96 @@ void main() {
       await pumpForAsyncSettle(tester);
 
       expect(find.textContaining('Current period ends'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "shows an error state with a retry action instead of a blank/confusing screen when the initial load fails",
+    (tester) async {
+      final repository = FakeSubscriptionsRepository(shouldFail: true);
+      final container = await createTestContainer(
+        signedIn: true,
+        subscriptionsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SubscriptionScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text("Couldn't load your membership"), findsOneWidget);
+      expect(find.text('Free plan'), findsNothing);
+
+      repository.shouldFail = false;
+      await tester.tap(find.text('Try again'));
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Free plan'), findsOneWidget);
+      expect(find.text("Couldn't load your membership"), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a failed refresh keeps showing the already-loaded plan alongside the error, rather than discarding it',
+    (tester) async {
+      final repository = FakeSubscriptionsRepository();
+      final container = await createTestContainer(
+        signedIn: true,
+        subscriptionsRepository: repository,
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SubscriptionScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+      expect(find.text('Free plan'), findsOneWidget);
+
+      repository.shouldFail = true;
+      unawaited(
+        container.read(subscriptionControllerProvider.notifier).refresh(),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Free plan'), findsOneWidget);
+      expect(find.textContaining('Network error'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'offers Restore Purchases alongside the Upgrade flow, and delegates to the store',
+    (tester) async {
+      final purchaseService = FakePurchaseService(
+        available: true,
+        products: const [_standardProduct],
+      );
+      final container = await createTestContainer(
+        signedIn: true,
+        purchaseService: purchaseService,
+        featureFlagsRepository: _purchasesEnabled(),
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: SubscriptionScreen()),
+        ),
+      );
+      await pumpForAsyncSettle(tester);
+
+      expect(find.text('Restore Purchases'), findsOneWidget);
+      await tester.tap(find.text('Restore Purchases'));
+      await pumpForAsyncSettle(tester);
+
+      expect(purchaseService.restoreCallCount, 1);
     },
   );
 

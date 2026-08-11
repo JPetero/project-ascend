@@ -43,7 +43,11 @@ exist before this could run in production.
 
 ### Transport & headers
 
-- `helmet()` applied globally for standard security headers.
+- `helmet()` applied globally for standard security headers, with a tuned Content-Security-Policy
+  (S13 Part 33-49, `common/middleware/security-headers.ts`) rather than bare defaults: every
+  Helmet default directive is kept, and `script-src`/`style-src`/`img-src` are relaxed by exactly
+  enough for Swagger UI (the only HTML page this API serves — every other route returns JSON,
+  which a CSP directive doesn't affect) to render at `/docs`.
 - CORS is configured (not left wide open by accident) via `CORS_ORIGIN`.
 - Rate limiting via `@nestjs/throttler`: 100 requests/minute per client by default, tightened to
   10 requests/minute (tracked per route, not shared) on `/auth/register`, `/auth/login`, and
@@ -92,8 +96,15 @@ launch:
   variables set by hand.
 - **Dependency/vulnerability scanning.** No `npm audit`/Dependabot/Snyk-equivalent is wired into
   CI yet.
-- **Security headers beyond Helmet's defaults** (e.g., a tuned Content-Security-Policy) have not
-  been reviewed for this specific API's needs.
+- **Admin app has no deployment/header story at all.** No `Dockerfile` or nginx/CDN config exists
+  for `apps/admin` (only the API has `infrastructure/docker/api.Dockerfile`) — no security headers
+  are set for it anywhere. Deliberately not papered over with a static CSP `<meta>` tag in
+  `apps/admin/index.html`: the admin app's real API host is only known at build time
+  (`VITE_API_BASE_URL`), and a same-origin-only `connect-src` baked into the HTML would silently
+  break every API call the moment the admin app is deployed to a different origin than the API —
+  worse than the current gap. Whatever serves `apps/admin`'s static build in production (a CDN,
+  nginx, a platform's static-site hosting) needs to set headers at that layer, once that
+  deployment target is chosen.
 - **PII/health-data handling policy.** As real health data (from wearables) and body-measurement
   fields become populated, this needs an explicit data-retention and deletion policy (and likely
   encryption at rest for sensitive fields) beyond what a generic PostgreSQL deployment provides
