@@ -7,11 +7,28 @@ import {
   IsString,
   validateSync,
 } from 'class-validator';
+import { DeploymentConfigValidation } from './deployment-config-validation';
+import {
+  DEPLOYMENT_ENVIRONMENTS,
+  DeploymentEnvironment,
+  resolveAscendEnv,
+} from './deployment-environment';
 
 class EnvironmentVariables {
+  // Node/Nest's own environment signal — never a fourth 'staging' value
+  // (see deployment-environment.ts's doc comment for why). Ecosystem
+  // packages branch on this for production-optimized behavior; Ascend's
+  // own "which real-world environment is this" signal is the separate
+  // ASCEND_ENV below.
   @IsIn(['development', 'test', 'production'])
   @IsOptional()
   NODE_ENV = 'development';
+
+  // S15 Part 1 — the deployment tier. See deployment-environment.ts's
+  // doc comment for the full model and the intended NODE_ENV pairing.
+  @IsIn(DEPLOYMENT_ENVIRONMENTS)
+  @IsOptional()
+  ASCEND_ENV: DeploymentEnvironment = 'development';
 
   @IsNumberString()
   @IsOptional()
@@ -198,29 +215,14 @@ class EnvironmentVariables {
   FCM_PROJECT_ID?: string;
 }
 
-// Hosts that are only ever correct for a developer's own machine —
-// mirrors the mobile app's AppConfigValidation.unsafeHosts (S14 Part 2):
-// never acceptable for DATABASE_URL or APP_PUBLIC_URL once NODE_ENV
-// claims to be production.
-const unsafeProductionHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
-
-// A short secret is crackable regardless of whether it happens to start
-// with 'dev_' — the existing prefix check below only catches the
-// specific placeholder values docker-compose.yml/.env.example ship, not
-// every weak secret an operator could type in its place.
-const MIN_JWT_SECRET_LENGTH = 32;
-
-function hostnameOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Fails fast at boot if required secrets/config are missing, per the
  * "fail fast when required secrets are absent in production" requirement.
+ * The deployment-environment-aware safety checks (S15 Part 2 — dev
+ * secrets, weak/duplicate JWT secrets, wildcard CORS, local DATABASE_URL/
+ * APP_PUBLIC_URL) live in `DeploymentConfigValidation`, which this
+ * delegates to so the same checks apply identically to staging and
+ * production — see that module's doc comment for why.
  */
 export function validateEnv(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
@@ -235,78 +237,31 @@ export function validateEnv(config: Record<string, unknown>) {
     throw new Error(`Invalid environment configuration:\n  - ${details}`);
   }
 
-  if (
-    validatedConfig.NODE_ENV === 'production' &&
-    (validatedConfig.JWT_ACCESS_SECRET.startsWith('dev_') ||
-      validatedConfig.JWT_REFRESH_SECRET.startsWith('dev_'))
-  ) {
-    throw new Error('Refusing to start in production with development JWT secrets.');
-  }
+  // resolveAscendEnv applies the safety net documented on it: an
+  // existing deployment with NODE_ENV=production but no ASCEND_ENV yet
+  // still gets treated as a real deployed environment, not silently
+  // downgraded to 'development'. Shared with configuration.ts's factory
+  // so the boot-time check and the runtime AppConfig.ascendEnv value
+  // (what ReleaseReadinessService etc. actually read) can never disagree.
+  validatedConfig.ASCEND_ENV = resolveAscendEnv(
+    config.ASCEND_ENV as string | undefined,
+    validatedConfig.NODE_ENV,
+  );
 
-  if (validatedConfig.NODE_ENV === 'production' && validatedConfig.CORS_ORIGIN === '*') {
+  const deploymentCheck = DeploymentConfigValidation.validate({
+    ascendEnv: validatedConfig.ASCEND_ENV,
+    nodeEnv: validatedConfig.NODE_ENV,
+    jwtAccessSecret: validatedConfig.JWT_ACCESS_SECRET,
+    jwtRefreshSecret: validatedConfig.JWT_REFRESH_SECRET,
+    corsOrigin: validatedConfig.CORS_ORIGIN,
+    databaseUrl: validatedConfig.DATABASE_URL,
+    appPublicUrl: validatedConfig.APP_PUBLIC_URL,
+  });
+  if (!deploymentCheck.isValid) {
     throw new Error(
-      'Refusing to start in production with CORS_ORIGIN unset or "*" — set it to an ' +
-        'explicit comma-separated allowlist of origins.',
+      `Invalid deployment configuration for ASCEND_ENV=${validatedConfig.ASCEND_ENV}:\n  - ` +
+        deploymentCheck.violations.join('\n  - '),
     );
-  }
-
-  if (validatedConfig.NODE_ENV === 'production') {
-    if (
-      validatedConfig.JWT_ACCESS_SECRET.length < MIN_JWT_SECRET_LENGTH ||
-      validatedConfig.JWT_REFRESH_SECRET.length < MIN_JWT_SECRET_LENGTH
-    ) {
-      throw new Error(
-        `Refusing to start in production with a JWT secret shorter than ${MIN_JWT_SECRET_LENGTH} ` +
-          'characters — a short secret is crackable regardless of its content.',
-      );
-    }
-
-    if (validatedConfig.JWT_ACCESS_SECRET === validatedConfig.JWT_REFRESH_SECRET) {
-      throw new Error(
-        'Refusing to start in production with JWT_ACCESS_SECRET and JWT_REFRESH_SECRET set ' +
-          'to the same value — a leaked access token secret must never also compromise refresh ' +
-          'tokens, and vice versa.',
-      );
-    }
-
-    const databaseHost = hostnameOf(validatedConfig.DATABASE_URL);
-    if (databaseHost !== null && unsafeProductionHosts.has(databaseHost)) {
-      throw new Error(
-        `Refusing to start in production with DATABASE_URL pointed at "${databaseHost}" — ` +
-          'that is a local-development-only address, not a real production database.',
-      );
-    }
-
-    const appPublicUrl = validatedConfig.APP_PUBLIC_URL?.trim();
-    if (!appPublicUrl) {
-      throw new Error(
-        'Refusing to start in production with APP_PUBLIC_URL unset — password-reset and ' +
-          'email-verification links are built from it, and there is no safe placeholder to ' +
-          'fall back to.',
-      );
-    }
-    const publicUrlParsed = (() => {
-      try {
-        return new URL(appPublicUrl);
-      } catch {
-        return null;
-      }
-    })();
-    if (publicUrlParsed === null) {
-      throw new Error(`APP_PUBLIC_URL "${appPublicUrl}" is not a valid URL.`);
-    }
-    if (publicUrlParsed.protocol !== 'https:') {
-      throw new Error(
-        `Refusing to start in production with APP_PUBLIC_URL using "${publicUrlParsed.protocol}//" ` +
-          '— it must use https://.',
-      );
-    }
-    if (unsafeProductionHosts.has(publicUrlParsed.hostname.toLowerCase())) {
-      throw new Error(
-        `Refusing to start in production with APP_PUBLIC_URL pointed at ` +
-          `"${publicUrlParsed.hostname}" — that is a local-development-only address.`,
-      );
-    }
   }
 
   return validatedConfig;

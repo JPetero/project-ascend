@@ -83,7 +83,9 @@ cp services/api/.env.example services/api/.env
 The defaults in `.env.example` work out of the box with the `docker-compose.yml` PostgreSQL
 service. For anything beyond local development, replace `JWT_ACCESS_SECRET` and
 `JWT_REFRESH_SECRET` with strong random values (e.g. `openssl rand -base64 48`) — the API refuses
-to start in `NODE_ENV=production` with the checked-in development secrets.
+to start in any deployed environment (`ASCEND_ENV=staging` or `production`, see
+[`packages/docs/staging-deployment.md`](packages/docs/staging-deployment.md#s15-part-1-correction-node_env-vs-ascend_env)
+for the `NODE_ENV`/`ASCEND_ENV` distinction) with the checked-in development secrets.
 
 ## 5. Start PostgreSQL
 

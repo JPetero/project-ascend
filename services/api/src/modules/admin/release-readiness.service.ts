@@ -13,6 +13,7 @@ import {
   SocialAuthConfig,
 } from '../../config/configuration';
 import { PrismaService } from '../../prisma/prisma.service';
+import { isDeployedEnvironment } from '../../config/deployment-environment';
 import { AscendFeatureKey } from '../feature-flags/feature-flag-registry';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 
@@ -121,13 +122,23 @@ export class ReleaseReadinessService {
 
     return {
       environment: app.nodeEnv,
+      // S15 Part 1 — the deployment tier (development | staging |
+      // production), distinct from `environment` above (which is only
+      // ever NODE_ENV's three values and can no longer tell staging and
+      // production apart now that staging correctly runs
+      // NODE_ENV=production too). Additive — `environment` is unchanged
+      // for whatever already reads it.
+      ascendEnv: app.ascendEnv,
       security: {
         usingDevJwtSecrets,
         corsWildcard,
-        // These are hard boot-time failures in production (see
-        // validateEnv) — surfaced here too so staging/dev can catch them
-        // before a production promotion, not just at production boot.
-        productionSafe: app.nodeEnv !== 'production' || (!usingDevJwtSecrets && !corsWildcard),
+        // These are hard boot-time failures for any deployed
+        // environment — staging and production alike (see
+        // DeploymentConfigValidation) — surfaced here too so a
+        // not-yet-deployed dev/test environment can catch them before
+        // ever being promoted to staging or production.
+        productionSafe:
+          !isDeployedEnvironment(app.ascendEnv) || (!usingDevJwtSecrets && !corsWildcard),
       },
       integrations: {
         mediaStorage: media.storageProvider === 's3' ? Boolean(media.s3Bucket) : true,
@@ -172,7 +183,11 @@ export class ReleaseReadinessService {
     migrations: { upToDate: boolean; pending: string[] };
     isFlagOn: (key: AscendFeatureKey) => boolean;
   }): ReadinessItem[] {
-    const isProduction = ctx.app.nodeEnv === 'production';
+    // S15 Part 1-2 — staging is a real deployed environment too now
+    // that it correctly runs NODE_ENV=production; "is this environment
+    // real enough that local-filesystem media/console email should be
+    // flagged" means isDeployedEnvironment, not nodeEnv === 'production'.
+    const isProduction = isDeployedEnvironment(ctx.app.ascendEnv);
 
     return [
       // --- Mobile / CI (not directly observable from this backend process) ---

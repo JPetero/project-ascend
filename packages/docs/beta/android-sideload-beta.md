@@ -25,13 +25,18 @@ depending on whether a staging backend has been configured yet (see
   `founder-setup-checklist.md`). This build talks to that real backend
   and is the one to use for actual testing.
 - **`ascend-development-sideload`** — if no staging backend exists
-  yet. This build only works pointed at a backend on the same machine
-  it was built for (it uses the same safe default as local
-  development), so on a real phone it will open, but most features that
-  need the network (login, syncing, everything server-backed) won't
-  work yet. It's still useful for confirming the app installs and the
-  UI renders correctly on a real device before a staging backend is
-  ready.
+  yet. This build ships with the same default API address as local
+  development, `http://10.0.2.2:3000` — but that address is an
+  **Android-emulator-only** NAT alias for "the machine the emulator is
+  running on"; it is not reachable from a real physical phone under any
+  circumstances, regardless of what network the phone is on or where
+  the backend is actually running (see `AppConfig`'s doc comment in
+  `apps/mobile/lib/core/config/app_config.dart`). So on a real phone
+  this build will open, but every network call (login, syncing,
+  everything server-backed) will simply fail to connect — not merely
+  "not work yet" as if it were pointed at something real. It's still
+  useful for confirming the app installs and the UI renders correctly
+  on a real device before a staging backend is ready.
 
 Both builds show an on-screen **STAGING** or **DEV** banner in the
 corner, so there's never any doubt which build you're looking at — a

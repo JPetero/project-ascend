@@ -50,6 +50,7 @@ describe('ReleaseReadinessService', () => {
     configValues = {
       app: {
         nodeEnv: 'development',
+        ascendEnv: 'development',
         corsOrigin: '*',
         jwt: { accessSecret: 'dev_access', refreshSecret: 'dev_refresh' },
       },
@@ -91,6 +92,7 @@ describe('ReleaseReadinessService', () => {
   it('reports productionSafe=false in production with dev secrets or wildcard CORS', async () => {
     configValues.app = {
       nodeEnv: 'production',
+      ascendEnv: 'production',
       corsOrigin: '*',
       jwt: { accessSecret: 'dev_access', refreshSecret: 'dev_refresh' },
     };
@@ -289,6 +291,7 @@ describe('ReleaseReadinessService', () => {
 
       configValues.app = {
         nodeEnv: 'production',
+        ascendEnv: 'production',
         corsOrigin: 'https://app.example.com',
         jwt: { accessSecret: 'real', refreshSecret: 'real' },
       };

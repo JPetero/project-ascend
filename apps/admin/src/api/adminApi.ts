@@ -117,6 +117,11 @@ export interface UpsertFeatureFlagInput {
 // booleans; see services/api's ReleaseReadinessService doc comment.
 export interface ReleaseReadiness {
   environment: string;
+  // S15 Part 1 — the deployment tier (development | staging |
+  // production), distinct from `environment` above (NODE_ENV's three
+  // values, which can no longer tell staging and production apart now
+  // that staging correctly runs NODE_ENV=production too).
+  ascendEnv: 'development' | 'staging' | 'production';
   security: {
     usingDevJwtSecrets: boolean;
     corsWildcard: boolean;

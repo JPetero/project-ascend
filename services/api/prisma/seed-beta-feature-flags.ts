@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { assertBetaLaunchProfileAllowed } from '../src/config/beta-launch-profile-guard';
 
 const prisma = new PrismaClient();
 
@@ -11,6 +12,16 @@ const prisma = new PrismaClient();
  * registry file, so production's defaults are untouched unless someone
  * points this script at a production database (which the guard below
  * refuses).
+ *
+ * S15 Part 3 — the guard checks `ASCEND_ENV`, not `NODE_ENV`. Staging
+ * now correctly runs `NODE_ENV=production` (see
+ * deployment-environment.ts), so a `NODE_ENV`-only guard would have
+ * refused to run against staging too — exactly the environment this
+ * script exists to seed. `ASCEND_ENV=staging` is allowed;
+ * `ASCEND_ENV=production` is refused. The guard itself lives in
+ * `src/config/beta-launch-profile-guard.ts` (with its own unit tests) so
+ * it's testable without a database connection — this script only calls
+ * it.
  *
  * Founder scenario list this maps to (see beta-blockers.md and
  * founder-setup-checklist.md for the underlying setup each depends on):
@@ -60,8 +71,7 @@ const BETA_LAUNCH_PROFILE: Array<{ key: string; enabled: boolean; description: s
   {
     key: 'RESEARCH_MODE',
     enabled: false,
-    description:
-      'Beta launch profile: off until Brave Search (and an AI provider) is configured.',
+    description: 'Beta launch profile: off until Brave Search (and an AI provider) is configured.',
   },
   {
     key: 'STORE_PURCHASES',
@@ -72,17 +82,13 @@ const BETA_LAUNCH_PROFILE: Array<{ key: string; enabled: boolean; description: s
   {
     key: 'ASCEND_PROMOTE',
     enabled: false,
-    description: 'Beta launch profile: off for the entire initial beta — depends on Store Purchases.',
+    description:
+      'Beta launch profile: off for the entire initial beta — depends on Store Purchases.',
   },
 ];
 
 async function main() {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'Refusing to run the beta feature-flag launch profile against a production environment (NODE_ENV=production). ' +
-        'This profile intentionally disables integrations a real production deployment may already have configured and enabled.',
-    );
-  }
+  assertBetaLaunchProfileAllowed(process.env.ASCEND_ENV, process.env.NODE_ENV ?? 'development');
 
   for (const flag of BETA_LAUNCH_PROFILE) {
     await prisma.featureFlag.upsert({

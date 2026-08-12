@@ -56,7 +56,10 @@ async function bootstrap() {
 
   await app.listen(appConfig.port);
   // eslint-disable-next-line no-console
-  console.log(`Project Ascend API listening on port ${appConfig.port} (env: ${appConfig.nodeEnv})`);
+  console.log(
+    `Project Ascend API listening on port ${appConfig.port} ` +
+      `(NODE_ENV: ${appConfig.nodeEnv}, ASCEND_ENV: ${appConfig.ascendEnv})`,
+  );
 }
 
 void bootstrap();

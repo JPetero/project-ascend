@@ -1,5 +1,11 @@
+import { DeploymentEnvironment, resolveAscendEnv } from './deployment-environment';
+
 export interface AppConfig {
   nodeEnv: string;
+  // S15 Part 1 — the deployment tier (development | staging |
+  // production), distinct from nodeEnv above. See
+  // deployment-environment.ts's doc comment for the full model.
+  ascendEnv: DeploymentEnvironment;
   port: number;
   corsOrigin: string;
   databaseUrl: string;
@@ -109,6 +115,7 @@ export default (): {
 } => ({
   app: {
     nodeEnv: process.env.NODE_ENV ?? 'development',
+    ascendEnv: resolveAscendEnv(process.env.ASCEND_ENV, process.env.NODE_ENV ?? 'development'),
     port: parseInt(process.env.PORT ?? '3000', 10),
     corsOrigin: process.env.CORS_ORIGIN ?? '*',
     databaseUrl: process.env.DATABASE_URL ?? '',

@@ -11,6 +11,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 const sampleReadiness = {
   environment: 'production',
+  ascendEnv: 'production',
   security: {
     usingDevJwtSecrets: false,
     corsWildcard: false,
