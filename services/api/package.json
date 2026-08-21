@@ -20,7 +20,9 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
-    "seed:beta-feature-flags": "ts-node prisma/seed-beta-feature-flags.ts"
+    "seed:beta-feature-flags": "ts-node prisma/seed-beta-feature-flags.ts",
+    "staging:bootstrap": "ts-node prisma/staging-bootstrap.ts",
+    "bootstrap:admin": "ts-node prisma/bootstrap-admin.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

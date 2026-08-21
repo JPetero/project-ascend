@@ -69,7 +69,15 @@ variable can never silently weaken protection, only an explicit
    boot, and after every subsequent deploy that adds a migration — or
    run `pnpm staging:bootstrap` (S15 Part 8), which does this plus the
    reference-data and beta-feature-profile seeds in the correct order.
-4. Confirm `GET /livez` (process alive, no database check) and
+4. Create the first admin account:
+   `ADMIN_BOOTSTRAP_EMAIL=you@example.com pnpm bootstrap:admin` (S15
+   Part 9). No credentials are hardcoded anywhere — supply
+   `ADMIN_BOOTSTRAP_PASSWORD` yourself (16+ chars) or omit it and a
+   strong one is generated and printed exactly once. The script refuses
+   to run if any admin already exists, so it can safely stay in the
+   image; every subsequent admin is promoted from the Admin app by an
+   account holding `MANAGE_ADMINS`.
+5. Confirm `GET /livez` (process alive, no database check) and
    `GET /readyz` (database-aware — S14 Part 6 split these apart; the
    older `GET /health` still exists as an alias identical to `/readyz`,
    kept only for anything already pointed at it) both return
