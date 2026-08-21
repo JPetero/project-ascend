@@ -19,12 +19,23 @@ message instead of the feature just being absent.
 registry file, so production keeps the registry's defaults unless an
 admin explicitly changes them — this only ever affects whichever database
 `DATABASE_URL` points at when you run it, and refuses to run at all
-against `NODE_ENV=production`.
+against `ASCEND_ENV=production`.
+
+*(S15 Part 3 corrected that guard: it previously checked
+`NODE_ENV=production`, which would have refused to run against staging
+too — since staging correctly runs `NODE_ENV=production` — i.e. against
+exactly the environment this script exists to seed. See
+[staging-deployment.md](../staging-deployment.md#s15-part-1-correction-node_env-vs-ascend_env).)*
 
 ```bash
 cd services/api
-DATABASE_URL=<staging database URL> pnpm seed:beta-feature-flags
+DATABASE_URL=<staging database URL> ASCEND_ENV=staging pnpm seed:beta-feature-flags
 ```
+
+This profile is exactly the **Stage B** feature set — see
+[release-stages.md](release-stages.md) for what each release stage does
+and does not require. Every flag below being off at Stage B is the
+intended configuration, not a gap.
 
 ### ON for the first beta (no flag exists — always on)
 

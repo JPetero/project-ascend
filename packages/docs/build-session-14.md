@@ -123,9 +123,18 @@ migration `20260811185814_add_re_engagement_reminders_preference`).
 Retention win-back notifications previously piggybacked on the general
 `socialNotifications` preference — a user who wanted friend/community
 notifications but not marketing-style win-back nudges had no way to
-separate the two. Added a dedicated, defaulted-`true`, explicitly
-opt-in-able `reEngagementReminders` column and wired it through the
+separate the two. Added a dedicated, explicitly opt-**in**
+`reEngagementReminders` column and wired it through the
 notification-preferences API and mobile UI.
+
+*(S15 Part 6 — corrected a typo in this paragraph, which previously read
+"defaulted-`true`". The column's actual default is `false`, as an
+opt-in preference must be: see `schema.prisma`'s
+`reEngagementReminders Boolean @default(false)`, migration
+`20260811185814_add_re_engagement_reminders_preference`, and the
+`notifications.e2e-spec.ts` assertion that a fresh user reads back
+`false`. Only the sentence was wrong — the schema and behavior were
+always correct, and nothing about them was changed.)*
 
 ## Part 9 — Retention job single-execution safety + query scaling
 
