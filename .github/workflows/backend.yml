@@ -116,3 +116,137 @@ jobs:
           tags: project-ascend-migrate:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # S15 Part 10 — an image that builds is not the same as an image
+      # that starts. These two checks are deliberately narrow: they prove
+      # the entrypoint resolves and the process comes up far enough to
+      # report a real error, without needing a database. The full
+      # database-backed round trip is the ephemeral integration workflow's
+      # job (staging-integration.yml, S15 Part 16).
+      - name: Verify the runtime image starts and fails loudly on bad config
+        run: |
+          # No DATABASE_URL/JWT secrets: validateEnv must reject this and
+          # exit non-zero rather than booting a half-configured API. A
+          # zero exit here would mean the fail-fast contract is broken.
+          if docker run --rm project-ascend-api:ci > runtime.log 2>&1; then
+            echo "API image started WITHOUT required config — fail-fast is broken." >&2
+            cat runtime.log >&2
+            exit 1
+          fi
+          # Either message satisfies the contract being tested here, and
+          # which one appears depends on how much config happens to be
+          # present: a wholly empty environment fails class-validator's
+          # required-field check first ("Invalid environment
+          # configuration"), while an environment that supplies the
+          # required fields with unsafe values reaches
+          # DeploymentConfigValidation ("Invalid deployment
+          # configuration"). Matching only one would make this step
+          # brittle against a change in either direction.
+          grep -qE "Invalid (environment|deployment) configuration" runtime.log || {
+            echo "API image exited non-zero, but not from config validation:" >&2
+            cat runtime.log >&2
+            exit 1
+          }
+          echo "Runtime image correctly refused to boot without required config."
+
+      - name: Verify the migrate image resolves its entrypoint
+        run: |
+          # Points at a host that cannot exist, so this can only fail at
+          # connection time — proving prisma itself is present and
+          # runnable in the pruned image, which is what this image is for.
+          docker run --rm \
+            -e DATABASE_URL="postgresql://u:p@unreachable.invalid:5432/db" \
+            project-ascend-migrate:ci > migrate.log 2>&1 && {
+              echo "Migrate image unexpectedly succeeded against an unreachable host." >&2
+              exit 1
+            }
+          if grep -qiE "not found|no such file|cannot find module" migrate.log; then
+            echo "Migrate image failed to resolve its entrypoint/tooling:" >&2
+            cat migrate.log >&2
+            exit 1
+          fi
+          echo "Migrate image ran prisma and failed at connection time, as expected."
+          cat migrate.log
+
+  # S15 Part 11 — publish the API and migrate images to GitHub Container
+  # Registry so a staging host has something real to pull. Without this,
+  # "deploy the staging API" means "clone the repo and build on the box",
+  # which is slower, needs a toolchain in production, and can silently
+  # deploy something different from what CI verified.
+  #
+  # Guarded three ways: only on a push to main (never a PR, never a
+  # fork), only after both the test and docker-build jobs pass, and
+  # using the workflow's own GITHUB_TOKEN — no long-lived registry
+  # credential exists or needs to be created.
+  publish-images:
+    runs-on: ubuntu-latest
+    needs: [lint-test-build, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lowercased because GHCR rejects uppercase repository names, and
+      # a GitHub org/user can legitimately contain them.
+      - name: Compute image names
+        id: names
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "api=ghcr.io/${owner}/project-ascend-api" >> "$GITHUB_OUTPUT"
+          echo "migrate=ghcr.io/${owner}/project-ascend-migrate" >> "$GITHUB_OUTPUT"
+
+      - name: Publish runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: runtime
+          push: true
+          # Both a moving `main` tag and an immutable per-commit SHA tag:
+          # the SHA tag is what a staging deploy should actually pin to,
+          # so a redeploy is reproducible and a rollback is a real target
+          # rather than "whatever main pointed at yesterday".
+          tags: |
+            ${{ steps.names.outputs.api }}:main
+            ${{ steps.names.outputs.api }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: migrate
+          push: true
+          tags: |
+            ${{ steps.names.outputs.migrate }}:main
+            ${{ steps.names.outputs.migrate }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summarize what was published
+        run: |
+          {
+            echo "### Published images"
+            echo ""
+            echo "| Image | Tags |"
+            echo "|---|---|"
+            echo "| \`${{ steps.names.outputs.api }}\` | \`main\`, \`${{ github.sha }}\` |"
+            echo "| \`${{ steps.names.outputs.migrate }}\` | \`main\`, \`${{ github.sha }}\` |"
+            echo ""
+            echo "Pin a staging deploy to the SHA tag, not \`main\` — see"
+            echo "\`infrastructure/staging/README.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"

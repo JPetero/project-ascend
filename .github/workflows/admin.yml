@@ -5,10 +5,16 @@ on:
     branches: [main]
     paths:
       - "apps/admin/**"
+      # S15 Part 10 — admin.Dockerfile and nginx-admin.conf live here, so
+      # a change to either must trigger this workflow's docker-build job.
+      # Without this filter, the admin image could break in a commit that
+      # never ran the job that builds it.
+      - "infrastructure/docker/**"
       - ".github/workflows/admin.yml"
   pull_request:
     paths:
       - "apps/admin/**"
+      - "infrastructure/docker/**"
       - ".github/workflows/admin.yml"
 
 jobs:
@@ -44,3 +50,54 @@ jobs:
         env:
           VITE_API_BASE_URL: https://ci-placeholder.invalid
         run: pnpm admin:build
+
+  # S15 Part 10 — admin.Dockerfile carried a comment saying it was "not
+  # build-verified in this sandbox" (true: no privileged Docker daemon is
+  # available here). That is exactly why it needs to be built in real CI,
+  # where a daemon does exist — an unbuilt Dockerfile is an untested one,
+  # and the staging deployment bundle depends on this image existing.
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build admin runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/admin.Dockerfile
+          target: runtime
+          push: false
+          load: true
+          tags: project-ascend-admin:ci
+          # Same CI-only placeholder the Build step above uses: proves the
+          # ARG/ENV plumbing works end to end without baking a real host
+          # into a throwaway image.
+          build-args: |
+            VITE_API_BASE_URL=https://ci-placeholder.invalid
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Proves the image actually runs, not merely that it built — a
+      # static-asset image that builds but serves nothing is a real
+      # failure mode (wrong dist path, bad nginx config). nginx-unprivileged
+      # listens on 8080.
+      - name: Verify the image serves the built admin bundle
+        run: |
+          docker run -d --name admin-ci -p 8080:8080 project-ascend-admin:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/ > /dev/null; then
+              echo "Admin image served a response after ${i}s."
+              curl -fsS http://127.0.0.1:8080/ | head -c 400
+              docker rm -f admin-ci
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Admin image never served a response on :8080 — dumping logs." >&2
+          docker logs admin-ci >&2
+          docker rm -f admin-ci
+          exit 1
