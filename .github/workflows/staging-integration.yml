@@ -1,0 +1,210 @@
+name: Staging Integration
+
+# S15 Part 15-16 — stands up the real Docker images against a real
+# PostgreSQL, in an ephemeral container, and runs the same smoke test
+# that a real staging deployment is verified with.
+#
+# This is the closest thing to a genuine staging deployment that can be
+# proven in CI without external infrastructure. It exercises what unit
+# and e2e tests structurally cannot:
+#
+#   - that the built IMAGES work, not just the source tree (the e2e suite
+#     runs against ts-node, never against the pruned runtime image);
+#   - that the migrate image can actually apply migrations to an empty
+#     database (this is exactly where S15 found a real bug: the image's
+#     pnpm symlinks dangled and it had never once run);
+#   - that the API boots with ASCEND_ENV=staging and the deployed-
+#     environment config validation passes rather than hard-failing;
+#   - that staging:smoke itself still matches the API's real response
+#     shapes, so the script a Founder runs against a live host is known
+#     to work rather than assumed to.
+#
+# It does NOT prove a real staging deployment works — there is no public
+# host, no TLS, and no DNS here. Never report this workflow passing as
+# "staging is VERIFIED".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - "infrastructure/**"
+      - ".github/workflows/staging-integration.yml"
+  pull_request:
+    paths:
+      - "services/api/**"
+      - "infrastructure/**"
+      - ".github/workflows/staging-integration.yml"
+  workflow_dispatch:
+
+jobs:
+  ephemeral-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # A user-defined bridge network gives containers DNS resolution by
+      # name, so DATABASE_URL can use `ascend-pg` as the host. That also
+      # keeps it out of DeploymentConfigValidation's unsafe-host set
+      # (localhost/127.0.0.1/0.0.0.0), which a deployed environment
+      # correctly refuses — the same rule a real staging box lives under.
+      - name: Create network and start PostgreSQL
+        run: |
+          docker network create ascend-ci
+          # Published to the host as well as attached to the network: the
+          # API container reaches it as `ascend-pg`, while the seed and
+          # bootstrap scripts (which run on the runner, not in a
+          # container) reach the same database on 127.0.0.1.
+          docker run -d --name ascend-pg --network ascend-ci -p 5432:5432 \
+            -e POSTGRES_USER=ascend \
+            -e POSTGRES_PASSWORD=ci_ephemeral_password \
+            -e POSTGRES_DB=ascend_staging_ci \
+            --health-cmd "pg_isready -U ascend -d ascend_staging_ci" \
+            --health-interval 3s --health-timeout 5s --health-retries 20 \
+            postgres:16-alpine
+
+          echo "Waiting for PostgreSQL to become healthy..."
+          for i in $(seq 1 40); do
+            state="$(docker inspect -f '{{.State.Health.Status}}' ascend-pg)"
+            if [ "$state" = "healthy" ]; then
+              echo "PostgreSQL healthy after ${i}s."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL never became healthy." >&2
+          docker logs ascend-pg >&2
+          exit 1
+
+      - name: Build API and migrate images
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: runtime
+          push: false
+          load: true
+          tags: project-ascend-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/api.Dockerfile
+          target: migrate
+          push: false
+          load: true
+          tags: project-ascend-migrate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The step that would have caught S15's migrate-image bug on day
+      # one: run it for real against an empty database and require it to
+      # succeed.
+      - name: Apply migrations using the migrate image
+        run: |
+          docker run --rm --network ascend-ci \
+            -e DATABASE_URL="postgresql://ascend:ci_ephemeral_password@ascend-pg:5432/ascend_staging_ci?schema=public" \
+            project-ascend-migrate:ci
+
+      - name: Start the API image as a staging deployment
+        run: |
+          docker run -d --name ascend-api --network ascend-ci -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e ASCEND_ENV=staging \
+            -e PORT=3000 \
+            -e DATABASE_URL="postgresql://ascend:ci_ephemeral_password@ascend-pg:5432/ascend_staging_ci?schema=public" \
+            -e JWT_ACCESS_SECRET="ci-ephemeral-access-secret-long-enough-to-pass" \
+            -e JWT_REFRESH_SECRET="ci-ephemeral-refresh-secret-long-enough-to-pass" \
+            -e CORS_ORIGIN="https://ci.invalid" \
+            -e APP_PUBLIC_URL="https://ci.invalid" \
+            project-ascend-api:ci
+
+          echo "Waiting for the API to answer /livez..."
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/livez > /dev/null 2>&1; then
+              echo "API answering after ${i}s."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API never became reachable — dumping logs." >&2
+          docker logs ascend-api >&2
+          exit 1
+
+      # Seeding runs from the source tree, not the runtime image: the
+      # runtime image is deliberately pruned of ts-node and the Prisma
+      # CLI. This mirrors what infrastructure/staging/README.md tells an
+      # operator to do, so the documented procedure is the tested one.
+      - name: Install workspace dependencies for the seed/smoke scripts
+        run: pnpm install --filter @project-ascend/api... --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @project-ascend/api prisma:generate
+
+      - name: Seed reference data and the Stage B feature profile
+        env:
+          DATABASE_URL: postgresql://ascend:ci_ephemeral_password@127.0.0.1:5432/ascend_staging_ci?schema=public
+          ASCEND_ENV: staging
+        run: |
+          pnpm --filter @project-ascend/api prisma:seed
+          pnpm --filter @project-ascend/api seed:beta-feature-flags
+
+      - name: Create the first admin
+        env:
+          DATABASE_URL: postgresql://ascend:ci_ephemeral_password@127.0.0.1:5432/ascend_staging_ci?schema=public
+          ASCEND_ENV: staging
+          ADMIN_BOOTSTRAP_EMAIL: ci-admin@ci.invalid
+          ADMIN_BOOTSTRAP_PASSWORD: ci-ephemeral-admin-password-long-enough
+        run: pnpm --filter @project-ascend/api bootstrap:admin
+
+      # The payoff: the exact script a Founder runs against a real
+      # staging host, run against a real running deployment here.
+      - name: Smoke-test the ephemeral deployment
+        env:
+          STAGING_ADMIN_EMAIL: ci-admin@ci.invalid
+          STAGING_ADMIN_PASSWORD: ci-ephemeral-admin-password-long-enough
+        run: |
+          pnpm --filter @project-ascend/api staging:smoke \
+            --base-url http://127.0.0.1:3000 \
+            --admin-email "$STAGING_ADMIN_EMAIL" \
+            --admin-password "$STAGING_ADMIN_PASSWORD"
+
+      - name: Dump API logs on failure
+        if: failure()
+        run: |
+          echo "=== API ==="; docker logs ascend-api 2>&1 | tail -100
+          echo "=== PostgreSQL ==="; docker logs ascend-pg 2>&1 | tail -50
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker rm -f ascend-api ascend-pg 2>/dev/null || true
+          docker network rm ascend-ci 2>/dev/null || true
+
+      - name: Summarize
+        if: success()
+        run: |
+          {
+            echo "### Ephemeral staging integration passed"
+            echo ""
+            echo "Built images, applied migrations with the migrate image against an"
+            echo "empty database, booted the API with \`ASCEND_ENV=staging\`, seeded"
+            echo "reference data, bootstrapped an admin, and passed \`staging:smoke\`."
+            echo ""
+            echo "This does **not** mean a real staging environment is verified —"
+            echo "there is no public host, no TLS, and no DNS here."
+          } >> "$GITHUB_STEP_SUMMARY"

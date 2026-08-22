@@ -22,7 +22,8 @@
     "prisma:seed": "prisma db seed",
     "seed:beta-feature-flags": "ts-node prisma/seed-beta-feature-flags.ts",
     "staging:bootstrap": "ts-node prisma/staging-bootstrap.ts",
-    "bootstrap:admin": "ts-node prisma/bootstrap-admin.ts"
+    "bootstrap:admin": "ts-node prisma/bootstrap-admin.ts",
+    "staging:smoke": "ts-node scripts/staging-smoke.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
