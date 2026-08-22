@@ -1,0 +1,4 @@
+# The filled-in env file carries real staging secrets (database password,
+# JWT signing secrets). Only the template is ever committed.
+.env.staging
+.env

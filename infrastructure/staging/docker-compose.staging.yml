@@ -1,0 +1,135 @@
+# Project Ascend — staging deployment bundle (S15 Part 12)
+#
+# Deliberately NOT the root docker-compose.yml. That file is a local
+# development convenience: it hardcodes dev secrets, exposes Postgres on
+# the host, runs pgadmin, and builds images from source. Every one of
+# those is wrong for a real internet-reachable staging box, and quietly
+# reusing it is exactly how a staging deployment ends up with
+# `dev_access_secret_change_me` signing real tokens.
+#
+# Differences from the root compose file, all deliberate:
+#   - Pulls published GHCR images instead of building from source, so
+#     staging runs the exact artifact CI verified (S15 Part 11).
+#   - Every secret comes from the environment. Nothing is hardcoded and
+#     nothing has a default — a missing value fails the deploy rather
+#     than silently substituting something unsafe.
+#   - Postgres is NOT published to the host. It is reachable only on the
+#     internal compose network.
+#   - The API is bound to 127.0.0.1, so the only path in is the reverse
+#     proxy that terminates TLS — see reverse-proxy-tls-contract.md.
+#   - No pgadmin. A database admin UI on a public host is a liability.
+#
+# Usage:
+#   cp .env.staging.template .env.staging   # then fill it in
+#   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+#
+# See README.md in this directory for the full procedure.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ascend-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    # No `ports:` mapping on purpose — nothing outside this compose
+    # network should be able to reach the database directly.
+    volumes:
+      - ascend_staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: applies pending migrations, then exits. The api service
+  # will not start until this exits 0, so the schema is always in sync
+  # before anything serves traffic.
+  migrate:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER is required}/project-ascend-migrate:${IMAGE_TAG:?IMAGE_TAG is required — pin a commit SHA, not "main"}
+    container_name: ascend-staging-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    restart: "no"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  api:
+    image: ghcr.io/${GHCR_OWNER}/project-ascend-api:${IMAGE_TAG}
+    container_name: ascend-staging-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # Staging runs Node in production mode and declares itself staging
+      # via ASCEND_ENV — see packages/docs/staging-deployment.md. Both are
+      # fixed here rather than templated: getting either wrong is the P0
+      # this whole bundle exists downstream of.
+      NODE_ENV: production
+      ASCEND_ENV: staging
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required — an explicit allowlist, never "*"}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:?APP_PUBLIC_URL is required — the real https:// URL}
+      # Optional integrations. Empty is a valid, intended Stage B value
+      # for every one of these — see release/staging-config-contract.md.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Project Ascend (Staging)}
+      MEDIA_STORAGE_PROVIDER: ${MEDIA_STORAGE_PROVIDER:-local}
+      MEDIA_S3_ENDPOINT: ${MEDIA_S3_ENDPOINT:-}
+      MEDIA_S3_REGION: ${MEDIA_S3_REGION:-}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-}
+      MEDIA_S3_ACCESS_KEY_ID: ${MEDIA_S3_ACCESS_KEY_ID:-}
+      MEDIA_S3_SECRET_ACCESS_KEY: ${MEDIA_S3_SECRET_ACCESS_KEY:-}
+      MEDIA_S3_PUBLIC_BASE_URL: ${MEDIA_S3_PUBLIC_BASE_URL:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+      FCM_SERVICE_ACCOUNT_JSON: ${FCM_SERVICE_ACCOUNT_JSON:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      APPLE_IAP_SHARED_SECRET: ${APPLE_IAP_SHARED_SECRET:-}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_PLAY_PACKAGE_NAME: ${GOOGLE_PLAY_PACKAGE_NAME:-}
+    # Bound to loopback only: the reverse proxy in front of this is the
+    # sole ingress, and it is what terminates TLS. Publishing 0.0.0.0:3000
+    # here would expose the API over plaintext HTTP to the internet,
+    # bypassing the proxy entirely.
+    ports:
+      - "127.0.0.1:3000:3000"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  admin:
+    image: ghcr.io/${GHCR_OWNER}/project-ascend-admin:${IMAGE_TAG}
+    container_name: ascend-staging-admin
+    restart: unless-stopped
+    # Same loopback-only reasoning as the api service. nginx-unprivileged
+    # listens on 8080 inside the container.
+    ports:
+      - "127.0.0.1:8080:8080"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  ascend_staging_pgdata:

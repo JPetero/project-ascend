@@ -34,7 +34,21 @@ RUN set -eu; \
 # --prod-filter) services/api install from the build stage so the Prisma
 # CLI (a devDependency, deliberately absent from the runtime image) is
 # available, without re-running `pnpm install` a second time.
+#
+# S15 Part 10 — the root /workspace/node_modules copy below is REQUIRED,
+# not an optimization. pnpm does not place real package directories under
+# services/api/node_modules; it places symlinks pointing up and out, e.g.
+#   services/api/node_modules/prisma
+#     -> ../../../node_modules/.pnpm/prisma@5.22.0/node_modules/prisma
+# Copying only services/api therefore produced an image whose `prisma`
+# symlink dangled, and the container died instantly with
+# "Cannot find module '/workspace/services/api/node_modules/prisma/build/index.js'".
+# This image had never actually run — the previous CI job built it but
+# never started it, so nothing caught it until S15 added a real run check
+# (observed failing in run 32548370176). Both paths must be copied
+# together so the relative symlinks resolve.
 FROM base AS migrate
+COPY --from=build /workspace/node_modules node_modules
 COPY --from=build /workspace/services/api services/api
 WORKDIR /workspace/services/api
 CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
