@@ -19,7 +19,7 @@ jobs:
         working-directory: apps/mobile
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -56,7 +56,7 @@ jobs:
         working-directory: apps/mobile
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -129,7 +129,7 @@ jobs:
       HAS_PRODUCTION_SECRETS: ${{ secrets.ASCEND_KEYSTORE_BASE64 != '' && secrets.ASCEND_KEYSTORE_PASSWORD != '' && secrets.ASCEND_KEY_ALIAS != '' && secrets.ASCEND_KEY_PASSWORD != '' && secrets.PROD_API_BASE_URL != '' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: ${{ env.HAS_PRODUCTION_SECRETS == 'true' }}
 
       - uses: subosito/flutter-action@v2
