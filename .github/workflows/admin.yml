@@ -65,7 +65,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build admin runtime image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/admin.Dockerfile
@@ -149,7 +149,7 @@ jobs:
           fi
 
       - name: Publish admin image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/admin.Dockerfile

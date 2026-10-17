@@ -94,7 +94,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build runtime image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/api.Dockerfile
@@ -106,7 +106,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build migrate image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/api.Dockerfile
@@ -208,7 +208,7 @@ jobs:
           echo "migrate=ghcr.io/${owner}/project-ascend-migrate" >> "$GITHUB_OUTPUT"
 
       - name: Publish runtime image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/api.Dockerfile
@@ -225,7 +225,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Publish migrate image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: infrastructure/docker/api.Dockerfile
